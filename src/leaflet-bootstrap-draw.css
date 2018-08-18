@@ -1,0 +1,16 @@
+/***********************************************
+	leaflet-bootstrap-draw.scss,
+
+	(c) 2018, FCOO
+
+	https://github.com/FCOO/leaflet-bootstrap-draw
+	https://github.com/FCOO
+
+
+************************************************/
+.lbm-draw {
+  border-width: 3px; }
+
+.leaflet-dragging .hide-on-leaflet-dragging,
+.leaflet-dragging .leaflet-tooltip {
+  display: none; }

@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="da" style="font-size: 100%">
+<head>
+    <title>fcoo.dk - leaflet-bootstrap-draw - Demo</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv='x-dns-prefetch-control' content='on'>
+
+    <meta name='copyright' content='FCOO'>
+    <meta name='owner' content='FCOO'>
+
+    <link  href="bower_components.css" rel="stylesheet">
+    <link  href="../src/leaflet-bootstrap-draw.css" rel="stylesheet">
+    <link  href="css/fontawesome-all.css" rel="stylesheet">
+    <style>
+        html, body, #map {
+            padding: 0; margin: 0; width:100%; height:100%;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div id="map" style="_width: 800px; _height: 800px"></div>
+
+
+
+
+    <script src="bower_components.js"></script>
+    <script src="../src/leaflet-latlng-point.js"></script>
+
+    <script src="../src/leaflet-bootstrap-geopolyline.js"></script>
+
+    <script src="../src/leaflet-polyline.js"></script>
+    <script src="../src/leaflet-bootstrap-draw.js"></script>
+
+    <script src="../src/leaflet-marker-vessel.js"></script>
+
+
+
+    <script>
+    window.bsIsTouch = false;
+    window.bsIsTouch = (window.location.search =='?touch');
+
+		$(function() {
+            i18next.init();
+            i18next.changeLanguage('en');
+
+            var map = L.map('map', {
+                drawControl: false,
+                noWrap: true,
+                maxZoom: 18,
+                minZoom: 3
+            }).setView([37.77, 22.43], 6);
+
+            L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {noWrap: false, minZoom: 3, maxZoom: 18,attribution: '&copy; <a href="http://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors</a>'}).addTo(map);
+
+
+$(map._container)
+    .removeClass('leaflet-grab')
+//    .addClass('leaflet-interactive');
+
+var latlngs = [
+        [37.77, 22.43],
+        [34.04, 18.2],
+        [40.78, 3.91],
+        [41.83, 7.62],
+        [32.76, 6.72]
+];
+var latlngs2 = [
+    [45.51, -122.68],
+    [40.78, -73.91],
+     [32.76, -96.72]
+];
+
+var route = new L.Route({
+        list: latlngs,
+        isPolygon: false,
+        onUpdate: function( list, currentPoint ){
+            console.log(list.getDistance());
+        },
+        events: {
+            dragstart: function( type, x, y){
+                //console.log(type, x, y);
+            },
+            dragend: function( type, x, y){
+                //console.log(type, x, y);
+            }
+        }
+    });
+
+route.addVessel(1000*1000, {color: "red", shape: 'airplane'});
+route.addVessel(2000*1000, {color: "pink", shape: 'boat'});
+var greenPlane;
+route.addVessel(3000*1000, {color: "yellow", shape: 'airplane'});
+
+
+
+
+
+
+
+L.control.bsButton({text:'Rediger', onClick: function(){
+    route.setInteractiveOn();
+}}).addTo(map);
+
+L.control.bsButton({text:'OK (Stop redigering)', onClick: function(){
+    route.setInteractiveOff();
+}}).addTo(map);
+
+L.control.bsButton({text:'Cancel (Afbryd redigering)', onClick: function(){
+    route.setInteractiveOff();
+    route.restore();
+}}).addTo(map);
+
+L.control.bsButton({text:'Skift polygon', onClick: function(){
+    route.setPolygon();
+}}).addTo(map);
+
+L.control.bsButton({text:'Skift rhumb', onClick: function(){
+    route.setRhumb();
+}}).addTo(map);
+
+L.control.bsButton({text:'Add to map', onClick: function(){
+    route.addTo(map);
+}}).addTo(map);
+
+L.control.bsButton({text:'Remove from map', onClick: function(){
+    route.remove();
+}}).addTo(map);
+
+L.control.bsButton({text:'Add 35,20', onClick: function(){
+    route.appendLatLng([35,20]);
+}}).addTo(map);
+
+
+L.control.bsButton({text:'Add green airplane', onClick: function(){
+    greenPlane = route.addVessel(2500*1000, {color: "green", shape: 'airplane'});
+}}).addTo(map);
+
+L.control.bsButton({text:'Remove green airplane', onClick: function(){
+    route.removeVessel(greenPlane);
+}}).addTo(map);
+
+
+
+
+
+});
+
+    </script>
+</body>
+</html>
