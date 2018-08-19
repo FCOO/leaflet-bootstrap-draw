@@ -1,5 +1,5 @@
 /****************************************************************************
-leaflet-latlng-geopolyline.js
+leaflet-latlng-pointConstructor.js
 
 Object representing a list of LatLng that represent a polyline or polygon
 ****************************************************************************/
