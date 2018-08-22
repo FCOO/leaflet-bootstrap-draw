@@ -1064,9 +1064,10 @@ Object representing a polyline or polygon as Geodesic
         *****************************************************/
         onRestore: function( backupObj ){
             //Remove current vessels
-            $.each( this.vesselList, function( dummy, vessel ){
+            $.each( this.vesselList, function( index, vessel ){
                 vessel.remove();
             });
+            this.vesselList = [];
 
             //Restore vesselList
             var _this = this;
@@ -1355,7 +1356,7 @@ ctx.fillRect(0, 0, shapeDim, shapeDim);
 
     //Default options
         options: {
-            VERSION: "0.1.1"
+            VERSION: "0.1.2"
 
         },
 

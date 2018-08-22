@@ -88,8 +88,8 @@ var route = new L.Route({
     });
 
 route.addVessel(1000*1000, {color: "red", shape: 'airplane'});
-route.addVessel(2000*1000, {color: "pink", shape: 'boat'});
-var greenPlane;
+var pinkBoat = route.addVessel(2000*1000, {color: "pink", shape: 'boat'});
+var greenPlaneIndex;
 route.addVessel(3000*1000, {color: "yellow", shape: 'airplane'});
 
 
@@ -132,12 +132,24 @@ L.control.bsButton({text:'Add 35,20', onClick: function(){
 }}).addTo(map);
 
 
+L.control.bsButton({text:'Pink boat + 100km', onClick: function(){
+    pinkBoat = route.vesselList[1];
+    pinkBoat.distance = pinkBoat.distance + 100*1000;
+    pinkBoat.update();
+}}).addTo(map);
+L.control.bsButton({text:'Pink boat - 100km', onClick: function(){
+    pinkBoat = route.vesselList[1];
+    pinkBoat.distance = pinkBoat.distance - 100*1000;
+    pinkBoat.update();
+}}).addTo(map);
+
+
 L.control.bsButton({text:'Add green airplane', onClick: function(){
-    greenPlane = route.addVessel(2500*1000, {color: "green", shape: 'airplane'});
+    greenPlaneIndex = route.addVessel(2500*1000, {color: "green", shape: 'airplane'});
 }}).addTo(map);
 
 L.control.bsButton({text:'Remove green airplane', onClick: function(){
-    route.removeVessel(greenPlane);
+    route.removeVessel(greenPlaneIndex);
 }}).addTo(map);
 
 

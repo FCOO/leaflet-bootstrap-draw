@@ -580,9 +580,10 @@ Object representing a polyline or polygon as Geodesic
         *****************************************************/
         onRestore: function( backupObj ){
             //Remove current vessels
-            $.each( this.vesselList, function( dummy, vessel ){
+            $.each( this.vesselList, function( index, vessel ){
                 vessel.remove();
             });
+            this.vesselList = [];
 
             //Restore vesselList
             var _this = this;
