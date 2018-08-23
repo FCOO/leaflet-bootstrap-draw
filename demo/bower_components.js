@@ -1,5 +1,5 @@
 /* @preserve
- * Leaflet 1.3.3, a JS library for interactive maps. http://leafletjs.com
+ * Leaflet 1.3.4, a JS library for interactive maps. http://leafletjs.com
  * (c) 2010-2018 Vladimir Agafonkin, (c) 2010-2011 CloudMade
  */
 
@@ -9,7 +9,7 @@
 	(factory((global.L = {})));
 }(this, (function (exports) { 'use strict';
 
-var version = "1.3.3";
+var version = "1.3.4";
 
 /*
  * @namespace Util
@@ -2221,7 +2221,7 @@ function removeDoubleTapListener(obj, id) {
 // @property TRANSFORM: String
 // Vendor-prefixed transform style name (e.g. `'webkitTransform'` for WebKit).
 var TRANSFORM = testProp(
-	['transform', 'WebkitTransform', 'OTransform', 'MozTransform', 'msTransform']);
+	['transform', 'webkitTransform', 'OTransform', 'MozTransform', 'msTransform']);
 
 // webkitTransition comes first because some browser versions that drop vendor prefix don't do
 // the same for the transitionend event, in particular the Android 4.1 stock browser
@@ -5369,6 +5369,10 @@ Map.mergeOptions({
 
 Map.addInitHook(function () {
 	if (this.options.zoomControl) {
+		// @section Controls
+		// @property zoomControl: Control.Zoom
+		// The default zoom control (only available if the
+		// [`zoomControl` option](#map-zoomcontrol) was `true` when creating the map).
 		this.zoomControl = new Zoom();
 		this.addControl(this.zoomControl);
 	}
@@ -7014,7 +7018,7 @@ var Icon = Class.extend({
 
 	options: {
 		popupAnchor: [0, 0],
-		tooltipAnchor: [0, 0],
+		tooltipAnchor: [0, 0]
 	},
 
 	initialize: function (options) {
@@ -7330,22 +7334,6 @@ var Marker = Layer.extend({
 		// Option inherited from "Interactive layer" abstract class
 		interactive: true,
 
-		// @option draggable: Boolean = false
-		// Whether the marker is draggable with mouse/touch or not.
-		draggable: false,
-
-		// @option autoPan: Boolean = false
-		// Set it to `true` if you want the map to do panning animation when marker hits the edges.
-		autoPan: false,
-
-		// @option autoPanPadding: Point = Point(50, 50)
-		// Equivalent of setting both top left and bottom right autopan padding to the same value.
-		autoPanPadding: [50, 50],
-
-		// @option autoPanSpeed: Number = 10
-		// Number of pixels the map should move by.
-		autoPanSpeed: 10,
-
 		// @option keyboard: Boolean = true
 		// Whether the marker can be tabbed to with a keyboard and clicked by pressing enter.
 		keyboard: true,
@@ -7381,7 +7369,25 @@ var Marker = Layer.extend({
 		// @option bubblingMouseEvents: Boolean = false
 		// When `true`, a mouse event on this marker will trigger the same event on the map
 		// (unless [`L.DomEvent.stopPropagation`](#domevent-stoppropagation) is used).
-		bubblingMouseEvents: false
+		bubblingMouseEvents: false,
+
+		// @section Draggable marker options
+		// @option draggable: Boolean = false
+		// Whether the marker is draggable with mouse/touch or not.
+		draggable: false,
+
+		// @option autoPan: Boolean = false
+		// Whether to pan the map when dragging this marker near its edge or not.
+		autoPan: false,
+
+		// @option autoPanPadding: Point = Point(50, 50)
+		// Distance (in pixels to the left/right and to the top/bottom) of the
+		// map edge to start panning the map.
+		autoPanPadding: [50, 50],
+
+		// @option autoPanSpeed: Number = 10
+		// Number of pixels the map should pan by.
+		autoPanSpeed: 10
 	},
 
 	/* @section
@@ -8963,12 +8969,12 @@ var ImageOverlay = Layer.extend({
 		errorOverlayUrl: '',
 
 		// @option zIndex: Number = 1
-		// The explicit [zIndex](https://developer.mozilla.org/docs/Web/CSS/CSS_Positioning/Understanding_z_index) of the tile layer.
+		// The explicit [zIndex](https://developer.mozilla.org/docs/Web/CSS/CSS_Positioning/Understanding_z_index) of the overlay layer.
 		zIndex: 1,
 
 		// @option className: String = ''
 		// A custom class name to assign to the image. Empty by default.
-		className: '',
+		className: ''
 	},
 
 	initialize: function (url, bounds, options) { // (String, LatLngBounds, Object)
@@ -9074,7 +9080,7 @@ var ImageOverlay = Layer.extend({
 		return events;
 	},
 
-	// @method: setZIndex(value: Number) : this
+	// @method setZIndex(value: Number): this
 	// Changes the [zIndex](#imageoverlay-zindex) of the image overlay.
 	setZIndex: function (value) {
 		this.options.zIndex = value;
@@ -9160,7 +9166,7 @@ var ImageOverlay = Layer.extend({
 
 	_overlayOnError: function () {
 		// @event error: Event
-		// Fired when the ImageOverlay layer has loaded its image
+		// Fired when the ImageOverlay layer fails to load its image
 		this.fire('error');
 
 		var errorUrl = this.options.errorOverlayUrl;
@@ -11220,12 +11226,6 @@ var GridLayer = Layer.extend({
 		var tile = this._tiles[key];
 		if (!tile) { return; }
 
-		// Cancels any pending http requests associated with the tile
-		// unless we're on Android's stock browser,
-		// see https://github.com/Leaflet/Leaflet/issues/137
-		if (!androidStock) {
-			tile.el.setAttribute('src', emptyImageUrl);
-		}
 		remove(tile.el);
 
 		delete this._tiles[key];
@@ -11294,8 +11294,6 @@ var GridLayer = Layer.extend({
 	},
 
 	_tileReady: function (coords, err, tile) {
-		if (!this._map || tile.getAttribute('src') === emptyImageUrl) { return; }
-
 		if (err) {
 			// @event tileerror: TileErrorEvent
 			// Fired when there is an error loading a tile.
@@ -11611,6 +11609,28 @@ var TileLayer = GridLayer.extend({
 				}
 			}
 		}
+	},
+
+	_removeTile: function (key) {
+		var tile = this._tiles[key];
+		if (!tile) { return; }
+
+		// Cancels any pending http requests associated with the tile
+		// unless we're on Android's stock browser,
+		// see https://github.com/Leaflet/Leaflet/issues/137
+		if (!androidStock) {
+			tile.el.setAttribute('src', emptyImageUrl);
+		}
+
+		return GridLayer.prototype._removeTile.call(this, key);
+	},
+
+	_tileReady: function (coords, err, tile) {
+		if (!this._map || (tile && tile.getAttribute('src') === emptyImageUrl)) {
+			return;
+		}
+
+		return GridLayer.prototype._tileReady.call(this, coords, err, tile);
 	}
 });
 
@@ -12073,7 +12093,7 @@ var Canvas = Renderer.extend({
 
 	_updateDashArray: function (layer) {
 		if (typeof layer.options.dashArray === 'string') {
-			var parts = layer.options.dashArray.split(','),
+			var parts = layer.options.dashArray.split(/[, ]+/),
 			    dashArray = [],
 			    i;
 			for (i = 0; i < parts.length; i++) {
@@ -66525,14 +66545,15 @@ TODO:
         setValue: function(value, validate){
             var $elem = this.getElement();
             switch (this.options.type || 'input'){
-                case 'input'     : $elem.val( value );                   break;
-                case 'select'    : $elem.val( value ).trigger('change'); break;
-                case 'checkbox'  : $elem.prop('checked', !!value );      break;
+                case 'input'     : $elem.val( value );                      break;
+                case 'select'    : $elem.val( value ).trigger('change');    break;
+                case 'checkbox'  : $elem.prop('checked', !!value );         break;
                 case 'selectlist': this.getRadioGroup().setSelected(value); break;
 //TODO case 'radio': ... break;
                 case 'slider'    :
-                case 'timeslider': this.getSlider().setValue( value ); break;
-                case 'text'      : break;
+                case 'timeslider': this.getSlider().setValue( value );      break;
+                case 'text'      :                                          break;
+                case 'hidden'    : $elem.val( value );                      break;
             }
             this.onChanging();
             return validate ? this.validate() : this;
@@ -66544,14 +66565,15 @@ TODO:
         getResetValue: function(){
             var result = null;
             switch (this.options.type || 'input'){
-                case 'input'     : result = '';       break;
-                case 'select'    : result = -1;       break;
-                case 'checkbox'  : result = false;    break;
+                case 'input'     : result = '';    break;
+                case 'select'    : result = -1;    break;
+                case 'checkbox'  : result = false; break;
                 case 'selectlist': result = this.getRadioGroup().options.list[0].id; break;
 //TODO case 'radio': result = ... break;
                 case 'slider'    :
                 case 'timeslider': result = this.getSlider().result.min; break;
-                case 'text'      : result = '';
+                case 'text'      : result = '';                          break;
+                case 'hidden'    : result = '';                          break;
             }
             return result;
         },
@@ -66577,7 +66599,7 @@ TODO:
         *******************************************************/
         getValue: function(){
             var $elem = this.getElement(),
-                result;
+                result = null;
             switch (this.options.type || 'input'){
                 case 'input'     : result = $elem.val();               break;
                 case 'select'    : result = $elem.val();               break;
@@ -66586,9 +66608,10 @@ TODO:
 //TODO case 'radio': ... break;
                 case 'slider'    :
                 case 'timeslider': result = this._getSliderValue(); break;
-                case 'text'      : result = ' '; break;
+                case 'text'      : result = ' ';                    break;
+                case 'hidden'    : result = $elem.val();            break;
             }
-            return result || this.getResetValue();
+            return result ===null ? this.getResetValue() : result;
         },
 
         /*******************************************************
@@ -66666,12 +66689,13 @@ TODO:
 
         this.options.id = this.options.id || 'bsModalFormId' + formId++;
 
+        this.options.onClose_user = this.options.onClose || function(){};
         this.options.onClose = $.proxy( this.onClose, this );
 
         //this.input = simple object with all input-elements. Also convert element-id to unique id for input-element
         this.inputs = {};
 
-        var types = ['input', 'select', 'selectlist', 'checkbox', 'radio', 'table', 'slider', 'timeslider'];
+        var types = ['input', 'select', 'selectlist', 'checkbox', 'radio', 'table', 'slider', 'timeslider', 'hidden'];
 
         function setId( dummy, obj ){
             if ($.isPlainObject(obj) && (obj.type !== undefined) && (types.indexOf(obj.type) >= 0) && obj.id){
@@ -66692,7 +66716,6 @@ TODO:
                     $.each( obj, setId );
         }
         setId( 'dummy', this.options.content);
-
 
         //Create a hidden submit-button to be placed inside the form
         var $hiddenSubmitButton = this.$hiddenSubmitButton = $('<button type="submit" style="display:none"/>');
@@ -66805,8 +66828,10 @@ TODO:
         *******************************************************/
         onClose: function(){
             //Check if any of the new values are different from the original ones
-            if (!this.isDifferent(this.originalValues))
+            if (!this.isDifferent(this.originalValues)){
+                this.options.onClose_user();
                 return true;
+            }
 
             var _this = this,
                 noty =
@@ -66965,7 +66990,9 @@ TODO:
         *******************************************************/
         onSubmit: function( event/*, data*/ ){
             this.options.onSubmit ? this.options.onSubmit( this.getValues() ) : null;
+
             this.$bsModal._close();
+            this.options.onClose_user();
 
             event.preventDefault();
             return false;
@@ -69611,6 +69638,10 @@ Add sort-functions + save col-index for sorted column
                 return $('<div/>')._bsAddHtml( options );
             }
 
+            function buildHidden( options ){
+                return $.bsInput( options ).css('display', 'none');
+            }
+
 
             if (!options)
                 return this;
@@ -69652,6 +69683,7 @@ Add sort-functions + save col-index for sorted column
                         case 'slider'       :   buildFunc = buildBaseSlider;    insideFormGroup = true; addBorder = true; buildInsideParent = true; break;
                         case 'timeslider'   :   buildFunc = buildTimeSlider;    insideFormGroup = true; addBorder = true; buildInsideParent = true; break;
                         case 'text'         :   buildFunc = buildText;          insideFormGroup = true; addBorder = true; noValidation = true; break;
+                        case 'hidden'       :   buildFunc = buildHidden;        noValidation = true; break;
 //                        case 'xx'           :   buildFunc = $.bsXx;               break;
                     }
                 }
@@ -70116,6 +70148,8 @@ Adjust standard Leaflet popup to display as Bootstrap modal
 ****************************************************************************/
 (function ($, L/*, window, document, undefined*/) {
     "use strict";
+
+return; //TODO - IT IS **NOT** WORKING
 
     /*********************************************************
     Overwrite default Popu-options: Remove default leaflet closeButton
@@ -70894,3 +70928,245 @@ if (Number.prototype.toDegrees === undefined) {
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 }(L, this, document));
+
+;
+/****************************************************************************
+leaflet-marker-vessel
+
+Based on leaflet.boatmarker v1.1.0 by Thomas Brüggemann
+
+Each vessel is defined in a coordinat system with x:[-100, 100] y: [-100, 100]
+The vessel is defined as going from bottom to top
+****************************************************************************/
+(function ($, L, window, document, undefined) {
+    "use strict";
+
+    var defaultOptions = {
+            draggable: false,
+            dim      : 30,
+            shape    : 'airplane',
+            color    : '#8ED6FF',
+            heading  : 0
+        };
+
+/*
+    //adjustShape - Used to mirror a shape
+    function adjustShape( shape ){
+        for (var i=shape.length-1; i>=0; i-- ){
+            var point = shape[i].slice();
+            point[0] = -point[0];
+            if (point.length == 4)
+                point[2] = -point[2];
+            shape.push( point );
+        }
+    }
+*/
+    //The different shapes. Each point = normal:[x, y] or quadraticCurveTo:[x,y, qcx, qcy], or bezierCurveTo:[x,y, cp1x, cp1y, cp2x, cp2y]
+    var shapes = {};
+
+    //Airplane
+    shapes['airplane'] = [
+        [  0,  160],
+        [  80, 180],
+        [  80, 130],
+        [  40, 100],
+        [  40,  60],
+        [ 160, 110],
+        [ 160,  40],
+        [  40, -30],
+        [  40,-100],
+        [   0, -160,  20, -160],
+        [ -40, -100, -20, -160],
+        [ -40, -30],
+        [-160,  40],
+        [-160, 110],
+        [ -40,  60],
+        [ -40, 100],
+        [ -80, 130],
+        [ -80, 180],
+        [   0, 160]
+    ];
+
+    //Pleasure boat - adopted from leaflet.boatmarker
+    var x = -70, y=100, b=1.4;
+    shapes['boat'] = [
+        [x, y],
+        [x+100*b, y, x, y+80*b, x+100*b, y+80*b],
+        [x+50*b, y-200*b, x+100*b, y-100*b],
+        [x, y, x, y-100*b]
+    ];
+
+
+    //Ship - TODO
+    shapes['ship'] = [
+
+    ];
+
+    /*****************************************************
+    L.VesselIcon
+    *****************************************************/
+    L.VesselIcon = L.Icon.extend({
+        options: {
+            className: "leaflet-vessel-icon",
+            course   : 0
+        },
+
+        /*****************************************************
+        createIcon - setup the icon and start drawing
+        *****************************************************/
+        createIcon: function () {
+            var elem = document.createElement("canvas");
+            this._setIconStyles(elem, "icon");
+
+            elem.width  = this.options.iconSize.x;
+            elem.height = this.options.iconSize.y;
+
+            this.setShape( this.options.shape );
+
+            this.ctx = elem.getContext("2d");
+            this.draw();
+
+            return elem;
+        },
+
+        /**********************************************************
+        setColor - Set new colro
+        **********************************************************/
+        setColor: function(color) {
+            this.options.color = color;
+            this.draw();
+        },
+
+        /**********************************************************
+        setShape - Select and adjust a new shape
+        **********************************************************/
+        setShape: function(shape) {
+            this.options.shape = shape;
+
+            /*
+            The icon is 1.5 x the size of the drawing.
+            All drawings are given in a coordinat system [-100, 100]x[-100, 100]
+            offset and factor are set to convert from [-100, 100]x[-100, 100] to canvas coordinates
+            */
+            var _this = this,
+                shapeDim = this.options.dim,
+                margin = shapeDim*0.5/2,
+                offset = 100,
+                factor = (shapeDim-2*margin)/(2*offset);
+
+            function trans( rel ){
+                return rel == undefined ? null : margin + (rel + offset)*factor;
+            }
+
+            this.shapePoints = [];
+            $.each(shapes[this.options.shape], function( index, xy ){
+                _this.shapePoints.push({
+                    x   : trans(xy[0]),
+                    y   : trans(xy[1]),
+                    qcx : trans(xy[2]),
+                    qcy : trans(xy[3]),
+                    cp1x: trans(xy[2]),
+                    cp1y: trans(xy[3]),
+                    cp2x: trans(xy[4]),
+                    cp2y: trans(xy[5])
+
+                });
+            });
+        },
+
+        /**********************************************************
+        draw - renders the vessel icon onto the canvas element
+        **********************************************************/
+        draw: function() {
+            if(!this.ctx) return;
+
+            var ctx = this.ctx,
+                shape = this.shapePoints,
+                shapeDim = this.options.dim;
+
+            ctx.clearRect(0, 0, shapeDim, shapeDim);
+/*Only test:
+ctx.fillStyle = '#999999';
+ctx.fillRect(0, 0, shapeDim, shapeDim);
+*/
+            ctx.translate(shapeDim/2, shapeDim/2);
+
+            var rotate = this.options.rotate ? -this.options.rotate : 0;
+            this.options.rotate = this.options.course*Math.PI/180;
+            ctx.rotate(rotate + this.options.rotate);
+            ctx.translate(-shapeDim/2, -shapeDim/2);
+
+            ctx.beginPath();
+            ctx.moveTo(shape[0].x, shape[0].y );
+
+            $.each( shape, function(index, pos){
+                if (pos.qcx == null)
+                    ctx.lineTo(pos.x, pos.y);
+                else
+                    if (pos.cp2x == null)
+                        ctx.quadraticCurveTo(pos.qcx, pos.qcy, pos.x, pos.y);
+                    else
+                        ctx.bezierCurveTo(pos.cp1x, pos.cp1y, pos.cp2x, pos.cp2y, pos.x, pos.y);
+            });
+
+            ctx.strokeStyle = "#000000";
+            ctx.fillStyle   = this.options.color;
+            ctx.lineJoin    = 'round';
+
+            ctx.fill();
+            ctx.stroke();
+            ctx.closePath();
+        },
+
+        /**********************************************************
+        setHeading - sets the vessel heading and update the vessel icon accordingly
+        **********************************************************/
+        setHeading: function(heading) {
+            this.options.course = (heading % 360);
+            this.draw();
+        }
+    });
+
+    /*****************************************************
+    L.VesselMarker
+    *****************************************************/
+    L.VesselMarker = L.Marker.extend({
+        initialize: function(latLng, options){
+            options = $.extend({}, defaultOptions, options);
+            options.icon =  new L.VesselIcon({
+                                    shape   : options.shape,
+                                    color   : options.color,
+                                    dim     : options.dim,
+                                    course  : (options.heading % 360),
+                                    iconSize: new L.Point(options.dim, options.dim)
+                                });
+            L.Marker.prototype.initialize.call(this, latLng, options);
+        },
+
+        onAdd: function(){
+            this.options.icon.options.rotate = 0;
+            return L.Marker.prototype.onAdd.apply( this, arguments );
+        },
+
+        setHeading: function(heading){
+            this.options.heading = heading;
+            this.options.icon.setHeading(heading);
+            return this;
+        },
+        setShape: function(shape){
+            this.options.shape = shape;
+            this.options.icon.setShape(shape);
+            return this;
+        },
+        setColor: function(color){
+            this.options.color = color;
+            this.options.icon.setColor(color);
+            return this;
+        }
+    });
+
+    L.vesselMarker = function(latLng, options) {
+        return new L.VesselMarker(latLng, options);
+    };
+
+}(jQuery, L, this, document));
