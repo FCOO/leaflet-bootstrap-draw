@@ -70931,6 +70931,309 @@ if (Number.prototype.toDegrees === undefined) {
 
 ;
 /****************************************************************************
+	leaflet-latlng-point.js,
+
+	(c) 2018, FCOO
+
+	https://github.com/FCOO/leaflet-latlng-point
+	https://github.com/FCOO
+
+    L.LatLngPointList     = A doubly-linked List of points representing a polyline or polygon
+
+    L.LatLngPoint         = A point in L.LatLngPointList
+    L.LatLngDistancePoint = Extension of LatLngPoint representing a point on the polyline given by the distance from the start
+
+    Object representing a list of LatLng that represent a polyline or polygon
+
+****************************************************************************/
+(function ($, L, window, document, undefined) {
+    "use strict";
+
+    /******************************************************************
+    *******************************************************************
+    L.LatLngPoint = A point in the list
+    *******************************************************************
+    ******************************************************************/
+    L.LatLngPoint = L.Class.extend({
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function( latLng, latLngPointlist ){
+
+            this.latLngPointlist = latLngPointlist;
+
+            //Workaround that L.LatLng isn't a real constructor
+            latLng = L.latLng( latLng );
+
+            this.lat = latLng.lat;
+            this.lng = latLng.lng;
+
+            this.prevPoint = null;
+            this.nextPoint = null;
+
+            this.prev = {};
+            this.next = {};
+        },
+
+        /*****************************************************
+        update
+        *****************************************************/
+        update: function(){
+            this.latLngPointlist.update();
+        },
+
+        /*****************************************************
+        _update
+        *****************************************************/
+        _update: function( prevLatLngPoint, nextLatLngPoint ){
+            this.prevPoint = prevLatLngPoint;
+            this.nextPoint = nextLatLngPoint;
+            this.totalDistance = 0;
+            this.totalRhumbDistance = 0;
+            if (this.prevPoint){
+                this.prev = {
+                    distance     : this.prevPoint.next.distance      || this.prevPoint.distanceTo( this ),
+                    bearing      : this.prevPoint.next.bearing       || this.prevPoint.bearingTo( this ),
+                    finalBearing : this.prevPoint.next.finalBearing  || this.prevPoint.finalBearingTo( this ),
+                    rhumbDistance: this.prevPoint.next.rhumbDistance || this.prevPoint.rhumbDistanceTo( this ),
+                    rhumbBearing : this.prevPoint.next.rhumbBearing  || this.prevPoint.rhumbBearingTo( this ),
+                };
+                this.totalDistance      = this.prevPoint.totalDistance      + this.prev.distance;
+                this.totalRhumbDistance = this.prevPoint.totalRhumbDistance + this.prev.rhumbDistance;
+
+                this.prev.finalRhumbBearing  = this.prev.rhumbBearing;
+                this.prev.totalDistance      = this.totalDistance;
+                this.prev.totalRhumbDistance = this.totalRhumbDistance;
+
+            }
+            if (this.nextPoint){
+                this.next = {
+                    distance     : this.distanceTo( this.nextPoint ),
+                    bearing      : this.bearingTo( this.nextPoint ),
+                    finalBearing : this.finalBearingTo( this.nextPoint ),
+                    rhumbDistance: this.rhumbDistanceTo( this.nextPoint ),
+                    rhumbBearing : this.rhumbBearingTo( this.nextPoint ),
+                };
+                this.next.finalRhumbBearing  = this.next.rhumbBearing;
+                this.next.totalDistance      = this.totalDistance + this.next.distance;
+                this.next.totalRhumbDistance = this.totalRhumbDistance + this.next.rhumbDistance;
+            }
+        },
+
+        /*****************************************************
+        onUpdate
+        *****************************************************/
+        onUpdate: function(){},
+
+        /*****************************************************
+        remove
+        *****************************************************/
+        remove: function(){
+            this.latLngPointlist.remove( this.index );
+        },
+
+        /*****************************************************
+        onRemove
+        *****************************************************/
+        onRemove: function(){}
+    });
+
+    //Extend LatLngPoint with L.LatLng
+	$.extend( L.LatLngPoint.prototype, L.LatLng.prototype );
+
+    L.latLngPoint = function( latLng, latLngPointlist){ return new L.LatLngPoint(latLng, latLngPointlist); };
+
+
+    /******************************************************************
+    *******************************************************************
+    L.LatLngDistancePoint - Extension of LatLngPoint representing
+    a point on the polyline given by the distance from the start
+    *******************************************************************
+    ******************************************************************/
+    L.LatLngDistancePoint = L.LatLngPoint.extend({
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function( distance, latLngPointlist ){
+            L.LatLngPoint.prototype.initialize.call(this, [0,0], latLngPointlist);
+            this.distance = null;
+            this.bearing = null;
+            this.exists = false;
+            this.setDistance( distance );
+        },
+
+        /*****************************************************
+        setDistance - Set new distance and update
+        *****************************************************/
+        setDistance: function( distance ){
+            this.distance = distance;
+            this.update();
+        },
+
+        /*****************************************************
+        update - Calculate the position and bering on the
+        latLngPointlist distance from the start point
+        *****************************************************/
+        update: function(){
+            var _this = this,
+                distance = this.distance,
+                isRhumb = this.latLngPointlist.options.isRhumb,
+                list = this.latLngPointlist.list,
+                distanceFraction, latLng = null;
+
+            this.exists = false;
+            this.lat = 0;
+            this.lng = 0;
+
+            function getTotalDistance( obj ){ return isRhumb ? obj.totalRhumbDistance : obj.totalDistance; }
+
+            if ( (distance == null) || (distance < 0) || (distance > getTotalDistance( this.latLngPointlist )) || (list.length < 2) )
+                return;
+
+            //Find the segment where the distance lies between
+            $.each( list, function( index, latLngPoint ){
+                if ( (distance >= getTotalDistance(latLngPoint)) &&
+                     latLngPoint.nextPoint &&
+                     (distance <= getTotalDistance(latLngPoint.next)) ){
+                    _this.exists = true;
+                    distanceFraction = distance - getTotalDistance(latLngPoint);
+                    if (isRhumb){
+                        latLng = latLngPoint.rhumbDestinationPoint(distanceFraction, latLngPoint.next.rhumbBearing);
+                    }
+                    else {
+                        //Calculate the fraction between this.prevPoint and this.nextPoint
+                        var fraction = distanceFraction / ( getTotalDistance(latLngPoint.next) - getTotalDistance(latLngPoint) );
+                        latLng = latLngPoint.intermediatePointTo(latLngPoint.nextPoint, fraction);
+                    }
+
+                    _this.lat = latLng.lat;
+                    _this.lng = latLng.lng;
+                    _this._update(latLngPoint, latLngPoint.nextPoint);
+                    _this.bearing = isRhumb ? _this.next.rhumbBearing : _this.next.bearing;
+                    return false;
+                }
+            });
+        },
+
+        /*****************************************************
+        remove - Don't remove this from list. Only call this.onRemove
+        *****************************************************/
+        remove: function(){
+            this.onRemove();
+        }
+    });
+
+    /******************************************************************
+    *******************************************************************
+    L.LatLngPointList = A list of L.LatLngPoint
+    *******************************************************************
+    ******************************************************************/
+    L.LatLngPointList = L.Class.extend({
+        options: {
+            isPolygon       : false,
+            isRhumb         : false,
+            pointConstructor: L.latLngPoint
+        },
+
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function( options ){
+            options = options || [];
+            L.setOptions(this, $.isArray(options) ? {list:options} : options );
+            this.list = this.options.list || [];
+            var _this = this;
+            $.each( this.list, function(index, latLng){
+                _this.list[index] = _this.options.pointConstructor( latLng, _this );
+            });
+            this.update();
+        },
+
+        /*****************************************************
+        getDistance
+        *****************************************************/
+        getDistance: function(){
+            return this.options.isRhumb ? this.totalRhumbDistance : this.totalDistance;
+        },
+
+        /*****************************************************
+        update
+        *****************************************************/
+        update: function(){
+            this.firstPoint = this.list.length ? this.list[0] : null;
+            this.lastPoint = this.list.length ? this.list[this.list.length-1] : null;
+            var _this = this;
+
+            $.each( this.list, function(index, latLngPoint){
+                latLngPoint.index = index;
+                latLngPoint._update(
+                    index ? _this.list[index-1] : null,
+                    index == (_this.list.length-1) ? (_this.options.isPolygon ? _this.firstPoint : null) : _this.list[index+1]
+                );
+            });
+
+            this.totalDistance      = this.lastPoint ? this.lastPoint.totalDistance      + (this.options.isPolygon ? this.lastPoint.next.distance      : 0) : 0;
+            this.totalRhumbDistance = this.lastPoint ? this.lastPoint.totalRhumbDistance + (this.options.isPolygon ? this.lastPoint.next.rhumbDistance : 0) : 0;
+
+            //Update totalDistanceToEnd and totalRhumbDistanceToEnd
+            $.each( this.list, function(index, latLngPoint){
+                latLngPoint.totalDistanceToEnd      = _this.totalDistance      - latLngPoint.totalDistance;
+                latLngPoint.totalRhumbDistanceToEnd = _this.totalRhumbDistance - latLngPoint.totalRhumbDistance;
+            });
+
+
+            $.each( this.list, function(index, latLngPoint){
+                latLngPoint.onUpdate( _this );
+            });
+
+            if (this.options.onUpdate)
+                this.options.onUpdate( this );
+
+        },
+
+        /*****************************************************
+        onUpdate
+        *****************************************************/
+        onUpdate: function(){},
+
+        /*****************************************************
+        append - Add a point to the end of the list
+        *****************************************************/
+        append: function( latLng, options ){
+            return this.insert( latLng, undefined, options );
+        },
+
+        /*****************************************************
+        insert - Insert a point after the point at list[index]
+        *****************************************************/
+        insert: function( latLng, index ){
+            if (index == undefined)
+                index = this.list.length-1;
+
+            var newPoint = this.options.pointConstructor( latLng, this );
+            this.list.splice(index+1, 0, newPoint );
+            this.update();
+            return newPoint;
+        },
+
+        /*****************************************************
+        remove - Remove the latLngPoint at index
+        *****************************************************/
+        remove: function( index ){
+            var latLngPoint = this.list[index];
+            this.list.splice(index, 1);
+            latLngPoint.onRemove();
+            this.update();
+        }
+    });
+    L.latLngPointList = function( options ){ return new L.LatLngPointList( options ); };
+
+}(jQuery, L, this, document));
+
+
+
+;
+/****************************************************************************
 leaflet-marker-vessel
 
 Based on leaflet.boatmarker v1.1.0 by Thomas Brüggemann
@@ -71170,3 +71473,200 @@ ctx.fillRect(0, 0, shapeDim, shapeDim);
     };
 
 }(jQuery, L, this, document));
+
+;
+/****************************************************************************
+	leaflet-polyline.js,
+
+	(c) 2018, FCOO
+
+	https://github.com/FCOO/leaflet-polyline
+	https://github.com/FCOO
+
+    Extend L.Polyline with options to draw "shadow" and "interactive"-zone
+
+****************************************************************************/
+(function ($, L/*, window, document, undefined*/) {
+    "use strict";
+    var beforeAndAfter = function(methodName, method, reverseOrder) {
+            method = method || L.Polyline.prototype[methodName];
+            return function(){
+                var firstLayerGroup = reverseOrder ? this.interactiveLayerGroup : this.shadowLayerGroup,
+                    lastLayerGroup  = reverseOrder ? this.shadowLayerGroup : this.interactiveLayerGroup;
+
+                if (firstLayerGroup)
+                    firstLayerGroup[methodName].apply(firstLayerGroup, arguments);
+
+                var result = method.apply(this, arguments);
+
+                if (lastLayerGroup)
+                    lastLayerGroup[methodName].apply(lastLayerGroup, arguments);
+                return result;
+            };
+        };
+
+
+    L.Polyline.include({
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function( initialize ){
+            return function( latLngs, options ){
+                options = options || {};
+
+                if (options.addInteractive)
+                    options.interactive = true;
+
+                initialize.call(this, latLngs, options );
+
+                this.options = $.extend(true, {},
+                    {
+                        shadowStyle: {
+                            width: 1,
+                            color: 'white',
+                            opacity: 0.5
+                        },
+/*
+                        _interactiveStyle: {
+                            width: 14,
+                            color: 'yellow',
+                            opacity: .5,
+                        },
+*/
+                        interactiveStyle: {
+                            width  : 4,
+                            color  : 'transparent',
+                            opacity: 1
+                        },
+                    },
+                    this.options
+                );
+
+                function extendOptions( options, style, interactive ){
+                    var result = $.extend({}, options);
+                    return $.extend(result, {
+                        weight : options.weight+2*style.width,
+                        color  : style.color,
+                        opacity: style.opacity,
+                        addShadow: false,
+                        addInteractive: false,
+                        interactive: interactive,
+                    });
+                }
+
+                if (this.options.addShadow){
+                    this.shadowLayerGroup = L.layerGroup();
+                    this.shadowPolyline = L.polyline(this.getLatLngs(), extendOptions(this.options, this.options.shadowStyle, false) );
+                    this.shadowLayerGroup.addLayer(  this.shadowPolyline );
+                }
+
+                if (this.options.addInteractive){
+                    this.interactiveLayerGroup = L.layerGroup();
+                    this.interactivePolyline = L.polyline(this.getLatLngs(), extendOptions(this.options, this.options.interactiveStyle, true) );
+                    this.interactiveLayerGroup.addLayer(  this.interactivePolyline );
+                    this.on('add remove', this.setInteractiveOff, this );
+                }
+                return this;
+            };
+        }(L.Polyline.prototype.initialize),
+
+        /*****************************************************
+        onAdd - Add Polyline, shadow- and inertactive LayerGroup
+        *****************************************************/
+        onAdd: beforeAndAfter( 'addTo', L.Polyline.prototype.onAdd ),
+
+        /*****************************************************
+        Bind tooltip to interactivePolyline (if any)
+        *****************************************************/
+        bindTooltip: function(bindTooltip){
+            return function(){
+                bindTooltip.apply(this.interactivePolyline || this, arguments);
+            };
+        }(L.Polyline.prototype.bindTooltip),
+
+        /*****************************************************
+        If polyline has addInteractive => All mouse-evnets on polyline get caught
+        by interactivePolyline and fired on this on clostes point
+        *****************************************************/
+        onMouseEventsOnInteractivePolyline: function( fn, context, mouseEvent ){
+            //Adjust mouseEvent to closest latlng on this
+            mouseEvent.latlng         = L.GeometryUtil.closest(this._map, this, mouseEvent.latlng);
+            mouseEvent.layerPoint     = this._map.latLngToLayerPoint( mouseEvent.latlng );
+            mouseEvent.containerPoint = this._map.latLngToContainerPoint( mouseEvent.latlng );
+
+            fn.call(context || this, mouseEvent );
+        },
+
+        _on: function( _on ){
+            return function(type, fn, context){
+                if (this.interactivePolyline && (['click', 'dblclick', 'mousedown', 'mouseup', 'mouseover', 'mouseout', 'mousemove', 'contextmenu'].indexOf(type) != -1))
+                    //Create a function to re-direct the event from this.interactivePolyline to this with latLng corrected to closest to this
+                    return _on.call(
+                        this.interactivePolyline,
+                        type,
+                        $.proxy(this.onMouseEventsOnInteractivePolyline, this, fn, context),
+                        this
+                    );
+                else
+                    return _on.apply(this, arguments );
+            };
+        }(L.Polyline.prototype._on),
+
+
+        /*****************************************************
+        onSetInteractive
+        *****************************************************/
+        onSetInteractive: function( /*on*/){
+        },
+
+        /*****************************************************
+        setInteractive( on ) - set the polyline interactive on or off
+        setInteractiveOn     - set the polyline interactive on
+        setInteractiveOff    - set the polyline interactive off
+        *****************************************************/
+        setInteractive: function( on ){
+            if (!this.interactivePolyline) return;
+            this.isInteractive = !!on;
+            if (on)
+                this._map.addLayer(this.interactiveLayerGroup);
+            else
+                this._map.removeLayer(this.interactiveLayerGroup);
+
+            //Toggle class "leaflet-interactive"
+            $(this._path).toggleClass( "leaflet-interactive",  this.isInteractive);
+            if (this.interactivePolyline)
+                $(this.interactivePolyline._path).toggleClass( "leaflet-interactive",  this.isInteractive);
+
+            this.onSetInteractive( this.isInteractive );
+        },
+
+        setInteractiveOn : function(){ this.setInteractive( true  ); },
+        setInteractiveOff: function(){ this.setInteractive( false ); },
+
+        /*****************************************************
+        setLatLngs - also called for shadowPolyline and interactivePolyline
+        *****************************************************/
+        setLatLngs: function( setLatLngs ){
+            return function(){
+                setLatLngs.apply(this, arguments);
+                if (this.shadowPolyline)
+                    setLatLngs.apply(this.shadowPolyline, arguments);
+                if (this.interactivePolyline)
+                    setLatLngs.apply(this.interactivePolyline, arguments);
+            };
+        }(L.Polyline.prototype.setLatLngs ),
+
+        /*****************************************************
+        bringToFront, bringToBack, removeFrom:
+        All called for shadowLayerGroup and interactiveLayerGroup
+        *****************************************************/
+        bringToFront: beforeAndAfter('bringToFront'),
+        bringToBack : beforeAndAfter('bringToBack', null, true),
+        removeFrom  : beforeAndAfter('removeFrom'),
+
+
+
+    });
+
+}(jQuery, L, this, document));
+

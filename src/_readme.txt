@@ -1,23 +1,29 @@
 Overview on objects in this packages
 
 
+** Administration of latlng-points **
+L.LatLngPoint - A point in the list
+    L.LatLngDistancePoint - Extension of LatLngPoint representing a point on the polyline given by the distance from the start
+
+L.LatLngPointList - A list of L.LatLngPoint
+
+
+** Different decedents of Leaflet marker **
+L.Marker
+    L.VesselMarker = Marker using L.VesselIcon as icon (fcoo/leaflet-marker-vessel)
+
 L.Marker (leaflet)
     L.BsMarker (from fcoo/leaflet-bootstrap): Round, color, shadow, puls
         L.LatLngMarker = Marker for points in GeoPolyline
             L.LatLngEditMarker = Marker for hover over line segment
 
-L.Marker
-    L.VesselMarker = Marker using L.VesselIcon as icon
 
 
 
 leaflet-polyline.js - Extend L.Polyline with options to draw "shadow" and "interactive"-zone 
 
-leaflet-latlng-geopolyline.js - Object representing a list of LatLng that represent a polyline or polygon
-    L.LatLngPoint - A point in the list
-        L.LatLngDistancePoint - Extension of LatLngPoint representing a point on the polyline given by the distance from the start
 
-L.LatLngPointList - A list of L.LatLngPoint
+leaflet-latlng-geopolyline.js - Object representing a list of LatLng that represent a polyline or polygon
 
 
 

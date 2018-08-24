@@ -21,7 +21,9 @@
         "Leaflet.GeometryUtil": "makinacorpus/Leaflet.GeometryUtil#^0.8.1",
         "leaflet-bootstrap": "fcoo/leaflet-bootstrap#^1.0.0",
         "leaflet-latlng-geodesy": "fcoo/leaflet-latlng-geodesy#^1.0.0",
-        "leaflet-marker-vessel": "fcoo/leaflet-marker-vessel#^1.0.0"
+        "leaflet-marker-vessel": "fcoo/leaflet-marker-vessel#^1.0.0",
+        "leaflet-latlng-point": "fcoo/leaflet-latlng-point#^1.0.0",
+        "leaflet-polyline": "fcoo/leaflet-polyline#^1.0.0"
     },
     "overrides": {
         "Leaflet.Geodesic": {
