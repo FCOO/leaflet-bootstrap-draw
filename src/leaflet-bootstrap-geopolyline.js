@@ -12,8 +12,10 @@ Object representing a polyline or polygon as Geodesic
     L.LatLngEditMarker = Marker for hover over line segment
     *******************************************************************
     ******************************************************************/
-    var iconDim = 12,
-        iconSize = [iconDim, iconDim];
+    var iconDim     = 12,
+        iconSize    = [iconDim, iconDim],
+        bigIconDim  = 24,
+        bigIconSize = [bigIconDim, bigIconDim];
 
     L.LatLngMarker = L.BsMarker.extend({
         options: {
@@ -22,19 +24,32 @@ Object representing a polyline or polygon as Geodesic
                            iconSize : iconSize,
                            className: 'lbm-icon lbm-draw'
                        }),
+            bigIcon  : L.divIcon({
+                           iconSize : bigIconSize,
+                           className: 'lbm-icon lbm-draw'
+                       }),
+
             tooltip  : {
                 da:'Træk for at ændre, klik for at fjerne',
                 en:'Drag to change, click to remove'
-            }
+            },
+            bigIconWhenTouch: true,
+
         }
     });
 
+    var bigIconClassName = 'lbm-icon lbm-draw hide-on-leaflet-dragging lbm-warning hide-for-no-mouse';
     L.LatLngEditMarker = L.LatLngMarker.extend({
         options: {
             icon   : L.divIcon({
                          iconSize : iconSize,
-                         className: 'lbm-icon lbm-draw hide-on-leaflet-dragging lbm-warning'
+                         className: bigIconClassName
                      }),
+            bigIcon: L.divIcon({
+                         iconSize : bigIconSize,
+                         className: bigIconClassName
+                     }),
+
             opacity: 0
         }
     });

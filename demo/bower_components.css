@@ -4863,27 +4863,27 @@ STYLE FOR SPECIFIC TYPE
   margin-right: 0.75rem; }
 
 /***********************************************
-    jquery-scroll-container.scss, 
+    jquery-scroll-container.scss,
 
     (c) 2017, FCOO
 
     https://github.com/FCOO/jquery-scroll-container
     https://github.com/FCOO
 
-    USING MODIFIED VERSIONS OF THE STYLE 
+    USING MODIFIED VERSIONS OF THE STYLE
     FROM PERFECT-SCROLLBAR
     https://github.com/noraesae/perfect-scrollbar
 
 ************************************************/
 /***********************************************
-    _jquery-scroll-container-variables.scss, 
+    _jquery-scroll-container-variables.scss,
 
     (c) 2017, FCOO
 
     https://github.com/FCOO/jquery-scroll-container
     https://github.com/FCOO
 
-    USING MODIFIED VERSIONS OF THE STYLE 
+    USING MODIFIED VERSIONS OF THE STYLE
     FROM PERFECT-SCROLLBAR
     https://github.com/noraesae/perfect-scrollbar
 
@@ -11995,14 +11995,14 @@ headers modal, popover, tables, buttons, list-items etc.
 VARIABLES
 ************************************************/
 /***********************************************
-    _jquery-scroll-container-variables.scss, 
+    _jquery-scroll-container-variables.scss,
 
     (c) 2017, FCOO
 
     https://github.com/FCOO/jquery-scroll-container
     https://github.com/FCOO
 
-    USING MODIFIED VERSIONS OF THE STYLE 
+    USING MODIFIED VERSIONS OF THE STYLE
     FROM PERFECT-SCROLLBAR
     https://github.com/noraesae/perfect-scrollbar
 
@@ -14655,7 +14655,7 @@ https://github.com/berkan52/select2-bootstrap4-theme
   width: 1px !important; }
 
 /***********************************************
-	leaflet-control-topcenter.scss, 
+	leaflet-control-topcenter.scss,
 
 	(c) 2016, FCOO
 
@@ -14888,6 +14888,21 @@ $dark:          $gray-800 !default;
 .leaflet-tooltip-right {
   margin-left: 10px; }
 
+.leaflet-tooltip-big-icon.leaflet-tooltip-bottom {
+  margin-top: 14px; }
+
+.leaflet-tooltip-big-icon.leaflet-tooltip-top {
+  margin-top: -14px; }
+
+.leaflet-tooltip-big-icon.leaflet-tooltip-left {
+  margin-left: -14px; }
+
+.leaflet-tooltip-big-icon.leaflet-tooltip-right {
+  margin-left: 14px; }
+
+.no-mouse .leaflet-tooltip:not(.leaflet-tooltip-permanent) {
+  display: none; }
+
 /***********************************************
 	leaflet-bootstrap-modal.scss
 ************************************************/
@@ -14895,7 +14910,7 @@ $dark:          $gray-800 !default;
   margin: 0; }
 
 /***********************************************
-	leaflet-marker-vessel.scss, 
+	leaflet-marker-vessel.scss,
 
 	(c) 2018, FCOO
 
