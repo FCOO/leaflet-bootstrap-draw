@@ -15,9 +15,5 @@
 .leaflet-dragging .leaflet-tooltip {
   display: none; }
 
-@media (hover: hover) {
-  .leaflet-tooltip {
-    background-color: red; } }
-
 .no-mouse .leaflet-tooltip:not(.leaflet-tooltip-permanent) {
   display: none !important; }

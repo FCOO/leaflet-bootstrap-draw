@@ -4292,6 +4292,14 @@ html.no-mouse-hover .show-for-mouse-hover {
 html.no-mouse-hover .hide-for-no-mouse-hover {
   display: none !important; }
 
+._test-for-hover_ {
+  display: none;
+  font-family: "__NO_HOVER_SUPPORT__"; }
+
+@media (hover: hover) {
+  ._test-for-hover_ {
+    font-family: "__HOVER_SUPPORT__"; } }
+
 /***********************************************
 jquery-base-slider.scss, Description from README.md
 
@@ -4863,27 +4871,27 @@ STYLE FOR SPECIFIC TYPE
   margin-right: 0.75rem; }
 
 /***********************************************
-    jquery-scroll-container.scss,
+    jquery-scroll-container.scss, 
 
     (c) 2017, FCOO
 
     https://github.com/FCOO/jquery-scroll-container
     https://github.com/FCOO
 
-    USING MODIFIED VERSIONS OF THE STYLE
+    USING MODIFIED VERSIONS OF THE STYLE 
     FROM PERFECT-SCROLLBAR
     https://github.com/noraesae/perfect-scrollbar
 
 ************************************************/
 /***********************************************
-    _jquery-scroll-container-variables.scss,
+    _jquery-scroll-container-variables.scss, 
 
     (c) 2017, FCOO
 
     https://github.com/FCOO/jquery-scroll-container
     https://github.com/FCOO
 
-    USING MODIFIED VERSIONS OF THE STYLE
+    USING MODIFIED VERSIONS OF THE STYLE 
     FROM PERFECT-SCROLLBAR
     https://github.com/noraesae/perfect-scrollbar
 
@@ -11995,14 +12003,14 @@ headers modal, popover, tables, buttons, list-items etc.
 VARIABLES
 ************************************************/
 /***********************************************
-    _jquery-scroll-container-variables.scss,
+    _jquery-scroll-container-variables.scss, 
 
     (c) 2017, FCOO
 
     https://github.com/FCOO/jquery-scroll-container
     https://github.com/FCOO
 
-    USING MODIFIED VERSIONS OF THE STYLE
+    USING MODIFIED VERSIONS OF THE STYLE 
     FROM PERFECT-SCROLLBAR
     https://github.com/noraesae/perfect-scrollbar
 
@@ -14655,7 +14663,7 @@ https://github.com/berkan52/select2-bootstrap4-theme
   width: 1px !important; }
 
 /***********************************************
-	leaflet-control-topcenter.scss,
+	leaflet-control-topcenter.scss, 
 
 	(c) 2016, FCOO
 
@@ -14910,7 +14918,7 @@ $dark:          $gray-800 !default;
   margin: 0; }
 
 /***********************************************
-	leaflet-marker-vessel.scss,
+	leaflet-marker-vessel.scss, 
 
 	(c) 2018, FCOO
 
