@@ -114,10 +114,12 @@ window.test('onDragstart '+this.lat+' ' +this.lng +' '+ $('html')[0].className )
         onDrag
         *****************************************************/
         onDrag: function(mouseEvent){
+window.test('onDrag '+this.lat+' ' +this.lng);
+
             this.lat  = mouseEvent.latlng.lat;
             this.lng = mouseEvent.latlng.lng;
             this.update();
-window.test('onDrag '+this.lat+' ' +this.lng);
+
         },
 
         /*****************************************************
@@ -125,9 +127,12 @@ window.test('onDrag '+this.lat+' ' +this.lng);
         *****************************************************/
         onDragend: function(mouseEvent){
 console.log(mouseEvent);
-mouseEvent.latlng = mouseEvent.target._latlng;
 window.test('onDragend');
-this.onDrag( mouseEvent );
+
+            //Fire drag one last time to get
+            mouseEvent.latlng = mouseEvent.target.getLatLng();
+            this.onDrag( mouseEvent );
+
             this.latLngPointlist.currentLatLngPoint = null;
             this.onDragEvent('dragend');
         },
