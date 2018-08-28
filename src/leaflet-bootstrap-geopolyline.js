@@ -97,7 +97,8 @@ Object representing a polyline or polygon as Geodesic
             this.marker.on('dragstart', this.onDragstart, this);
             this.marker.on('drag',      this.onDrag,      this);
 
-this.marker.on('touchmove',      this.onTouchmove,      this);
+this.marker.on('mousemove',      this.onDrag,      this);
+//this.marker.on('MSPointerMove',      this.onTouchmove,      this);
 
 
             this.marker.on('dragend',   this.onDragend,   this);
@@ -106,8 +107,9 @@ this.marker.on('touchmove',      this.onTouchmove,      this);
         },
 
 onTouchmove: function(e){
-    console.log('onTouchmove',e);
-    window.text('onTouchmove');
+
+    console.log('onTouchmove',e.latlng);
+    window.test('onTouchmove'+' '+e.latlng.lat);
 },
 
         /*****************************************************
