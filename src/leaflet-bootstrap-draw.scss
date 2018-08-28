@@ -34,3 +34,7 @@
         background-color: red;
     }
 }
+
+.no-mouse .leaflet-tooltip:not(.leaflet-tooltip-permanent){
+    display: none !important;
+}
