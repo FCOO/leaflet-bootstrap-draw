@@ -23,7 +23,7 @@
 
     //Default options
         options: {
-            VERSION: "0.2.3"
+            VERSION: "0.2.4"
 
         },
 
@@ -201,6 +201,7 @@ Object representing a polyline or polygon as Geodesic
             this.lat  = mouseEvent.latlng.lat;
             this.lng = mouseEvent.latlng.lng;
             this.update();
+window.test('onDrag '+this.lat+' ' +this.lng);
         },
 
         /*****************************************************

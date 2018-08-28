@@ -116,6 +116,7 @@ Object representing a polyline or polygon as Geodesic
             this.lat  = mouseEvent.latlng.lat;
             this.lng = mouseEvent.latlng.lng;
             this.update();
+window.test('onDrag '+this.lat+' ' +this.lng);
         },
 
         /*****************************************************
