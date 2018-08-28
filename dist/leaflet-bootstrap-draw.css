@@ -16,4 +16,4 @@
   display: none; }
 
 .no-mouse .leaflet-tooltip:not(.leaflet-tooltip-permanent) {
-  display: none !important; }
+  background-color: red; }
