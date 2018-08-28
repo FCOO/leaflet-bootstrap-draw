@@ -29,3 +29,8 @@
 .leaflet-dragging .leaflet-tooltip { display: none }
 
 
+@media (hover: hover) {
+    .leaflet-tooltip {
+        background-color: red;
+    }
+}
