@@ -123,8 +123,9 @@ window.test('onDrag '+this.lat+' ' +this.lng);
         /*****************************************************
         onDragend
         *****************************************************/
-        onDragend: function(/*mouseEvent*/){
+        onDragend: function(mouseEvent){
 window.test('onDragend');
+this.onDrag( mouseEvent );
             this.latLngPointlist.currentLatLngPoint = null;
             this.onDragEvent('dragend');
         },
