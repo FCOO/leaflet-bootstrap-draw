@@ -95,31 +95,24 @@ Object representing a polyline or polygon as Geodesic
             this.marker = new L.LatLngMarker(latLng);
 
             this.marker.on('dragstart', this.onDragstart, this);
+
             this.marker.on('drag',      this.onDrag,      this);
-
-this.marker.on('mousemove',      this.onDrag,      this);
-//this.marker.on('MSPointerMove',      this.onTouchmove,      this);
-
+            this.marker.on('mousemove', this.onDrag,      this);
 
             this.marker.on('dragend',   this.onDragend,   this);
+            this.marker.on('pouseup',   this.onDragend,   this);
             this.marker.on('click',     this.remove,      this );
 
         },
 
-onTouchmove: function(e){
-
-    console.log('onTouchmove',e.latlng);
-    window.test('onTouchmove'+' '+e.latlng.lat);
-},
 
         /*****************************************************
         onDragstart
         *****************************************************/
         onDragstart: function(/*mouseEvent*/){
-var _this = this;
 
-window.test('onDragstart '+this.lat+' ' +this.lng +' '+ $('html')[0].className );
-console.log(this.marker.dragging);
+            this.lastLatLng = L.latLng(0,0);
+
             this.latLngPointlist.currentLatLngPoint = this;
             this.onDragEvent('dragstart');
         },
@@ -128,20 +121,21 @@ console.log(this.marker.dragging);
         onDrag
         *****************************************************/
         onDrag: function(mouseEvent){
-window.test('onDrag '+this.lat+' ' +this.lng);
-
+            if (!this.lastLatLng || this.lastLatLng.equals(mouseEvent.latlng)){
+                return;
+            }
+            this.lastLatLng = mouseEvent.latlng;
             this.lat  = mouseEvent.latlng.lat;
             this.lng = mouseEvent.latlng.lng;
             this.update();
-
         },
 
         /*****************************************************
         onDragend
         *****************************************************/
         onDragend: function(mouseEvent){
-console.log(mouseEvent);
-window.test('onDragend');
+            if (!this.lastLatLng)
+                return;
 
             //Fire drag one last time to get
             mouseEvent.latlng = mouseEvent.target.getLatLng();
@@ -149,6 +143,8 @@ window.test('onDragend');
 
             this.latLngPointlist.currentLatLngPoint = null;
             this.onDragEvent('dragend');
+            this.lastLatLng = null;
+
         },
 
         /*****************************************************
