@@ -96,16 +96,28 @@ Object representing a polyline or polygon as Geodesic
 
             this.marker.on('dragstart', this.onDragstart, this);
             this.marker.on('drag',      this.onDrag,      this);
+
+this.marker.on('touchmove',      this.onTouchmove,      this);
+
+
             this.marker.on('dragend',   this.onDragend,   this);
             this.marker.on('click',     this.remove,      this );
 
         },
 
+onTouchmove: function(e){
+    console.log('onTouchmove',e);
+    window.text('onTouchmove');
+},
+
         /*****************************************************
         onDragstart
         *****************************************************/
         onDragstart: function(/*mouseEvent*/){
+var _this = this;
+
 window.test('onDragstart '+this.lat+' ' +this.lng +' '+ $('html')[0].className );
+console.log(this.marker.dragging);
             this.latLngPointlist.currentLatLngPoint = this;
             this.onDragEvent('dragstart');
         },
