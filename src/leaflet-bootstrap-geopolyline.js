@@ -122,6 +122,7 @@ Object representing a polyline or polygon as Geodesic
         onDragend
         *****************************************************/
         onDragend: function(/*mouseEvent*/){
+window.test('onDragend');
             this.latLngPointlist.currentLatLngPoint = null;
             this.onDragEvent('dragend');
         },
