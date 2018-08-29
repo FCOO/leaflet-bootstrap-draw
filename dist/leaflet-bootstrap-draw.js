@@ -23,7 +23,7 @@
 
     //Default options
         options: {
-            VERSION: "{VERSION}"
+            VERSION: "0.3.0"
 
         },
 
