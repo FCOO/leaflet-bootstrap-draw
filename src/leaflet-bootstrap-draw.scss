@@ -22,14 +22,3 @@
 .lbm-draw {
     border-width: 3px;
 }
-
-
-//Hide all tooltips when dragging any element
-.leaflet-dragging .hide-on-leaflet-dragging,
-.leaflet-dragging .leaflet-tooltip { display: none }
-
-
-.no-mouse .leaflet-tooltip:not(.leaflet-tooltip-permanent){
-background-color: red;
-//    display: none !important;
-}

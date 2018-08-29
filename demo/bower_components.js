@@ -70066,10 +70066,9 @@ Create L.bsMarker = a round marker with options for color, shadow and pulsart
         options: {
             draggable       : false,           //Whether the marker is draggable with mouse/touch or not.
             autoPan         : true,            //Sit to true if you want the map to do panning animation when marker hits the edges.
-            tooltipAnchor: [0,0],
             icon            : bsMarkerIcon,
             bigIcon         : bigBsMarkerIcon,
-            useBigIcon         : false,           //True to make the icon big
+            useBigIcon      : false,           //True to make the icon big
             bigIconWhenTouch: false,           //True to make big icon when window.bsIsTouch == true and options.draggable == true
             transparent     : false,           //True to make the marker semi-transparent
             bigShadow       : false,           //true to add big shadow to the marker
@@ -70077,8 +70076,9 @@ Create L.bsMarker = a round marker with options for color, shadow and pulsart
             puls            : false,           //true to have a pulsart icon
             color           : '',              //Name of color: "primary", "secondary", "success", "info", "warning", "danger", "standard". "primary"-"danger"=Bootstrap colors. "standard" = Google Maps default iocn color
 
-            tooltip         : null, //Content of tooltip
-            tooltipPermanent: false //Whether to open the tooltip permanently or only on mouseover.
+            tooltip                : null,  //Content of tooltip
+            tooltipPermanent       : false, //Whether to open the tooltip permanently or only on mouseover.
+            tooltipHideWhenDragging: false  //True and tooltipPermanent: false => the tooltip is hidden when dragged
         },
 
         /*****************************************************
@@ -70128,9 +70128,10 @@ Create L.bsMarker = a round marker with options for color, shadow and pulsart
 
             if (this.options.tooltip)
                 this.bindTooltip(this.options.tooltip, {
-                    sticky     : !this.options.tooltipPermanent, //If true, the tooltip will follow the mouse instead of being fixed at the feature center.
-                    interactive: false,                          //If true, the tooltip will listen to the feature events.
-                    permanent  : this.options.tooltipPermanent   //Whether to open the tooltip permanently or only on mouseover.
+                    sticky          : !this.options.tooltipPermanent,       //If true, the tooltip will follow the mouse instead of being fixed at the feature center.
+                    interactive     : false,                                //If true, the tooltip will listen to the feature events.
+                    permanent       : this.options.tooltipPermanent,        //Whether to open the tooltip permanently or only on mouseover.
+                    hideWhenDragging: this.options.tooltipHideWhenDragging  //True and tooltipPermanent: false => the tooltip is hidden when dragged
                 });
         },
 
@@ -70321,16 +70322,22 @@ return; //TODO - IT IS **NOT** WORKING
     "use strict";
 
     /*********************************************************
-    Overwrite L.Tooltip._initLayout to add leaflet-tooltip-permanent and
-    leaflet-tooltip-big-icon big-to class-name (when needed)
+    Overwrite L.Tooltip._initLayout to add
+    leaflet-tooltip-permanent and leaflet-tooltip-big-icon and leaflet-tooltip-hide-when-dragging
+    to class-name (when needed)
     *********************************************************/
     L.Tooltip.prototype._initLayout = function( _initLayout ){
         return function(){
+            this.options.className = this.options.className || '';
             if (this.options.permanent)
-                this.options.className = (this.options.className || '') + ' leaflet-tooltip-permanent';
+                this.options.className +=  ' leaflet-tooltip-permanent';
+
+            if (this.options.hideWhenDragging)
+                this.options.className +=  ' leaflet-tooltip-hide-when-dragging';
+
 
             if (this._source && this._source.$icon && this._source.$icon.hasClass('lbm-big'))
-                this.options.className = (this.options.className || '') + ' leaflet-tooltip-big-icon';
+                this.options.className += ' leaflet-tooltip-big-icon';
 
 
             _initLayout.apply( this, arguments );

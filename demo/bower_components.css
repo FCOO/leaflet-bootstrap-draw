@@ -14908,7 +14908,10 @@ $dark:          $gray-800 !default;
 .leaflet-tooltip-big-icon.leaflet-tooltip-right {
   margin-left: 14px; }
 
-.no-mouse .leaflet-tooltip:not(.leaflet-tooltip-permanent) {
+.no-mouse-hover .leaflet-tooltip:not(.leaflet-tooltip-permanent) {
+  display: none; }
+
+.leaflet-dragging .leaflet-tooltip.leaflet-tooltip-hide-when-dragging:not(.leaflet-tooltip-permanent) {
   display: none; }
 
 /***********************************************

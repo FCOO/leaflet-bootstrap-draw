@@ -10,10 +10,3 @@
 ************************************************/
 .lbm-draw {
   border-width: 3px; }
-
-.leaflet-dragging .hide-on-leaflet-dragging,
-.leaflet-dragging .leaflet-tooltip {
-  display: none; }
-
-.no-mouse .leaflet-tooltip:not(.leaflet-tooltip-permanent) {
-  background-color: red; }

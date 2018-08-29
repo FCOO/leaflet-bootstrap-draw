@@ -33,7 +33,8 @@ Object representing a polyline or polygon as Geodesic
                 da:'Træk for at ændre, klik for at fjerne',
                 en:'Drag to change, click to remove'
             },
-            bigIconWhenTouch: true,
+            bigIconWhenTouch       : true,
+            tooltipHideWhenDragging: true
 
         }
     });
