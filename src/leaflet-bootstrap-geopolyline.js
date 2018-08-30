@@ -99,9 +99,10 @@ Object representing a polyline or polygon as Geodesic
 
             this.marker.on('drag',      this.onDrag,      this);
             this.marker.on('mousemove', this.onDrag,      this);
+            this.mousemoveAdded = true;
 
             this.marker.on('dragend',   this.onDragend,   this);
-            this.marker.on('pouseup',   this.onDragend,   this);
+            this.marker.on('mouseup',   this.onDragend,   this);
             this.marker.on('click',     this.remove,      this );
 
         },
@@ -125,6 +126,13 @@ Object representing a polyline or polygon as Geodesic
             if (!this.lastLatLng || this.lastLatLng.equals(mouseEvent.latlng)){
                 return;
             }
+
+            //Remove mousemove event if drag is supported to minimize events fired
+            if ((mouseEvent.type == 'drag') && this.mousemoveAdded){
+                this.mousemoveAdded = false;
+                this.marker.off('mousemove', this.onDrag, this);
+            }
+
             this.lastLatLng = mouseEvent.latlng;
             this.lat  = mouseEvent.latlng.lat;
             this.lng = mouseEvent.latlng.lng;
