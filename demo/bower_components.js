@@ -40112,7 +40112,7 @@ return i18next;
 /* @preserve
  * The MIT License (MIT)
  * 
- * Copyright (c) 2013-2017 Petka Antonov
+ * Copyright (c) 2013-2018 Petka Antonov
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -40134,7 +40134,7 @@ return i18next;
  * 
  */
 /**
- * bluebird build version 3.5.1
+ * bluebird build version 3.5.2
  * Features enabled: core, race, call_get, generators, map, nodeify, promisify, props, reduce, settle, some, using, timers, filter, any, each
 */
 !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.Promise=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof _dereq_=="function"&&_dereq_;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof _dereq_=="function"&&_dereq_;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
@@ -40289,24 +40289,28 @@ if (!util.hasDevTools) {
     };
 }
 
-Async.prototype._drainQueue = function(queue) {
+function _drainQueue(queue) {
     while (queue.length() > 0) {
-        var fn = queue.shift();
-        if (typeof fn !== "function") {
-            fn._settlePromises();
-            continue;
-        }
+        _drainQueueStep(queue);
+    }
+}
+
+function _drainQueueStep(queue) {
+    var fn = queue.shift();
+    if (typeof fn !== "function") {
+        fn._settlePromises();
+    } else {
         var receiver = queue.shift();
         var arg = queue.shift();
         fn.call(receiver, arg);
     }
-};
+}
 
 Async.prototype._drainQueues = function () {
-    this._drainQueue(this._normalQueue);
+    _drainQueue(this._normalQueue);
     this._reset();
     this._haveDrainedQueues = true;
-    this._drainQueue(this._lateQueue);
+    _drainQueue(this._lateQueue);
 };
 
 Async.prototype._queueTick = function () {
@@ -40783,6 +40787,7 @@ var getDomain = Promise._getDomain;
 var async = Promise._async;
 var Warning = _dereq_("./errors").Warning;
 var util = _dereq_("./util");
+var es5 = _dereq_("./es5");
 var canAttachTrace = util.canAttachTrace;
 var unhandledRejectionHandled;
 var possiblyUnhandledRejection;
@@ -40901,6 +40906,7 @@ Promise.longStackTraces = function () {
     if (!config.longStackTraces && longStackTracesIsSupported()) {
         var Promise_captureStackTrace = Promise.prototype._captureStackTrace;
         var Promise_attachExtraTrace = Promise.prototype._attachExtraTrace;
+        var Promise_dereferenceTrace = Promise.prototype._dereferenceTrace;
         config.longStackTraces = true;
         disableLongStackTraces = function() {
             if (async.haveItemsQueued() && !config.longStackTraces) {
@@ -40908,12 +40914,14 @@ Promise.longStackTraces = function () {
             }
             Promise.prototype._captureStackTrace = Promise_captureStackTrace;
             Promise.prototype._attachExtraTrace = Promise_attachExtraTrace;
+            Promise.prototype._dereferenceTrace = Promise_dereferenceTrace;
             Context.deactivateLongStackTraces();
             async.enableTrampoline();
             config.longStackTraces = false;
         };
         Promise.prototype._captureStackTrace = longStackTracesCaptureStackTrace;
         Promise.prototype._attachExtraTrace = longStackTracesAttachExtraTrace;
+        Promise.prototype._dereferenceTrace = longStackTracesDereferenceTrace;
         Context.activateLongStackTraces();
         async.disableTrampolineIfNecessary();
     }
@@ -40929,10 +40937,14 @@ var fireDomEvent = (function() {
             var event = new CustomEvent("CustomEvent");
             util.global.dispatchEvent(event);
             return function(name, event) {
-                var domEvent = new CustomEvent(name.toLowerCase(), {
+                var eventData = {
                     detail: event,
                     cancelable: true
-                });
+                };
+                es5.defineProperty(
+                    eventData, "promise", {value: event.promise});
+                es5.defineProperty(eventData, "reason", {value: event.reason});
+                var domEvent = new CustomEvent(name.toLowerCase(), eventData);
                 return !util.global.dispatchEvent(domEvent);
             };
         } else if (typeof Event === "function") {
@@ -40943,6 +40955,8 @@ var fireDomEvent = (function() {
                     cancelable: true
                 });
                 domEvent.detail = event;
+                es5.defineProperty(domEvent, "promise", {value: event.promise});
+                es5.defineProperty(domEvent, "reason", {value: event.reason});
                 return !util.global.dispatchEvent(domEvent);
             };
         } else {
@@ -41091,6 +41105,7 @@ Promise.prototype._attachCancellationCallback = function(onCancel) {
 };
 Promise.prototype._captureStackTrace = function () {};
 Promise.prototype._attachExtraTrace = function () {};
+Promise.prototype._dereferenceTrace = function () {};
 Promise.prototype._clearCancellationData = function() {};
 Promise.prototype._propagateFrom = function (parent, flags) {
     ;
@@ -41194,6 +41209,10 @@ function longStackTracesAttachExtraTrace(error, ignoreSelf) {
             util.notEnumerableProp(error, "__stackCleaned__", true);
         }
     }
+}
+
+function longStackTracesDereferenceTrace() {
+    this._trace = undefined;
 }
 
 function checkForgottenReturns(returnValue, promiseCreated, name, promise,
@@ -41697,7 +41716,7 @@ return {
 };
 };
 
-},{"./errors":12,"./util":36}],10:[function(_dereq_,module,exports){
+},{"./errors":12,"./es5":13,"./util":36}],10:[function(_dereq_,module,exports){
 "use strict";
 module.exports = function(Promise) {
 function returner() {
@@ -43516,6 +43535,7 @@ Promise.prototype._fulfill = function (value) {
         } else {
             async.settlePromises(this);
         }
+        this._dereferenceTrace();
     }
 };
 
@@ -43610,7 +43630,7 @@ _dereq_("./synchronous_inspection")(Promise);
 _dereq_("./join")(
     Promise, PromiseArray, tryConvertToPromise, INTERNAL, async, getDomain);
 Promise.Promise = Promise;
-Promise.version = "3.5.1";
+Promise.version = "3.5.2";
 _dereq_('./map.js')(Promise, PromiseArray, apiRejection, tryConvertToPromise, INTERNAL, debug);
 _dereq_('./call_get.js')(Promise);
 _dereq_('./using.js')(Promise, apiRejection, tryConvertToPromise, createContext, INTERNAL, debug);
@@ -45546,8 +45566,12 @@ function toFastProperties(obj) {
     /*jshint -W027,-W055,-W031*/
     function FakeConstructor() {}
     FakeConstructor.prototype = obj;
-    var l = 8;
-    while (l--) new FakeConstructor();
+    var receiver = new FakeConstructor();
+    function ic() {
+        return typeof receiver.foo;
+    }
+    ic();
+    ic();
     return obj;
     eval(obj);
 }
@@ -66695,6 +66719,9 @@ TODO:
         content: json-object with full content Samer as content for bsModal with extention of
             id, and
             showWhen and hideWhen = [id] of value: hide or show element when another element with id has value
+
+        extended.content: Same as options.content, but NOT BOTH
+        useExtended: false - When true the extended.content is used as the content of the form
         onChanging: function( values ) - called when the value of any of the elements are changed
         onSubmit  : function( values ) - called when the form is submitted
     *************************************************************************
@@ -66731,7 +66758,12 @@ TODO:
                 if ($.isPlainObject(obj) || ($.type(obj) == 'array'))
                     $.each( obj, setId );
         }
-        setId( 'dummy', this.options.content);
+
+
+        if (this.options.extended && this.options.useExtended)
+            setId( 'dummy', this.options.extended);
+        else
+            setId( 'dummy', this.options.content);
 
         //Create a hidden submit-button to be placed inside the form
         var $hiddenSubmitButton = this.$hiddenSubmitButton = $('<button type="submit" style="display:none"/>');
@@ -66748,16 +66780,23 @@ TODO:
         this.options.show = false; //Only show using method edit(...)
 
         //Create the form
-        this.$form =
-            $('<form/>')
-                ._bsAppendContent( this.options.content, this.options.contentContext );
+        this.$form = $('<form/>');
+
+        if (this.options.extended && this.options.useExtended){
+            this.$form._bsAppendContent( this.options.extended.content, this.options.contentContext );
+            this.options.extended.content = this.$form;
+
+        }
+        else {
+            this.$form._bsAppendContent( this.options.content, this.options.contentContext );
+            this.options.content = this.$form;
+        }
+
 
         if (this.options.formValidation)
             this.$form.addClass('form-validation');
 
-
         //Create the modal
-        this.options.content = this.$form;
         this.$bsModal = $.bsModal( this.options );
 
         //Append the hidden submit-button the the form
@@ -67493,6 +67532,9 @@ TODO:
                     .toggleClass('modal-type-' + options.type, !!options.type)
                     .appendTo( this );
 
+        if (!options.content || (options.content === {}))
+            $modalBody.addClass('modal-body-no-content');
+
         if (!isTabs && options.height)
             $modalBody.height(options.height);
 
@@ -67504,6 +67546,8 @@ TODO:
 
         //Add content
         $modalContent._bsAppendContent( options.content, options.contentContext );
+
+
 
         //Add footer
         parts.$footer =
@@ -70193,8 +70237,6 @@ Adjust standard Leaflet popup to display as Bootstrap modal
 (function ($, L/*, window, document, undefined*/) {
     "use strict";
 
-return; //TODO - IT IS **NOT** WORKING
-
     /*********************************************************
     Overwrite default Popu-options: Remove default leaflet closeButton
     *********************************************************/
@@ -70202,7 +70244,15 @@ return; //TODO - IT IS **NOT** WORKING
 
     //Add methods to pin or unpin popup
     L.Popup.prototype._setPinned = function(pinned) {
-        this.options._pinned = pinned;
+        this._pinned = pinned = !!pinned;
+
+        //Update pin-icon (if avaiable)
+        if (this.bsModal && this.bsModal.$container){
+            this.bsModal.isPinned = pinned;
+            this.bsModal.$container.modernizrToggle('modal-pinned', pinned );
+        }
+
+        //Update related options
         this.options.closeOnEscapeKey = !pinned;
         this.options.autoClose        = !pinned;
     };
@@ -70212,49 +70262,54 @@ return; //TODO - IT IS **NOT** WORKING
     *********************************************************/
     L.Popup.prototype._brintToFocus = function() {
         this.bringToFront();
-        if (this._map && this._map._popup && this._map._popup !== this && !this._map._popup.options._pinned)
+        if (this._map && this._map._popup && this._map._popup !== this && !this._map._popup._pinned)
             this._map.closePopup(this._map._popup);
     };
 
-    function popup_getEvents_preclick(){
-        if (!this.options._pinned)
-            this._close();
-    }
 
     /*********************************************************
-    Adjust Popup.getEvents to adjust preclick
+    Adjust Popup._close and Popup._onCloseButtonClick
+    to only close popup if it isn't pinned or it is closed from close-button
     *********************************************************/
-    L.Popup.prototype.getEvents = function (getEvents) {
-        return function() {
-            var events = getEvents.apply(this, arguments);
-            if (this.options.fixable)
-                events.preclick = events.preclick ? popup_getEvents_preclick : null;
-            return events;
+    L.Popup.prototype._close = function (_close) {
+        return function () {
+            if (!this._pinned || this._closeViaCloseButton){
+                this._closeViaCloseButton = false;
+                _close.apply(this, arguments);
+            }
         };
-    } (L.Popup.prototype.getEvents);
+    } (L.Popup.prototype._close);
 
-    /*********************************************************
-    Adjust Popup.initialize
-    *********************************************************/
-    L.Popup.prototype.initialize = function (initialize) {
-        return function (options) {
-            if (options && options.fixable)
-                this.onPin = $.proxy( this._setPinned, this);
-            return initialize.apply(this, arguments);
+    L.Popup.prototype._onCloseButtonClick = function (_onCloseButtonClick) {
+        return function () {
+            this._closeViaCloseButton = true;
+            _onCloseButtonClick.apply(this, arguments);
         };
-    } (L.Popup.prototype.initialize);
+    } (L.Popup.prototype._onCloseButtonClick);
+
+
 
 
     /*********************************************************
     Extend L.Popup._initLayout to create popup with Bootstrap-components
     *********************************************************/
     L.Popup.prototype._initLayout = function (_initLayout) {
-        return function (options, source) {
-            options = options || {};
-            options.closeButton = false; //No default leaflet close - close-button part of content
+        return function () {
+            //Some options can be given in this._content
+            if ($.isPlainObject(this._content)){
+                this.options.minWidth  = this._content.minWidth  || this.options.minWidth;
+                this.options.maxWidth  = this._content.maxWidth  || this.options.maxWidth;
+                this.options.maxHeight = this._content.maxHeight || this.options.maxHeight;
+                this.options.width     = this._content.width     || this.options.width;
+            }
+            //Set fixed width
+            if (this.options.width){
+                this.options.minWidth = this.options.width;
+                this.options.maxWidth = this.options.width;
+            }
 
             //Original function/method
-            _initLayout.call(this, options, source);
+            _initLayout.apply(this, arguments);
 
             //Set class-name for wrapper to remove margin, bg-color etc.
             $(this._wrapper).addClass('modal-wrapper');
@@ -70264,19 +70319,24 @@ return; //TODO - IT IS **NOT** WORKING
 
             //Close open popup and brint to front when "touched"
             L.DomEvent.on(this._contentNode, 'mousedown', this._brintToFocus, this );
+
+            return this;
         };
     } (L.Popup.prototype._initLayout);
 
 
     /*********************************************************
-    Overwrite L.Popup._updateContent to create popup with Bootstrap-components
+    Overwrite L.Popup._updateContent to update inside bsModal-body
     *********************************************************/
     L.Popup.prototype._updateContent = function(){
-		if (!this._content) { return; }
+        //Reset pinned-status
+        var isPinned = !!this._pinned;
+        this._setPinned(false);
 
+        //Create and adjust options in this._content into options for bsModal
         //this._content can be 1: string or function, 2: object with the content, 3: Full popup-options
         //Convert this._content into bsModal-options
-        var contentAsModalOptions = ($.isPlainObject(this._content) && !!this._content.content) ? this._content : {content: this._content, closeButton: false},
+        var contentAsModalOptions = ($.isPlainObject(this._content) && !!this._content.content) ? this._content : {content: this._content},
             modalOptions = $.extend(true, {
                 small         : true,
                 smallButtons  : true,
@@ -70285,15 +70345,25 @@ return; //TODO - IT IS **NOT** WORKING
                         onClick: $.proxy(this._onCloseButtonClick, this)
                     }
                 },
-                onPin         : this.onPin,
+                closeButton   : contentAsModalOptions.closeButton,
                 noHeader      : !contentAsModalOptions.header,
                 contentContext: this,
             },
             contentAsModalOptions );
 
+
+
+        if (modalOptions.fixable){
+            this.options.fixable = true;
+            modalOptions.onPin = $.proxy( this._setPinned, this);
+        }
+
         //Adjust options for leaflet popup
         if (modalOptions.scroll)
             this.options.maxHeight = this.options.maxHeight || 300; //maxHeight must be set if content is inside a scroll
+
+        //Save modal-options and content
+        this.modalOptions = modalOptions;
 
         //Get the content-node and build the content as a Bootstrap modal
         var $contentNode = $(this._contentNode);
@@ -70301,10 +70371,48 @@ return; //TODO - IT IS **NOT** WORKING
             .empty()
             ._bsModalContent( modalOptions );
 
+        //Save the modal-object
+        this.bsModal = $contentNode.bsModal;
+
         //Set max-height of inner modal-container
         if (this.options.maxHeight)
             $contentNode.bsModal.$container.css('max-height', this.options.maxHeight);
+
+        this._setPinned(isPinned);
+
+        this.fire('contentupdate');
     };
+
+    /*********************************************************
+    NEW METHOD L.Popup.changeContent - only changes the content
+    of the "body" of the bsModal inside the popup
+    *********************************************************/
+    L.Popup.prototype.changeContent = function(content, contentContext) {
+        var _contentContent = ($.isPlainObject(content) && !!content.content) ? content : {content: content, contentContext: contentContext};
+
+        $.extend(this._content, _contentContent );
+
+        //Update normal content
+        this.bsModal.$body.empty();
+        this.bsModal.$body._bsAppendContent(
+            this._content.content,
+            this._content.contentContext
+        );
+
+
+        if (this.bsModal.extended){
+            //Update extended content
+            this.bsModal.extended.$body.empty();
+            this.bsModal.extended.$body._bsAppendContent(
+                this._content.extended.content,
+                this._content.extended.contentContext
+            );
+        }
+
+        this.update();
+		return this;
+	};
+
 
 }(jQuery, L, this, document));
 

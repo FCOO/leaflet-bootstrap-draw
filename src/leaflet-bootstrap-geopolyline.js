@@ -456,14 +456,14 @@ Object representing a polyline or polygon as Geodesic
         /******************************************************
         Events on interactive layer
         ******************************************************/
-        onMouseover( mouseEvent ){
+        onMouseover: function( mouseEvent ){
             this.onMousemove( mouseEvent );
             this.editMarker.setOpacity(1);
         },
-        onMousemove( mouseEvent ){
+        onMousemove: function( mouseEvent ){
             this.editMarker.setLatLng( mouseEvent.latlng );
         },
-        onMouseout( /*mouseEvent*/ ){
+        onMouseout: function( /*mouseEvent*/ ){
             this.editMarker.setOpacity(0);
         },
 
@@ -494,7 +494,7 @@ Object representing a polyline or polygon as Geodesic
         /******************************************************
         Events on map
         ******************************************************/
-        _map_onClick( mouseEvent ){
+        _map_onClick: function( mouseEvent ){
             if (this.isInteractive){
                 this.appendLatLng( mouseEvent.latlng );
                 L.DomEvent.stop( mouseEvent );

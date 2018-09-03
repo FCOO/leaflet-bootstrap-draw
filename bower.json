@@ -1,6 +1,6 @@
 {
   "name": "leaflet-bootstrap-draw",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "homepage": "https://github.com/FCOO/leaflet-bootstrap-draw",
   "authors": [
     "Niels Holt"
@@ -32,14 +32,7 @@
       }
     },
     "Leaflet.GeometryUtil": {
-      "main": [
-        "src/leaflet.geometryutil.js"
-      ]
-    },
-    "_geodesy": {
-      "main": [
-        "latlon-spherical.js"
-      ]
+      "main": "src/leaflet.geometryutil.js"
     }
   },
   "devDependencies": {
