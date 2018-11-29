@@ -23,7 +23,7 @@
 
     //Default options
         options: {
-            VERSION: "0.3.2"
+            VERSION: "1.0.0"
 
         },
 
@@ -93,245 +93,33 @@ Object representing a polyline or polygon as Geodesic
 
     /******************************************************************
     *******************************************************************
-    L.LatLngMarker     = Marker for points in GeoPolyline
-    L.LatLngEditMarker = Marker for hover over line segment
-    *******************************************************************
-    ******************************************************************/
-    var iconDim     = 12,
-        iconSize    = [iconDim, iconDim],
-        bigIconDim  = 30,
-        bigIconSize = [bigIconDim, bigIconDim];
-
-    L.LatLngMarker = L.BsMarker.extend({
-        options: {
-            draggable: true,
-            icon     : L.divIcon({
-                           iconSize : iconSize,
-                           className: 'lbm-icon lbm-draw'
-                       }),
-            bigIcon  : L.divIcon({
-                           iconSize : bigIconSize,
-                           className: 'lbm-icon lbm-draw'
-                       }),
-
-            tooltip  : {
-                da:'Træk for at ændre, klik for at fjerne',
-                en:'Drag to change, click to remove'
-            },
-            bigIconWhenTouch       : true,
-            tooltipHideWhenDragging: true
-
-        }
-    });
-
-    var bigIconClassName = 'lbm-icon lbm-draw hide-on-leaflet-dragging lbm-warning hide-for-no-mouse';
-    L.LatLngEditMarker = L.LatLngMarker.extend({
-        options: {
-            icon   : L.divIcon({
-                         iconSize : iconSize,
-                         className: bigIconClassName
-                     }),
-            bigIcon: L.divIcon({
-                         iconSize : bigIconSize,
-                         className: bigIconClassName
-                     }),
-
-            opacity: 0
-        }
-    });
-
-    /******************************************************************
-    *******************************************************************
-    LatLngPointMarker_include - include for different varaitions of L.LatLngPointMarker
-    *******************************************************************
-    ******************************************************************/
-    var LatLngPointMarker_include = {
-        /*****************************************************
-        addToLayerGroup
-        *****************************************************/
-        addToLayerGroup: function( layerGroup, markerPane ){
-            this.layerGroup = this.layerGroup || layerGroup;
-            if (markerPane)
-                this.marker.options.pane = markerPane;
-            if (this.layerGroup && !this.layerGroup.hasLayer(this.marker))
-                this.layerGroup.addLayer(this.marker);
-        },
-
-        /*****************************************************
-        onRemove
-        *****************************************************/
-        onRemove: function(){
-            if (this.layerGroup && this.layerGroup.hasLayer(this.marker))
-                this.layerGroup.removeLayer(this.marker);
-        },
-
-    };
-
-    /******************************************************************
-    *******************************************************************
-    L.LatLngPointMarker - Extend L.latLngPoint with draggable marker
-    *******************************************************************
-    ******************************************************************/
-    L.LatLngPointMarker = L.LatLngPoint.extend({
-        /*****************************************************
-        initialize
-        *****************************************************/
-        initialize: function( latLng, latLngPointlist ){
-            L.LatLngPoint.prototype.initialize.call(this, latLng, latLngPointlist);
-            this.marker = new L.LatLngMarker(latLng);
-
-            this.marker.on('dragstart', this.onDragstart, this);
-
-            this.marker.on('drag',      this.onDrag,      this);
-            this.marker.on('mousemove', this.onDrag,      this);
-            this.mousemoveAdded = true;
-
-            this.marker.on('dragend',   this.onDragend,   this);
-            this.marker.on('mouseup',   this.onDragend,   this);
-            this.marker.on('click',     this.remove,      this );
-
-        },
-
-
-        /*****************************************************
-        onDragstart
-        *****************************************************/
-        onDragstart: function(/*mouseEvent*/){
-
-            this.lastLatLng = L.latLng(0,0);
-
-            this.latLngPointlist.currentLatLngPoint = this;
-            this.onDragEvent('dragstart');
-        },
-
-        /*****************************************************
-        onDrag
-        *****************************************************/
-        onDrag: function(mouseEvent){
-            if (!this.lastLatLng || this.lastLatLng.equals(mouseEvent.latlng)){
-                return;
-            }
-
-            //Remove mousemove event if drag is supported to minimize events fired
-            if ((mouseEvent.type == 'drag') && this.mousemoveAdded){
-                this.mousemoveAdded = false;
-                this.marker.off('mousemove', this.onDrag, this);
-            }
-
-            this.lastLatLng = mouseEvent.latlng;
-            this.lat  = mouseEvent.latlng.lat;
-            this.lng = mouseEvent.latlng.lng;
-            this.update();
-        },
-
-        /*****************************************************
-        onDragend
-        *****************************************************/
-        onDragend: function(mouseEvent){
-            if (!this.lastLatLng)
-                return;
-
-            //Fire drag one last time to get
-            mouseEvent.latlng = mouseEvent.target.getLatLng();
-            this.onDrag( mouseEvent );
-
-            this.latLngPointlist.currentLatLngPoint = null;
-            this.onDragEvent('dragend');
-            this.lastLatLng = null;
-
-        },
-
-        /*****************************************************
-        onDragEvent
-        *****************************************************/
-        onDragEvent: function( type ){
-            this.latLngPointlist.onDragEvent( type );
-        },
-
-
-        /*****************************************************
-        onUpdate
-        *****************************************************/
-        onUpdate: function(){
-            this.marker.setLatLng( this );
-        },
-
-    });
-    L.LatLngPointMarker.include( LatLngPointMarker_include );
-
-    L.latLngPointMarker = function( latLng, latLngPointlist ){ return new L.LatLngPointMarker( latLng, latLngPointlist ); };
-
-
-    /******************************************************************
-    *******************************************************************
-    L.LatLngDistancePointVessel
-    Extend L.LatLngDistancePoint with "vessel"-marker (L.VesselMarker)
-    *******************************************************************
-    ******************************************************************/
-    L.LatLngDistancePointVessel = L.LatLngDistancePoint.extend({
-        /*****************************************************
-        initialize
-        *****************************************************/
-        initialize: function( distance, latLngPointlist, options ){
-            L.LatLngDistancePoint.prototype.initialize.call(this, distance, latLngPointlist);
-            this.marker = L.vesselMarker( this, options );
-        },
-
-        /*****************************************************
-        update
-        *****************************************************/
-        update: function(){
-            L.LatLngDistancePoint.prototype.update.call(this);
-
-            //Update vessel
-            if (this.marker){
-                this.marker.setLatLng( this );
-                this.marker.setHeading( this.bearing );
-                this.marker.setOpacity( this.exists ? 1 : 0 );
-            }
-        }
-    });
-    L.LatLngDistancePointVessel.include( LatLngPointMarker_include );
-
-
-    /******************************************************************
-    *******************************************************************
-    L.LatLngPointMarkerList - Extend L.LatLngPointList with drag-events
-    *******************************************************************
-    ******************************************************************/
-    L.LatLngPointMarkerList = L.LatLngPointList.extend({
-        /*****************************************************
-        initialize
-        *****************************************************/
-        initialize: function( options, polyline ){
-            L.LatLngPointList.prototype.initialize.call(this, options);
-            this.polyline = polyline;
-        },
-
-        /*****************************************************
-        onDragEvent
-        *****************************************************/
-        onDragEvent: function(type){
-            this.polyline && this.polyline.onDragEvent ? this.polyline.onDragEvent( type ) : null;
-        }
-    });
-
-    /******************************************************************
-    *******************************************************************
     L.GeoPolyline
     *******************************************************************
     ******************************************************************/
     L.GeoPolyline = L.Geodesic.extend({
         options: {
+            //options for leaflet-bootstrap
+            tooltip: {da:'Klik for at tilføje', en:'Click to add'},
+            tooltipHideWhenDragging : true,
+            tooltipHideWhenPopupOpen: true,
+
+            //Options for L.Geodesic
             steps: 1,
             wrap : false,
 
-            weight          : 2,
-            opacity         : 1,
-            color           : "black",
-            addShadow       : true,
-            addInteractive  : true,
-            interactiveStyle: { width: (iconDim-2)/2 },
+            //options for L.Polyline
+            addInteractive          : true,
+            addInteractiveLayerGroup: true,
+            weight                  : 2,
+            lineColorName           : "black",
+            shadowWhenInteractive   : true,
+
+            border          : true,
+            shadow          : false,
+            hover           : false,
+            width           : 2,
+
+            //options for GeoPolyline
             isPolygon       : false,
             isRhumb         : true,
         },
@@ -345,11 +133,6 @@ Object representing a polyline or polygon as Geodesic
             options.addInteractive = true;
             options.events = options.events || {};
 
-            //Set widther interactive-zone if browser is with touch
-            if (window.bsIsTouch)
-                this.options.interactiveStyle.width = (bigIconDim-2)/2;
-
-
             L.Geodesic.prototype.initialize.call(this, [[]], options );
 
             this.latLngPointMarkerList = new L.LatLngPointMarkerList({
@@ -360,10 +143,7 @@ Object representing a polyline or polygon as Geodesic
                 onUpdate        : $.proxy(this.update, this)
             }, this);
 
-            this.bindTooltip({
-                da:'Klik for at tilføje',
-                en:'Click to add'
-            }, {sticky: true});
+            this.bindTooltip(this.options.tooltip);
 
             this.editMarker = null; //Created on add to map
 
@@ -372,7 +152,7 @@ Object representing a polyline or polygon as Geodesic
             this.on('mouseout',  this.onMouseout,  this );
             this.on('click',     this.onClick,     this );
 
-            this.on('dragstart', this.onDragstart,     this );
+            this.on('dragstart', this.onDragstart, this );
 
             return this;
 
@@ -406,6 +186,9 @@ Object representing a polyline or polygon as Geodesic
 
             if (this.options.addInteractive && !this.editMarker){
                 this.editMarker = new L.LatLngEditMarker([0,0], {pane: paneName}, this);
+                this.editMarker.$icon.addClass('hide-for-leaflet-dragging');
+                this.editMarker.setOpacity(0);
+
                 this.interactiveLayerGroup.addLayer( this.editMarker );
             }
 
@@ -464,6 +247,36 @@ Object representing a polyline or polygon as Geodesic
 
 
         /*****************************************************
+        onSetInteractive
+        *****************************************************/
+/*
+        onSetInteractive: function( onSetInteractive ){
+            return function( on ){
+                onSetInteractive.call( this, on );
+            };
+        }( L.Geodesic.prototype.onSetInteractive ),
+*/
+
+        /*****************************************************
+        setBorderColor
+        Overwrite default method to include setting color for
+        all marker in this.latLngPointMarkerList and this.editMarker
+        *****************************************************/
+        setBorderColor: function( setBorderColor ){
+            return function( borderColorName ){
+                setBorderColor.call( this, borderColorName );
+
+                if (this.latLngPointMarkerList)
+                    $.each( this.latLngPointMarkerList.list, function(index, latLngPointMarker){
+                        latLngPointMarker.setBorderColor( borderColorName );
+                });
+                if (this.editMarker)
+                    this.editMarker.setBorderColor( borderColorName );
+
+            };
+        }( L.Geodesic.prototype.setBorderColor ),
+
+        /*****************************************************
         setPolygon and setRhumb
         *****************************************************/
         _setAny: function(id, value){
@@ -520,6 +333,8 @@ Object representing a polyline or polygon as Geodesic
         insertLatLng: function( latLng, index ){
             var newPoint = this.latLngPointMarkerList.insert( latLng, index );
             newPoint.addToLayerGroup(this.interactiveLayerGroup);
+            newPoint.setBorderColor( this.options.borderColorName );
+
             this.update();
             return newPoint;
         },
@@ -543,13 +358,16 @@ Object representing a polyline or polygon as Geodesic
         ******************************************************/
         onMouseover: function( mouseEvent ){
             this.onMousemove( mouseEvent );
-            this.editMarker.setOpacity(1);
+            if (this.editMarker)
+                this.editMarker.setOpacity(1);
         },
         onMousemove: function( mouseEvent ){
-            this.editMarker.setLatLng( mouseEvent.latlng );
+            if (this.editMarker)
+                this.editMarker.setLatLng( mouseEvent.latlng );
         },
         onMouseout: function( /*mouseEvent*/ ){
-            this.editMarker.setOpacity(0);
+            if (this.editMarker)
+                this.editMarker.setOpacity(0);
         },
 
         /******************************************************
@@ -605,13 +423,16 @@ Object representing a polyline or polygon as Geodesic
         /*****************************************************
         onSetInteractive
         *****************************************************/
-        onSetInteractive: function( on ){
-            if (on)
-                this.backup();
-            var pane = this._map && this.vesselMarkerPaneName ? this._map.getPane(this.vesselMarkerPaneName) : null;
-            if (pane)
-                $(pane).css('z-index', this.vesselPaneZIndex + (on ? 0 : 2 ));
-        },
+        onSetInteractive: function( onSetInteractive ){
+            return function( on ){
+                onSetInteractive.call( this, on );
+                if (on)
+                    this.backup();
+                var pane = this._map && this.vesselMarkerPaneName ? this._map.getPane(this.vesselMarkerPaneName) : null;
+                if (pane)
+                    $(pane).css('z-index', this.vesselPaneZIndex + (on ? 0 : 2 ));
+            };
+        }( L.GeoPolyline.prototype.onSetInteractive ),
 
         /*****************************************************
         _updateVesselIndex
@@ -746,6 +567,238 @@ Object representing a polyline or polygon as Geodesic
         }
     });
 
+
+}(jQuery, L, this, document));
+;
+/****************************************************************************
+leaflet-bootstrap-latlng-marker.js,
+
+Object representing a marker on a geopolyline
+****************************************************************************/
+(function ($, L/*, window, document, undefined*/) {
+    "use strict";
+
+    /******************************************************************
+    *******************************************************************
+    L.LatLngMarker     = Marker for points in GeoPolyline
+    L.LatLngEditMarker = Marker for hover over line segment
+    *******************************************************************
+    ******************************************************************/
+    L.LatLngMarker = L.BsMarker.extend({
+        options: {
+            draggable       : true,
+            colorName       : 'white',
+            bigIconWhenTouch: true,
+            hover           : true,
+            thickBorder     : true,
+
+            tooltip  : {
+                da:'Træk for at ændre, klik for at fjerne',
+                en:'Drag to change, click to remove'
+            },
+            tooltipHideWhenDragging : true,
+            tooltipHideWhenPopupOpen: true
+
+        }
+    });
+
+
+    L.LatLngEditMarker = L.LatLngMarker.extend({
+        options: {
+            colorName  : 'warning',
+            thickBorder: true,
+            tooltip    : '',
+        }
+    });
+
+    /******************************************************************
+    *******************************************************************
+    LatLngPointMarker_include - include for different varaitions of L.LatLngPointMarker
+    *******************************************************************
+    ******************************************************************/
+    var LatLngPointMarker_include = {
+        /*****************************************************
+        addToLayerGroup
+        *****************************************************/
+        addToLayerGroup: function( layerGroup, markerPane ){
+            this.layerGroup = this.layerGroup || layerGroup;
+            if (markerPane)
+                this.marker.options.pane = markerPane;
+            if (this.layerGroup && !this.layerGroup.hasLayer(this.marker))
+                this.layerGroup.addLayer(this.marker);
+        },
+
+        /*****************************************************
+        onRemove
+        *****************************************************/
+        onRemove: function(){
+            if (this.layerGroup && this.layerGroup.hasLayer(this.marker))
+                this.layerGroup.removeLayer(this.marker);
+        },
+
+    };
+
+    /******************************************************************
+    *******************************************************************
+    L.LatLngPointMarker - Extend L.latLngPoint with draggable marker
+    *******************************************************************
+    ******************************************************************/
+    L.LatLngPointMarker = L.LatLngPoint.extend({
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function( latLng, latLngPointlist ){
+            L.LatLngPoint.prototype.initialize.call(this, latLng, latLngPointlist);
+            this.marker = new L.LatLngMarker(latLng);
+
+            this.marker.on('dragstart', this.onDragstart, this);
+
+            this.marker.on('drag',      this.onDrag,      this);
+            this.marker.on('mousemove', this.onDrag,      this);
+            this.mousemoveAdded = true;
+
+            this.marker.on('dragend',   this.onDragend,   this);
+            this.marker.on('mouseup',   this.onDragend,   this);
+            this.marker.on('click',     this.remove,      this );
+
+        },
+
+
+        /*****************************************************
+        setColor
+        *****************************************************/
+        setColor: function( colorName ){
+            this.marker.setColor( colorName );
+        },
+
+        /*****************************************************
+        setBorderColor
+        *****************************************************/
+        setBorderColor: function( borderColorName ){
+            this.marker.setBorderColor( borderColorName );
+        },
+
+        /*****************************************************
+        onDragstart
+        *****************************************************/
+        onDragstart: function(/*mouseEvent*/){
+            this.lastLatLng = L.latLng(0,0);
+
+            this.latLngPointlist.currentLatLngPoint = this;
+            this.onDragEvent('dragstart');
+        },
+
+        /*****************************************************
+        onDrag
+        *****************************************************/
+        onDrag: function(mouseEvent){
+            if (!this.lastLatLng || this.lastLatLng.equals(mouseEvent.latlng)){
+                return;
+            }
+
+            //Remove mousemove event if drag is supported to minimize events fired
+            if ((mouseEvent.type == 'drag') && this.mousemoveAdded){
+                this.mousemoveAdded = false;
+                this.marker.off('mousemove', this.onDrag, this);
+            }
+
+            this.lastLatLng = mouseEvent.latlng;
+            this.lat  = mouseEvent.latlng.lat;
+            this.lng = mouseEvent.latlng.lng;
+            this.update();
+        },
+
+        /*****************************************************
+        onDragend
+        *****************************************************/
+        onDragend: function(mouseEvent){
+            if (!this.lastLatLng)
+                return;
+
+            //Fire drag one last time to get
+            mouseEvent.latlng = mouseEvent.target.getLatLng();
+            this.onDrag( mouseEvent );
+
+            this.latLngPointlist.currentLatLngPoint = null;
+            this.onDragEvent('dragend');
+            this.lastLatLng = null;
+
+        },
+
+        /*****************************************************
+        onDragEvent
+        *****************************************************/
+        onDragEvent: function( type ){
+            this.latLngPointlist.onDragEvent( type );
+        },
+
+
+        /*****************************************************
+        onUpdate
+        *****************************************************/
+        onUpdate: function(){
+            this.marker.setLatLng( this );
+        },
+
+    });
+    L.LatLngPointMarker.include( LatLngPointMarker_include );
+
+    L.latLngPointMarker = function( latLng, latLngPointlist ){ return new L.LatLngPointMarker( latLng, latLngPointlist ); };
+
+
+    /******************************************************************
+    *******************************************************************
+    L.LatLngDistancePointVessel
+    Extend L.LatLngDistancePoint with "vessel"-marker (L.VesselMarker)
+    *******************************************************************
+    ******************************************************************/
+    L.LatLngDistancePointVessel = L.LatLngDistancePoint.extend({
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function( distance, latLngPointlist, options ){
+            L.LatLngDistancePoint.prototype.initialize.call(this, distance, latLngPointlist);
+            this.marker = L.vesselMarker( this, options );
+        },
+
+        /*****************************************************
+        update
+        *****************************************************/
+        update: function(){
+            L.LatLngDistancePoint.prototype.update.call(this);
+
+            //Update vessel
+            if (this.marker){
+                this.marker.setLatLng( this );
+                this.marker.setHeading( this.bearing );
+                this.marker.setOpacity( this.exists ? 1 : 0 );
+            }
+        }
+    });
+    L.LatLngDistancePointVessel.include( LatLngPointMarker_include );
+
+
+    /******************************************************************
+    *******************************************************************
+    L.LatLngPointMarkerList - Extend L.LatLngPointList with drag-events
+    *******************************************************************
+    ******************************************************************/
+    L.LatLngPointMarkerList = L.LatLngPointList.extend({
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function( options, polyline ){
+            L.LatLngPointList.prototype.initialize.call(this, options);
+            this.polyline = polyline;
+        },
+
+        /*****************************************************
+        onDragEvent
+        *****************************************************/
+        onDragEvent: function(type){
+            this.polyline && this.polyline.onDragEvent ? this.polyline.onDragEvent( type ) : null;
+        }
+    });
 
 }(jQuery, L, this, document));
 

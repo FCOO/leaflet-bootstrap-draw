@@ -13890,6 +13890,7 @@ window.L = exports;
 // along with Leaflet.Geodesic.  If not, see <http://www.gnu.org/licenses/>.
 
 
+
 /** Extend Number object with method to convert numeric degrees to radians */
 if (typeof Number.prototype.toRadians === "undefined") {
   Number.prototype.toRadians = function() {
@@ -13916,19 +13917,20 @@ L.Geodesic = L.Polyline.extend({
 
   initialize: function(latlngs, options) {
     this.options = this._merge_options(this.options, options);
-    this.options.dash = Math.max(1e-3, Math.min(1, parseFloat(this.options.dash) || 1));
     this.datum = {};
     this.datum.ellipsoid = {
         a: 6378137,
         b: 6356752.3142,
         f: 1 / 298.257223563
       }; // WGS-84
-    this._latlngs = this._generate_Geodesic(latlngs);
+    this._latlngs = (this.options.dash < 1) ? this._generate_GeodesicDashed(
+      latlngs) : this._generate_Geodesic(latlngs);
     L.Polyline.prototype.initialize.call(this, this._latlngs, this.options);
   },
 
   setLatLngs: function(latlngs) {
-    this._latlngs = this._generate_Geodesic(latlngs);
+    this._latlngs = (this.options.dash < 1) ? this._generate_GeodesicDashed(
+      latlngs) : this._generate_Geodesic(latlngs);
     L.Polyline.prototype.setLatLngs.call(this, this._latlngs);
   },
 
@@ -13937,7 +13939,7 @@ L.Geodesic = L.Polyline.extend({
    * @returns (Object} Object with several properties (e.g. overall distance)
    */
   getStats: function() {
-    let obj = {
+    var obj = {
         distance: 0,
         points: 0,
         polygons: this._latlngs.length
@@ -13961,13 +13963,14 @@ L.Geodesic = L.Polyline.extend({
    */
   geoJson: function(geojson) {
 
-    let normalized = L.GeoJSON.asFeature(geojson);
-    let features = normalized.type === "FeatureCollection" ? normalized.features : [
+    var normalized = L.GeoJSON.asFeature(geojson);
+    var features = normalized.type === "FeatureCollection" ? normalized.features : [
       normalized
     ];
     this._latlngs = [];
-    for (let feature of features) {
-      let geometry = feature.type === "Feature" ? feature.geometry :
+
+    features.forEach(function (feature) {
+      var geometry = feature.type === "Feature" ? feature.geometry :
         feature,
         coords = geometry.coordinates;
 
@@ -13989,7 +13992,7 @@ L.Geodesic = L.Polyline.extend({
           console.log("Drawing " + geometry.type +
             " as a geodesic is not supported. Skipping...");
       }
-    }
+    });
     L.Polyline.prototype.setLatLngs.call(this, this._latlngs);
   },
 
@@ -13999,28 +14002,28 @@ L.Geodesic = L.Polyline.extend({
    * @param {number} radius - radius of the circle in metres
    */
   createCircle: function(center, radius) {
-    let polylineIndex = 0;
-    let prev = {
+    var polylineIndex = 0;
+    var prev = {
       lat: 0,
       lng: 0,
       brg: 0
     };
-    let step;
+    var step;
 
     this._latlngs = [];
     this._latlngs[polylineIndex] = [];
 
-    let direct = this._vincenty_direct(L.latLng(center), 0, radius, this.options
+    var direct = this._vincenty_direct(L.latLng(center), 0, radius, this.options
       .wrap);
     prev = L.latLng(direct.lat, direct.lng);
     this._latlngs[polylineIndex].push(prev);
     for (step = 1; step <= this.options.steps;) {
       direct = this._vincenty_direct(L.latLng(center), 360 / this.options
         .steps * step, radius, this.options.wrap);
-      let gp = L.latLng(direct.lat, direct.lng);
+      var gp = L.latLng(direct.lat, direct.lng);
       if (Math.abs(gp.lng - prev.lng) > 180) {
-        let inverse = this._vincenty_inverse(prev, gp);
-        let sec = this._intersection(prev, inverse.initialBearing, {
+        var inverse = this._vincenty_inverse(prev, gp);
+        var sec = this._intersection(prev, inverse.initialBearing, {
           lat: -89,
           lng: ((gp.lng - prev.lng) > 0) ? -INTERSECT_LNG : INTERSECT_LNG
         }, 0);
@@ -14049,33 +14052,32 @@ L.Geodesic = L.Polyline.extend({
 
   /**
    * Creates a geodesic Polyline from given coordinates
-   * Note: dashed lines are under work
    * @param {Object} latlngs - One or more polylines as an array. See Leaflet doc about Polyline
    * @returns (Object} An array of arrays of geographical points.
    */
   _generate_Geodesic: function(latlngs) {
-    let _geo = [], _geocnt = 0;
+    var _geo = [],
+      _geocnt = 0,
+      s, poly, points, pointA, pointB;
 
-    for (let poly = 0; poly < latlngs.length; poly++) {
+    for (poly = 0; poly < latlngs.length; poly++) {
       _geo[_geocnt] = [];
-      let prev = L.latLng(latlngs[poly][0]);
-      for (let points = 0; points < (latlngs[poly].length - 1); points++) {
-        // use prev, so that wrapping behaves correctly
-        let pointA = prev;
-        let pointB = L.latLng(latlngs[poly][points + 1]);
+      for (points = 0; points < (latlngs[poly].length - 1); points++) {
+        pointA = L.latLng(latlngs[poly][points]);
+        pointB = L.latLng(latlngs[poly][points + 1]);
         if (pointA.equals(pointB)) {
           continue;
         }
-        let inverse = this._vincenty_inverse(pointA, pointB);
+        var inverse = this._vincenty_inverse(pointA, pointB);
+        var prev = pointA;
         _geo[_geocnt].push(prev);
-        for (let s = 1; s <= this.options.steps;) {
-          let distance = inverse.distance / this.options.steps;
-          // dashed lines don't go the full distance between the points
-          let dist_mult = s - 1 + this.options.dash;
-          let direct = this._vincenty_direct(pointA, inverse.initialBearing, distance*dist_mult, this.options.wrap);
-          let gp = L.latLng(direct.lat, direct.lng);
+        for (s = 1; s <= this.options.steps;) {
+          var direct = this._vincenty_direct(pointA, inverse.initialBearing,
+            inverse.distance / this.options.steps * s, this.options.wrap
+          );
+          var gp = L.latLng(direct.lat, direct.lng);
           if (Math.abs(gp.lng - prev.lng) > 180) {
-            let sec = this._intersection(pointA, inverse.initialBearing, {
+            var sec = this._intersection(pointA, inverse.initialBearing, {
               lat: -89,
               lng: ((gp.lng - prev.lng) > 0) ? -INTERSECT_LNG : INTERSECT_LNG
             }, 0);
@@ -14091,19 +14093,10 @@ L.Geodesic = L.Polyline.extend({
               _geo[_geocnt].push(gp);
               prev = gp;
               s++;
-            }  
+            }
           } else {
             _geo[_geocnt].push(gp);
-            // Dashed lines start a new line
-            if (this.options.dash < 1){
-                _geocnt++;
-                // go full distance this time, to get starting point for next line
-                let direct_full = this._vincenty_direct(pointA, inverse.initialBearing, distance*s, this.options.wrap);
-                _geo[_geocnt] = [];
-                prev = L.latLng(direct_full.lat, direct_full.lng);
-                _geo[_geocnt].push(prev);
-            }
-            else prev = gp;
+            prev = gp;
             s++;
           }
         }
@@ -14112,6 +14105,71 @@ L.Geodesic = L.Polyline.extend({
     }
     return _geo;
   },
+
+
+  /**
+   * Creates a dashed geodesic Polyline from given coordinates - under work
+   * @param {Object} latlngs - One or more polylines as an array. See Leaflet doc about Polyline
+   * @returns (Object} An array of arrays of geographical points.
+   */
+  _generate_GeodesicDashed: function(latlngs) {
+    var _geo = [],
+      _geocnt = 0,
+      s, poly, points;
+      //      _geo = latlngs;    // bypass
+
+    for (poly = 0; poly < latlngs.length; poly++) {
+      _geo[_geocnt] = [];
+      for (points = 0; points < (latlngs[poly].length - 1); points++) {
+        var inverse = this._vincenty_inverse(L.latLng(latlngs[poly][
+          points
+        ]), L.latLng(latlngs[poly][points + 1]));
+        var prev = L.latLng(latlngs[poly][points]);
+        _geo[_geocnt].push(prev);
+        for (s = 1; s <= this.options.steps;) {
+          var direct = this._vincenty_direct(L.latLng(latlngs[poly][
+              points
+            ]), inverse.initialBearing, inverse.distance / this.options
+            .steps * s - inverse.distance / this.options.steps * (1 -
+              this.options.dash), this.options.wrap);
+          var gp = L.latLng(direct.lat, direct.lng);
+          if (Math.abs(gp.lng - prev.lng) > 180) {
+            var sec = this._intersection(L.latLng(latlngs[poly][points]),
+              inverse.initialBearing, {
+                lat: -89,
+                lng: ((gp.lng - prev.lng) > 0) ? -INTERSECT_LNG : INTERSECT_LNG
+              }, 0);
+            if (sec) {
+              _geo[_geocnt].push(L.latLng(sec.lat, sec.lng));
+              _geocnt++;
+              _geo[_geocnt] = [];
+              prev = L.latLng(sec.lat, -sec.lng);
+              _geo[_geocnt].push(prev);
+            } else {
+              _geocnt++;
+              _geo[_geocnt] = [];
+              _geo[_geocnt].push(gp);
+              prev = gp;
+              s++;
+            }
+          } else {
+            _geo[_geocnt].push(gp);
+            _geocnt++;
+            var direct2 = this._vincenty_direct(L.latLng(latlngs[poly][
+                points
+              ]), inverse.initialBearing, inverse.distance / this.options
+              .steps * s, this.options.wrap);
+            _geo[_geocnt] = [];
+            _geo[_geocnt].push(L.latLng(direct2.lat, direct2.lng));
+            s++;
+          }
+        }
+      }
+      _geocnt++;
+    }
+    return _geo;
+  },
+
 
   /**
    * Vincenty direct calculation.
@@ -14351,11 +14409,11 @@ L.Geodesic = L.Polyline.extend({
    * @returns obj3 a new object based on obj1 and obj2
    */
   _merge_options: function(obj1, obj2) {
-    let obj3 = {};
-    for (let attrname in obj1) {
+    var obj3 = {};
+    for (var attrname in obj1) {
       obj3[attrname] = obj1[attrname];
     }
-    for (let attrname in obj2) {
+    for (var attrname in obj2) {
       obj3[attrname] = obj2[attrname];
     }
     return obj3;
@@ -31935,6 +31993,387 @@ return L.GeometryUtil;
 
 ;
 /****************************************************************************
+    color.js,
+    Functions to caluclate the brightness of a color
+    Taken from http://codepen.io/lunelson/pen/jENxwB
+
+****************************************************************************/
+
+(function (window/*, document, undefined*/) {
+    "use strict";
+
+    //Create fcoo-namespace
+    var nsColor = window;
+
+
+    function lin2log(n) {
+        if (n <= 0.0031308)
+            return n * 12.92;
+        else
+            return 1.055 * Math.pow(n,1/2.4) - 0.055;
+    }
+
+    function log2lin(n) {
+        if (n <= 0.04045)
+            return n / 12.92;
+        else
+            return Math.pow(((n + 0.055)/1.055),2.4);
+    }
+
+    /********************************************
+    brightness
+    ********************************************/
+    nsColor.brightness = function brightness(r, g, b) {
+        r = log2lin(r/255);
+        g = log2lin(g/255);
+        b = log2lin(b/255);
+        return lin2log(0.2126 * r + 0.7152 * g + 0.0722 * b) * 100;
+    };
+
+    /********************************************
+    colorContrastHEX
+    ********************************************/
+    nsColor.colorContrastHEX = function colorContrastHEX( color ) {
+        if (color.length === 3)
+            color = color.charAt(0) + color.charAt(0) + color.charAt(1) + color.charAt(1) + color.charAt(2) + color.charAt(2);
+        var rgb = [];
+        for (var i = 0; i <= 2; i++)
+            rgb[i] = parseInt(color.substr(1+i*2, 2), 16);
+        return nsColor.colorContrastRGB(rgb[0], rgb[1], rgb[2]);
+    };
+
+    /********************************************
+    colorContrastRGB
+    ********************************************/
+    nsColor.colorContrastRGB = function colorContrastRGB(r, g, b) {
+        var colorBrightness = nsColor.brightness(r, g, b),
+                whiteBrightness = nsColor.brightness(255, 255, 255),
+                blackBrightness = nsColor.brightness(0, 0, 0);
+        return Math.abs(colorBrightness - whiteBrightness) > Math.abs(colorBrightness - blackBrightness) ? '#ffffff' : '#000000';
+    };
+
+    /********************************************
+    rgbHex
+    Convert RGB color to HEX
+    From https://github.com/sindresorhus/rgb-hex
+    ********************************************/
+    nsColor.rgbHex = function(red, green, blue, alpha){
+        var isPercent = (red + (alpha || '')).toString().includes('%');
+
+        if (typeof red === 'string') {
+            var res = red.match(/(0?\.?\d{1,3})%?\b/g).map(Number);
+            red = res[0];
+            green = res[1];
+            blue = res[2];
+            alpha = res[3];
+        }
+        else
+            if (alpha !== undefined) {
+                alpha = parseFloat(alpha);
+            }
+
+        if (typeof red !== 'number' ||
+            typeof green !== 'number' ||
+            typeof blue !== 'number' ||
+            red > 255 ||
+            green > 255 ||
+            blue > 255) {
+                throw new TypeError('Expected three numbers below 256');
+        }
+
+        if (typeof alpha === 'number') {
+            if (!isPercent && alpha >= 0 && alpha <= 1) {
+                alpha = Math.round(255 * alpha);
+            }
+            else
+                if (isPercent && alpha >= 0 && alpha <= 100) {
+                    alpha = Math.round(255 * alpha / 100);
+                }
+                else {
+                    throw new TypeError('Expected alpha value (${alpha}) as a fraction or percentage');
+                }
+            alpha = (alpha | 1 << 8).toString(16).slice(1);
+        }
+        else {
+            alpha = '';
+        }
+
+        return ((blue | green << 8 | red << 16) | 1 << 24).toString(16).slice(1) + alpha;
+    };
+
+    /********************************************
+    hexRgb
+    Convert HEX color to RGB
+    From https://github.com/sindresorhus/hex-rgb
+    ********************************************/
+    var hexChars = 'a-f\\d',
+        match3or4Hex = '#?[' + hexChars + ']{3}[' + hexChars + ']?',
+        match6or8Hex = '#?[' + hexChars + ']{6}([' + hexChars + ']{2})?',
+        nonHexChars = new RegExp('[^#' + hexChars + ']', 'gi'),
+        validHexSize = new RegExp('^' + match3or4Hex + '$|^' + match6or8Hex + '$', 'i');
+
+    nsColor.hexRgb = function(hex, options) {
+        options = options || {};
+        if (typeof hex !== 'string' || nonHexChars.test(hex) || !validHexSize.test(hex)) {
+            throw new TypeError('Expected a valid hex string');
+        }
+
+        hex = hex.replace(/^#/, '');
+        var alpha = 255;
+
+        if (hex.length === 8) {
+            alpha = parseInt(hex.slice(6, 8), 16) / 255;
+            hex = hex.substring(0, 6);
+        }
+
+        if (hex.length === 4) {
+            alpha = parseInt(hex.slice(3, 4).repeat(2), 16) / 255;
+            hex = hex.substring(0, 3);
+        }
+
+        if (hex.length === 3) {
+            hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+        }
+
+        var num = parseInt(hex, 16),
+            red = num >> 16,
+            green = (num >> 8) & 255,
+            blue = num & 255;
+
+        return options.format === 'array' ? [red, green, blue, alpha] : { red: red, green: green, blue: blue, alpha: alpha };
+    };
+
+    /********************************************
+    hexSetAlpha
+    Set the alpha-value in a hex-color
+    ********************************************/
+    nsColor.hexSetAlpha = function(hex, alpha){
+        var rgba = nsColor.hexRgb(hex, {format: 'array'});
+        rgba[3] = alpha;
+        return nsColor.rgbHex.apply(this, rgba);
+    };
+
+}(this, document));
+;
+/****************************************************************************
+    json.js,
+****************************************************************************/
+
+(function (window/*, document, undefined*/) {
+    "use strict";
+
+    //Create fcoo-namespace
+    var nsJSON = window;
+
+    /******************************************
+    serializeJSON
+    Converts a json-object a la {id1:'value1', id2:'value2'}
+    to [ { name: "id1", value: "value1" }, { name: "id2", value: "value2" } ]
+    *******************************************/
+    nsJSON.serializeJSON = function( jsonObj ){
+        var result = [];
+        for (var id in jsonObj)
+            if (jsonObj.hasOwnProperty(id))
+                result.push( {name: id, value: jsonObj[id] });
+        return result;
+    };
+
+
+}(this, document));
+;
+/****************************************************************************
+    math.js,
+
+****************************************************************************/
+
+(function (window/*, document, undefined*/) {
+    "use strict";
+
+    var nsMath = window;
+
+    /*******************************************
+    significant - return n rounded to significant sf
+    *******************************************/
+    nsMath.significant = function significant(n, sf) {
+        sf = sf - Math.floor(Math.log(n) / Math.LN10) - 1;
+        sf = Math.pow(10, sf);
+        n = Math.round(n * sf);
+        n = n / sf;
+        return n;
+    };
+
+    /*******************************************
+    precision
+    *******************************************/
+    nsMath.precision = function precision(n, dp) {
+        dp = Math.pow(10, dp);
+        n = n * dp;
+        n = Math.round(n);
+        n = n / dp;
+        return n;
+    };
+
+    /*******************************************
+    nearest
+    *******************************************/
+    nsMath.nearest = function nearest(n, v) {
+        v = v ? v : 1;
+        n = n / v;
+        n = Math.round(n) * v;
+        return n;
+    };
+
+    /*******************************************
+    roundDownTo
+    *******************************************/
+    nsMath.roundDownTo = function roundDownTo(n, v) {
+        v = v ? v : 1;
+        n = n / v;
+        n = Math.floor(n) * v;
+        return n;
+    };
+
+    /*******************************************
+    roundToRange
+    *******************************************/
+    nsMath.roundToRange = function roundToRange(v, min, max) {
+        return Math.max( Math.min(v, max), min);
+    };
+
+    /*******************************************
+    toDecimal
+    Convert a integer value v to a decimal
+    Eq    toDecimal(89)        = 0.89
+            toDecimal(9)        = 0.9
+            toDecimal(1234)    = 0.1234
+    *******************************************/
+    nsMath.toDecimal = function toDecimal(v) {
+        var l = v.toString().length;
+        return v / Math.pow(10, l);
+    };
+
+}(this, document));
+;
+/*
+ * jQuery.bind-first library v0.2.3
+ * Copyright (c) 2013 Vladimir Zhuravlev
+ *
+ * Released under MIT License
+ * @license
+ *
+ * Date: Thu Feb  6 10:13:59 ICT 2014
+ **/
+
+(function($) {
+	var splitVersion = $.fn.jquery.split(".");
+	var major = parseInt(splitVersion[0]);
+	var minor = parseInt(splitVersion[1]);
+
+	var JQ_LT_17 = (major < 1) || (major == 1 && minor < 7);
+	
+	function eventsData($el) {
+		return JQ_LT_17 ? $el.data('events') : $._data($el[0]).events;
+	}
+	
+	function moveHandlerToTop($el, eventName, isDelegated) {
+		var data = eventsData($el);
+		var events = data[eventName];
+
+		if (!JQ_LT_17) {
+			var handler = isDelegated ? events.splice(events.delegateCount - 1, 1)[0] : events.pop();
+			events.splice(isDelegated ? 0 : (events.delegateCount || 0), 0, handler);
+
+			return;
+		}
+
+		if (isDelegated) {
+			data.live.unshift(data.live.pop());
+		} else {
+			events.unshift(events.pop());
+		}
+	}
+	
+	function moveEventHandlers($elems, eventsString, isDelegate) {
+		var events = eventsString.split(/\s+/);
+		$elems.each(function() {
+			for (var i = 0; i < events.length; ++i) {
+				var pureEventName = $.trim(events[i]).match(/[^\.]+/i)[0];
+				moveHandlerToTop($(this), pureEventName, isDelegate);
+			}
+		});
+	}
+	
+	function makeMethod(methodName) {
+		$.fn[methodName + 'First'] = function() {
+			var args = $.makeArray(arguments);
+			var eventsString = args.shift();
+
+			if (eventsString) {
+				$.fn[methodName].apply(this, arguments);
+				moveEventHandlers(this, eventsString);
+			}
+
+			return this;
+		}
+	}
+
+	// bind
+	makeMethod('bind');
+
+	// one
+	makeMethod('one');
+
+	// delegate
+	$.fn.delegateFirst = function() {
+		var args = $.makeArray(arguments);
+		var eventsString = args[1];
+		
+		if (eventsString) {
+			args.splice(0, 2);
+			$.fn.delegate.apply(this, arguments);
+			moveEventHandlers(this, eventsString, true);
+		}
+
+		return this;
+	};
+
+	// live
+	$.fn.liveFirst = function() {
+		var args = $.makeArray(arguments);
+
+		// live = delegate to the document
+		args.unshift(this.selector);
+		$.fn.delegateFirst.apply($(document), args);
+
+		return this;
+	};
+	
+	// on (jquery >= 1.7)
+	if (!JQ_LT_17) {
+		$.fn.onFirst = function(types, selector) {
+			var $el = $(this);
+			var isDelegated = typeof selector === 'string';
+
+			$.fn.on.apply($el, arguments);
+
+			// events map
+			if (typeof types === 'object') {
+				for (type in types)
+					if (types.hasOwnProperty(type)) {
+						moveEventHandlers($el, type, isDelegated);
+					}
+			} else if (typeof types === 'string') {
+				moveEventHandlers($el, types, isDelegated);
+			}
+
+			return $el;
+		};
+	}
+
+})(jQuery);
+
+;
+/****************************************************************************
 	bootstrap-popover-extensions.js,
 
 	(c) 2017, FCOO
@@ -35307,8 +35746,9 @@ var Translator = function (_EventEmitter) {
     var joinArrays = options.joinArrays !== undefined ? options.joinArrays : this.options.joinArrays;
 
     // object
+    var handleAsObjectInI18nFormat = !this.i18nFormat || this.i18nFormat.handleAsObject;
     var handleAsObject = typeof res !== 'string' && typeof res !== 'boolean' && typeof res !== 'number';
-    if (res && handleAsObject && noObject.indexOf(resType) < 0 && !(joinArrays && resType === '[object Array]')) {
+    if (handleAsObjectInI18nFormat && res && handleAsObject && noObject.indexOf(resType) < 0 && !(joinArrays && resType === '[object Array]')) {
       if (!options.returnObjects && !this.options.returnObjects) {
         this.logger.warn('accessing an object - but returnObjects options is not enabled!');
         return this.options.returnedObjectHandler ? this.options.returnedObjectHandler(resUsedKey, res, options) : 'key \'' + key + ' (' + this.language + ')\' returned an object instead of string.';
@@ -35329,7 +35769,7 @@ var Translator = function (_EventEmitter) {
         }
         res = copy$$1;
       }
-    } else if (joinArrays && resType === '[object Array]') {
+    } else if (handleAsObjectInI18nFormat && joinArrays && resType === '[object Array]') {
       // array special treatment
       res = res.join(joinArrays);
       if (res) res = this.extendTranslation(res, keys, options);
@@ -35341,7 +35781,12 @@ var Translator = function (_EventEmitter) {
       // fallback value
       if (!this.isValidLookup(res) && options.defaultValue !== undefined) {
         usedDefault = true;
-        res = options.defaultValue;
+
+        if (options.count !== undefined) {
+          var suffix = this.pluralResolver.getSuffix(lng, options.count);
+          res = options['defaultValue' + suffix];
+        }
+        if (!res) res = options.defaultValue;
       }
       if (!this.isValidLookup(res)) {
         usedKey = true;
@@ -35416,7 +35861,7 @@ var Translator = function (_EventEmitter) {
       // interpolate
       var data = options.replace && typeof options.replace !== 'string' ? options.replace : options;
       if (this.options.interpolation.defaultVariables) data = _extends({}, this.options.interpolation.defaultVariables, data);
-      res = this.interpolator.interpolate(res, data, options.lng || this.language);
+      res = this.interpolator.interpolate(res, data, options.lng || this.language, options);
 
       // nesting
       if (options.nest !== false) res = this.interpolator.nest(res, function () {
@@ -35461,7 +35906,7 @@ var Translator = function (_EventEmitter) {
       var needsPluralHandling = options.count !== undefined && typeof options.count !== 'string';
       var needsContextHandling = options.context !== undefined && typeof options.context === 'string' && options.context !== '';
 
-      var codes = options.lngs ? options.lngs : _this4.languageUtils.toResolveHierarchy(options.lng || _this4.language);
+      var codes = options.lngs ? options.lngs : _this4.languageUtils.toResolveHierarchy(options.lng || _this4.language, options.fallbackLng);
 
       namespaces.forEach(function (ns) {
         if (_this4.isValidLookup(found)) return;
@@ -35512,6 +35957,7 @@ var Translator = function (_EventEmitter) {
   Translator.prototype.getResource = function getResource(code, ns, key) {
     var options = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};
 
+    if (this.i18nFormat && this.i18nFormat.getResource) return this.i18nFormat.getResource(code, ns, key, options);
     return this.resourceStore.getResource(code, ns, key, options);
   };
 
@@ -35638,7 +36084,7 @@ var LanguageUtil = function () {
 
 // definition http://translate.sourceforge.net/wiki/l10n/pluralforms
 /* eslint-disable */
-var sets = [{ lngs: ['ach', 'ak', 'am', 'arn', 'br', 'fil', 'gun', 'ln', 'mfe', 'mg', 'mi', 'oc', 'pt', 'pt-BR', 'tg', 'ti', 'tr', 'uz', 'wa'], nr: [1, 2], fc: 1 }, { lngs: ['af', 'an', 'ast', 'az', 'bg', 'bn', 'ca', 'da', 'de', 'dev', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fi', 'fo', 'fur', 'fy', 'gl', 'gu', 'ha', 'he', 'hi', 'hu', 'hy', 'ia', 'it', 'kn', 'ku', 'lb', 'mai', 'ml', 'mn', 'mr', 'nah', 'nap', 'nb', 'ne', 'nl', 'nn', 'no', 'nso', 'pa', 'pap', 'pms', 'ps', 'pt-PT', 'rm', 'sco', 'se', 'si', 'so', 'son', 'sq', 'sv', 'sw', 'ta', 'te', 'tk', 'ur', 'yo'], nr: [1, 2], fc: 2 }, { lngs: ['ay', 'bo', 'cgg', 'fa', 'id', 'ja', 'jbo', 'ka', 'kk', 'km', 'ko', 'ky', 'lo', 'ms', 'sah', 'su', 'th', 'tt', 'ug', 'vi', 'wo', 'zh'], nr: [1], fc: 3 }, { lngs: ['be', 'bs', 'dz', 'hr', 'ru', 'sr', 'uk'], nr: [1, 2, 5], fc: 4 }, { lngs: ['ar'], nr: [0, 1, 2, 3, 11, 100], fc: 5 }, { lngs: ['cs', 'sk'], nr: [1, 2, 5], fc: 6 }, { lngs: ['csb', 'pl'], nr: [1, 2, 5], fc: 7 }, { lngs: ['cy'], nr: [1, 2, 3, 8], fc: 8 }, { lngs: ['fr'], nr: [1, 2], fc: 9 }, { lngs: ['ga'], nr: [1, 2, 3, 7, 11], fc: 10 }, { lngs: ['gd'], nr: [1, 2, 3, 20], fc: 11 }, { lngs: ['is'], nr: [1, 2], fc: 12 }, { lngs: ['jv'], nr: [0, 1], fc: 13 }, { lngs: ['kw'], nr: [1, 2, 3, 4], fc: 14 }, { lngs: ['lt'], nr: [1, 2, 10], fc: 15 }, { lngs: ['lv'], nr: [1, 2, 0], fc: 16 }, { lngs: ['mk'], nr: [1, 2], fc: 17 }, { lngs: ['mnk'], nr: [0, 1, 2], fc: 18 }, { lngs: ['mt'], nr: [1, 2, 11, 20], fc: 19 }, { lngs: ['or'], nr: [2, 1], fc: 2 }, { lngs: ['ro'], nr: [1, 2, 20], fc: 20 }, { lngs: ['sl'], nr: [5, 1, 2, 3], fc: 21 }];
+var sets = [{ lngs: ['ach', 'ak', 'am', 'arn', 'br', 'fil', 'gun', 'ln', 'mfe', 'mg', 'mi', 'oc', 'pt', 'pt-BR', 'tg', 'ti', 'tr', 'uz', 'wa'], nr: [1, 2], fc: 1 }, { lngs: ['af', 'an', 'ast', 'az', 'bg', 'bn', 'ca', 'da', 'de', 'dev', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fi', 'fo', 'fur', 'fy', 'gl', 'gu', 'ha', 'hi', 'hu', 'hy', 'ia', 'it', 'kn', 'ku', 'lb', 'mai', 'ml', 'mn', 'mr', 'nah', 'nap', 'nb', 'ne', 'nl', 'nn', 'no', 'nso', 'pa', 'pap', 'pms', 'ps', 'pt-PT', 'rm', 'sco', 'se', 'si', 'so', 'son', 'sq', 'sv', 'sw', 'ta', 'te', 'tk', 'ur', 'yo'], nr: [1, 2], fc: 2 }, { lngs: ['ay', 'bo', 'cgg', 'fa', 'id', 'ja', 'jbo', 'ka', 'kk', 'km', 'ko', 'ky', 'lo', 'ms', 'sah', 'su', 'th', 'tt', 'ug', 'vi', 'wo', 'zh'], nr: [1], fc: 3 }, { lngs: ['be', 'bs', 'dz', 'hr', 'ru', 'sr', 'uk'], nr: [1, 2, 5], fc: 4 }, { lngs: ['ar'], nr: [0, 1, 2, 3, 11, 100], fc: 5 }, { lngs: ['cs', 'sk'], nr: [1, 2, 5], fc: 6 }, { lngs: ['csb', 'pl'], nr: [1, 2, 5], fc: 7 }, { lngs: ['cy'], nr: [1, 2, 3, 8], fc: 8 }, { lngs: ['fr'], nr: [1, 2], fc: 9 }, { lngs: ['ga'], nr: [1, 2, 3, 7, 11], fc: 10 }, { lngs: ['gd'], nr: [1, 2, 3, 20], fc: 11 }, { lngs: ['is'], nr: [1, 2], fc: 12 }, { lngs: ['jv'], nr: [0, 1], fc: 13 }, { lngs: ['kw'], nr: [1, 2, 3, 4], fc: 14 }, { lngs: ['lt'], nr: [1, 2, 10], fc: 15 }, { lngs: ['lv'], nr: [1, 2, 0], fc: 16 }, { lngs: ['mk'], nr: [1, 2], fc: 17 }, { lngs: ['mnk'], nr: [0, 1, 2], fc: 18 }, { lngs: ['mt'], nr: [1, 2, 11, 20], fc: 19 }, { lngs: ['or'], nr: [2, 1], fc: 2 }, { lngs: ['ro'], nr: [1, 2, 20], fc: 20 }, { lngs: ['sl'], nr: [5, 1, 2, 3], fc: 21 }, { lngs: ['he'], nr: [1, 2, 20, 21], fc: 22 }];
 
 var _rulesPluralsTypes = {
   1: function _(n) {
@@ -35703,6 +36149,9 @@ var _rulesPluralsTypes = {
   },
   21: function _(n) {
     return Number(n % 100 == 1 ? 1 : n % 100 == 2 ? 2 : n % 100 == 3 || n % 100 == 4 ? 3 : 0);
+  },
+  22: function _(n) {
+    return Number(n === 1 ? 0 : n === 2 ? 1 : (n < 0 || n > 10) && n % 10 == 0 ? 2 : 3);
   }
 };
 /* eslint-enable */
@@ -35873,7 +36322,7 @@ var Interpolator = function () {
     this.nestingRegexp = new RegExp(nestingRegexpStr, 'g');
   };
 
-  Interpolator.prototype.interpolate = function interpolate(str, data, lng) {
+  Interpolator.prototype.interpolate = function interpolate(str, data, lng, options) {
     var _this = this;
 
     var match = void 0;
@@ -35896,6 +36345,8 @@ var Interpolator = function () {
 
     this.resetRegExp();
 
+    var missingInterpolationHandler = options && options.missingInterpolationHandler || this.options.missingInterpolationHandler;
+
     replaces = 0;
     // unescape if has unescapePrefix/Suffix
     /* eslint no-cond-assign: 0 */
@@ -35914,8 +36365,8 @@ var Interpolator = function () {
     while (match = this.regexp.exec(str)) {
       value = handleFormat(match[1].trim());
       if (value === undefined) {
-        if (typeof this.options.missingInterpolationHandler === 'function') {
-          var temp = this.options.missingInterpolationHandler(str, match);
+        if (typeof missingInterpolationHandler === 'function') {
+          var temp = missingInterpolationHandler(str, match);
           value = typeof temp === 'string' ? temp : '';
         } else {
           this.logger.warn('missed to pass in variable ' + match[1] + ' for interpolating ' + str);
@@ -36022,7 +36473,7 @@ var Connector = function (_EventEmitter) {
     return _this;
   }
 
-  Connector.prototype.queueLoad = function queueLoad(languages, namespaces, callback) {
+  Connector.prototype.queueLoad = function queueLoad(languages, namespaces, options, callback) {
     var _this2 = this;
 
     // find what needs to be loaded
@@ -36037,7 +36488,7 @@ var Connector = function (_EventEmitter) {
       namespaces.forEach(function (ns) {
         var name = lng + '|' + ns;
 
-        if (_this2.store.hasResourceBundle(lng, ns)) {
+        if (!options.reload && _this2.store.hasResourceBundle(lng, ns)) {
           _this2.state[name] = 2; // loaded
         } else if (_this2.state[name] < 0) {
           // nothing to do for err
@@ -36153,8 +36604,11 @@ var Connector = function (_EventEmitter) {
   /* eslint consistent-return: 0 */
 
 
-  Connector.prototype.load = function load(languages, namespaces, callback) {
+  Connector.prototype.prepareLoading = function prepareLoading(languages, namespaces) {
     var _this4 = this;
+
+    var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+    var callback = arguments[3];
 
     if (!this.backend) {
       this.logger.warn('No backend was added via i18next.use. Will not load resources.');
@@ -36164,7 +36618,7 @@ var Connector = function (_EventEmitter) {
     if (typeof languages === 'string') languages = this.languageUtils.toResolveHierarchy(languages);
     if (typeof namespaces === 'string') namespaces = [namespaces];
 
-    var toLoad = this.queueLoad(languages, namespaces, callback);
+    var toLoad = this.queueLoad(languages, namespaces, options, callback);
     if (!toLoad.toLoad.length) {
       if (!toLoad.pending.length) callback(); // nothing to load and no pendings...callback now
       return null; // pendings will trigger callback
@@ -36175,25 +36629,16 @@ var Connector = function (_EventEmitter) {
     });
   };
 
-  Connector.prototype.reload = function reload(languages, namespaces) {
-    var _this5 = this;
+  Connector.prototype.load = function load(languages, namespaces, callback) {
+    this.prepareLoading(languages, namespaces, {}, callback);
+  };
 
-    if (!this.backend) {
-      this.logger.warn('No backend was added via i18next.use. Will not load resources.');
-    }
-
-    if (typeof languages === 'string') languages = this.languageUtils.toResolveHierarchy(languages);
-    if (typeof namespaces === 'string') namespaces = [namespaces];
-
-    languages.forEach(function (l) {
-      namespaces.forEach(function (n) {
-        _this5.loadOne(l + '|' + n, 're');
-      });
-    });
+  Connector.prototype.reload = function reload(languages, namespaces, callback) {
+    this.prepareLoading(languages, namespaces, { reload: true }, callback);
   };
 
   Connector.prototype.loadOne = function loadOne(name) {
-    var _this6 = this;
+    var _this5 = this;
 
     var prefix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
 
@@ -36203,10 +36648,10 @@ var Connector = function (_EventEmitter) {
         ns = _name$split4[1];
 
     this.read(lng, ns, 'read', null, null, function (err, data) {
-      if (err) _this6.logger.warn(prefix + 'loading namespace ' + ns + ' for language ' + lng + ' failed', err);
-      if (!err && data) _this6.logger.log(prefix + 'loaded namespace ' + ns + ' for language ' + lng, data);
+      if (err) _this5.logger.warn(prefix + 'loading namespace ' + ns + ' for language ' + lng + ' failed', err);
+      if (!err && data) _this5.logger.log(prefix + 'loaded namespace ' + ns + ' for language ' + lng, data);
 
-      _this6.loaded(name, err, data);
+      _this5.loaded(name, err, data);
     });
   };
 
@@ -36246,6 +36691,7 @@ function get$1() {
     pluralSeparator: '_',
     contextSeparator: '_',
 
+    partialBundledLanguages: false, // allow bundling certain languages that are not remotely fetched
     saveMissing: false, // enable to send missing values
     updateMissing: false, // enable to update default values if different from translated value (only useful on initial development, or when keeping code as source of truth)
     saveMissingTo: 'fallback', // 'current' || 'all'
@@ -36446,7 +36892,7 @@ var I18n = function (_EventEmitter) {
 
     var callback = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : noop;
 
-    if (!this.options.resources) {
+    if (!this.options.resources || this.options.partialBundledLanguages) {
       if (this.language && this.language.toLowerCase() === 'cimode') return callback(); // avoid loading resources for cimode
 
       var toLoad = [];
@@ -36481,10 +36927,11 @@ var I18n = function (_EventEmitter) {
     }
   };
 
-  I18n.prototype.reloadResources = function reloadResources(lngs, ns) {
+  I18n.prototype.reloadResources = function reloadResources(lngs, ns, callback) {
     if (!lngs) lngs = this.languages;
     if (!ns) ns = this.options.ns;
-    this.services.backendConnector.reload(lngs, ns);
+    if (!callback) callback = function callback() {};
+    this.services.backendConnector.reload(lngs, ns, callback);
   };
 
   I18n.prototype.use = function use(module) {
@@ -38006,7 +38453,8 @@ return i18next;
         this.events.containerOnResize = called when the sizse of the container is changed
         *******************************************************************/
         this.events = {
-            containerOnResize: $.proxy( this.containerOnResize, this )
+            containerOnResize: $.proxy( this.containerOnResize, this ),
+            parentOnResize   : $.proxy( this.parentOnResize, this )
         };
 
         //Create event-function to be called on resize of the window and the container (added in init)
@@ -38081,6 +38529,9 @@ return i18next;
             this.initializing     = true;
             this.currentHandle    = null;
             this.isRepeatingClick = false;
+
+            this.checkParentResize = true;
+
 
             /*******************************************************************
             Set and adjust options
@@ -38649,17 +39100,31 @@ return i18next;
 
         /*******************************************************************
         containerOnResize
-        Call checkContainerDimentions when the container is resized.
-        Prevent multi updates by setting delay of 200ms
+        Call parentOnResize when the slider is finish building and the container is resized
         *******************************************************************/
         containerOnResize: function(){
             if (this.initializing || !this.isBuild)
                 return;
 
+            this.parentOnResize();
+        },
+
+
+        /*******************************************************************
+        parentOnResize
+        Call checkContainerDimentions when the container is resized.
+        Prevent multi updates by setting delay of 200ms
+        *******************************************************************/
+        parentOnResize: function(){
+            //Remove resize-event from parent if it isn't a resizable slider
+            if (!this.options.resizable && this.parentOnResizeAdded && this.cache.$parent){
+                this.cache.$parent.removeResize( this.events.parentOnResize );
+                this.parentOnResizeAdded = null;
+            }
+
             //Clear any previous added timeout
             if (this.resizeTimeoutId)
                 window.clearTimeout(this.resizeTimeoutId);
-
             this.resizeTimeoutId = window.setTimeout($.proxy(this.checkContainerDimentions, this), 200 );
         },
 
@@ -38669,11 +39134,10 @@ return i18next;
         *******************************************************************/
         getDimentions: function(){
             var result = {};
-            result.containerWidth    = this.cache.$container.innerWidth() || this.dimentions.containerWidth;
+            result.containerWidth    = Math.max(0, this.cache.$container.innerWidth()) || this.dimentions.containerWidth;
             result.containerWidthRem = pxToRem(result.containerWidth);
             if (this.options.isFixed)
                 result.outerContainerWidthRem = pxToRem( this.cache.$outerContainer.innerWidth() );
-
             return result;
         },
 
@@ -38720,8 +39184,20 @@ return i18next;
                     this.build();
                     updateSlider = true;
                 }
-                else
-                    this.checkContainerDimentions_TimeoutId = window.setTimeout($.proxy(this.checkContainerDimentions, this), 200 );
+                else {
+                    // if this.cache.$container has a parent-element with no-width => add ONE resize-event on the parent to detect when it changes it width e.q. is added to the DOM or made visible
+                    // else set timeout to check dimention of the container
+                    this.cache.$parent = this.cache.$container.parent();
+
+                    if (this.checkParentResize && this.cache.$parent.length){
+                        this.checkParentResize = false;
+                        this.parentOnResizeAdded = true;
+                        this.cache.$parent.resize( this.events.parentOnResize );
+                    }
+                    else
+                        this.checkContainerDimentions_TimeoutId = window.setTimeout($.proxy(this.checkContainerDimentions, this), 200 );
+                }
+
             }
 
             //Update slider
@@ -39763,7 +40239,7 @@ return i18next;
 
 ****************************************************************************/
 
-(function ($/*, window, document, undefined*/) {
+(function ($, window, document, undefined) {
     "use strict";
 
     var globalCheckboxId = 0;
@@ -40019,7 +40495,7 @@ return i18next;
                 options.context = this;
                 $child.data('cbx_options', options);
             }
-            if (this.options.selectedId){
+            if (this.options.selectedId != undefined){
                 var _this = this,
                     list = $.grep(this._cbxChildList, function($elem){ return $elem.data('cbx_options').id == _this.options.selectedId; });
                 if (list.length){
@@ -40134,7 +40610,7 @@ return i18next;
  * 
  */
 /**
- * bluebird build version 3.5.2
+ * bluebird build version 3.5.3
  * Features enabled: core, race, call_get, generators, map, nodeify, promisify, props, reduce, settle, some, using, timers, filter, any, each
 */
 !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.Promise=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof _dereq_=="function"&&_dereq_;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof _dereq_=="function"&&_dereq_;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
@@ -43630,7 +44106,7 @@ _dereq_("./synchronous_inspection")(Promise);
 _dereq_("./join")(
     Promise, PromiseArray, tryConvertToPromise, INTERNAL, async, getDomain);
 Promise.Promise = Promise;
-Promise.version = "3.5.2";
+Promise.version = "3.5.3";
 _dereq_('./map.js')(Promise, PromiseArray, apiRejection, tryConvertToPromise, INTERNAL, debug);
 _dereq_('./call_get.js')(Promise);
 _dereq_('./using.js')(Promise, apiRejection, tryConvertToPromise, createContext, INTERNAL, debug);
@@ -46555,6 +47031,30 @@ module.exports = ret;
     "use strict";
 
     /***********************************************************************
+    _isInitialized()
+    Return true if the i18next is initialized (i18next.init has been called
+    ***********************************************************************/
+//HER    i18next._isInitialized = function(){
+//HER        return !$.isEmptyObject(this.options);
+//HER    }
+
+
+    /***********************************************************************
+    While i18next hasn't been initialized a temporary version of addResource
+    is used to store the resource until i18next is initialized
+    ***********************************************************************/
+    i18next.resourceList = [];
+    i18next.addResource = function(){
+        this.resourceList.push(arguments);
+    };
+
+    i18next.on('initialized', function() {
+        $.each(i18next.resourceList, function(index, argum){
+            i18next.addResource.apply(i18next, argum);
+        });
+    });
+
+    /***********************************************************************
     _loadJSON( jsonFileName, options, resolve )
     Loading (key-)phrases from json-file(s) using fcoo/promise-get
     ***********************************************************************/
@@ -46702,8 +47202,8 @@ module.exports = ret;
     A single translation of a sentence. No key used or added
     ***********************************************************************/
     i18next.sentence = function( langValues, options ){
-        var nsTemp = '__TEMP__',
-            keyTemp = '__KEY__',
+        var nsTemp = '__SENTENCE_TEMP__',
+            keyTemp = '__SENTENCE_KEY__',
             _this = this,
             nsSeparator = this.options.nsSeparator;
 
@@ -46859,7 +47359,7 @@ return index;
 })));
 ;
 /****************************************************************************
-	jquery-i18next-phrases.js, 
+	jquery-i18next-phrases.js,
 
 	(c) 2017, FCOO
 
@@ -46868,21 +47368,21 @@ return index;
 
 ****************************************************************************/
 
-(function ($, window/*, document, undefined*/) {
+(function ($, i18next, window/*, document, undefined*/) {
 	"use strict";
-	
+
     /***********************************************************
-    Initialize jquery-i18next - i18next plugin for jquery 
+    Initialize jquery-i18next - i18next plugin for jquery
     https://github.com/i18next/jquery-i18next
     ***********************************************************/
     var jQuery_i18n_selectorAttr = 'data-i18n',    // selector for translating elements
         jQuery_i18n_targetAttr   = 'i18n-target',  // data-() attribute to grab target element to translate (if diffrent then itself)
         jQuery_i18n_optionsAttr  = 'i18n-options'; // data-() attribute that contains options, will load/set if useOptionsAttr = true
 
-    
+
     window.jqueryI18next.init(
-        window.i18next/*i18nextInstance*/, 
-        $, 
+        i18next/*i18nextInstance*/,
+        $,
         {
             tName         : 't',                        // --> appends $.t = i18next.t
             i18nName      : 'i18n',                     // --> appends $.i18n = i18next
@@ -46897,27 +47397,27 @@ return index;
 
 
     /***********************************************************
-    Add new methods to jQuery prototype: 
+    Add new methods to jQuery prototype:
     $.fn.i18n( htmlOrKeyOrPhrase[, attribute][, options] )
     Add/updates the "data-i18n" attribute
 
-    htmlOrKeyOrPhrase = simple html-string ( "This will <u>always</u> be in English" ) OR 
-                        i18next-key ( "myNS:myKey" ) OR 
+    htmlOrKeyOrPhrase = simple html-string ( "This will <u>always</u> be in English" ) OR
+                        i18next-key ( "myNS:myKey" ) OR
                         a phrase-object - see langValue in i18next.addPhrase ( {da:"Dette er en test", en:"This is a test"} ) OR
                         a string representing a phrase-object ( '{"da":"Dette er en test", "en":"This is a test"}' )
     ***********************************************************/
     var tempKeyId = 0,
-        tempNS = '__TEMP__';
+        tempNS = '__JQ_TEMP__';
 
     $.fn.i18n = function( htmlOrKeyOrPhrase ) {
-        var options = null, 
-            attribute = '', 
+        var options = null,
+            attribute = '',
             argument,
-            keyFound = true, 
+            keyFound = true,
             key = htmlOrKeyOrPhrase;
 
         for (var i=1; i<arguments.length; i++ ){
-            argument = arguments[i];              
+            argument = arguments[i];
             switch ($.type(argument)){
               case 'object': options = argument; break;
               case 'string': attribute = argument; break;
@@ -46929,7 +47429,7 @@ return index;
             htmlOrKeyOrPhrase = JSON.parse(htmlOrKeyOrPhrase);
         }
         catch (e) {
-            htmlOrKeyOrPhrase = original; 
+            htmlOrKeyOrPhrase = original;
         }
 
         //Convert number back to string
@@ -46938,13 +47438,13 @@ return index;
 
         //Get the key or add a temp-phrase
         if (typeof htmlOrKeyOrPhrase == 'string')
-            keyFound = window.i18next.exists(htmlOrKeyOrPhrase);
+            keyFound = i18next.exists(htmlOrKeyOrPhrase);
         else {
             //It is a {da:'...', en:'...', de:'...'} object
             key = 'jqueryfni18n' + tempKeyId++;
-            window.i18next.addPhrase( tempNS, key, htmlOrKeyOrPhrase );
+            i18next.addPhrase( tempNS, key, htmlOrKeyOrPhrase );
             key = tempNS+':'+key;
-        }    
+        }
 
         return this.each(function() {
             var $this = $(this),
@@ -46954,20 +47454,20 @@ return index;
                 newStr = attribute ? '[' + attribute + ']' + key : key,
                 keep;
             oldData = oldData ? oldData.split(';') : [];
-            
+
             for (var i=0; i<oldData.length; i++ ){
                 oldStr = oldData[i];
                 keep = true;
                 //if the new key has an attribute => remove data with '[attribute]'
                 if (attribute && (oldStr.indexOf('[' + attribute + ']') == 0))
-                    keep = false;                      
+                    keep = false;
                 //if the new key don't has a attribute => only keep other attributes
-                if (!attribute && (oldStr.indexOf('[') == -1)) 
+                if (!attribute && (oldStr.indexOf('[') == -1))
                     keep = false;
                 if (keep)
                     newData.push( oldStr );
             }
-            newData.push( newStr);                                
+            newData.push( newStr);
 
             //Set data-i18n
             $this.attr( jQuery_i18n_selectorAttr, newData.join(';') );
@@ -46984,12 +47484,12 @@ return index;
                     $(this).html( htmlOrKeyOrPhrase );
             }
             //Update contents
-            $this.localize();        
+            $this.localize();
 
         });
     };
 
-}(jQuery, this, document));
+}(jQuery, this.i18next, this, document));
 ;
 /****************************************************************************
     jquery-scroll-container.js, 
@@ -48804,6 +49304,289 @@ module.exports = function (element) {
 };
 
 },{"../lib/dom":3,"../lib/helper":6,"./instances":18,"./update-geometry":19,"./update-scroll":20}]},{},[1]);
+
+;
+// Stupid jQuery table plugin.
+
+(function($) {
+  $.fn.stupidtable = function(sortFns) {
+    return this.each(function() {
+      var $table = $(this);
+      sortFns = sortFns || {};
+      sortFns = $.extend({}, $.fn.stupidtable.default_sort_fns, sortFns);
+      $table.data('sortFns', sortFns);
+      $table.stupidtable_build();
+
+      $table.on("click.stupidtable", "thead th", function() {
+          $(this).stupidsort();
+      });
+
+      // Sort th immediately if data-sort-onload="yes" is specified. Limit to
+      // the first one found - only one default sort column makes sense anyway.
+      var $th_onload_sort = $table.find("th[data-sort-onload=yes]").eq(0);
+      $th_onload_sort.stupidsort();
+    });
+  };
+
+  // ------------------------------------------------------------------
+  // Default settings
+  // ------------------------------------------------------------------
+  $.fn.stupidtable.default_settings = {
+    should_redraw: function(sort_info){
+      return true;
+    },
+    will_manually_build_table: false
+  };
+  $.fn.stupidtable.dir = {ASC: "asc", DESC: "desc"};
+  $.fn.stupidtable.default_sort_fns = {
+    "int": function(a, b) {
+      return parseInt(a, 10) - parseInt(b, 10);
+    },
+    "float": function(a, b) {
+      return parseFloat(a) - parseFloat(b);
+    },
+    "string": function(a, b) {
+      return a.toString().localeCompare(b.toString());
+    },
+    "string-ins": function(a, b) {
+      a = a.toString().toLocaleLowerCase();
+      b = b.toString().toLocaleLowerCase();
+      return a.localeCompare(b);
+    }
+  };
+
+  // Allow specification of settings on a per-table basis. Call on a table
+  // jquery object. Call *before* calling .stuidtable();
+  $.fn.stupidtable_settings = function(settings) {
+    return this.each(function() {
+      var $table = $(this);
+      var final_settings = $.extend({}, $.fn.stupidtable.default_settings, settings);
+      $table.stupidtable.settings = final_settings;
+    });
+  };
+
+
+  // Expects $("#mytable").stupidtable() to have already been called.
+  // Call on a table header.
+  $.fn.stupidsort = function(force_direction){
+    var $this_th = $(this);
+    var datatype = $this_th.data("sort") || null;
+
+    // No datatype? Nothing to do.
+    if (datatype === null) {
+      return;
+    }
+
+    var dir = $.fn.stupidtable.dir;
+    var $table = $this_th.closest("table");
+
+    var sort_info = {
+        $th: $this_th,
+        $table: $table,
+        datatype: datatype
+    };
+
+
+    // Bring in default settings if none provided
+    if(!$table.stupidtable.settings){
+        $table.stupidtable.settings = $.extend({}, $.fn.stupidtable.default_settings);
+    }
+
+    sort_info.compare_fn = $table.data('sortFns')[datatype];
+    sort_info.th_index = calculateTHIndex(sort_info);
+    sort_info.sort_dir = calculateSortDir(force_direction, sort_info);
+
+    $this_th.data("sort-dir", sort_info.sort_dir);
+    $table.trigger("beforetablesort", {column: sort_info.th_index, direction: sort_info.sort_dir, $th: $this_th});
+
+    // More reliable method of forcing a redraw
+    $table.css("display");
+
+    // Run sorting asynchronously on a timout to force browser redraw after
+    // `beforetablesort` callback. Also avoids locking up the browser too much.
+    setTimeout(function() {
+      if(!$table.stupidtable.settings.will_manually_build_table){
+        $table.stupidtable_build();
+      }
+      var table_structure = sortTable(sort_info);
+      var trs = getTableRowsFromTableStructure(table_structure, sort_info);
+
+      if(!$table.stupidtable.settings.should_redraw(sort_info)){
+        return;
+      }
+      $table.children("tbody").append(trs);
+
+      updateElementData(sort_info);
+      $table.trigger("aftertablesort", {column: sort_info.th_index, direction: sort_info.sort_dir, $th: $this_th});
+      $table.css("display");
+
+    }, 10);
+    return $this_th;
+  };
+
+  // Call on a sortable td to update its value in the sort. This should be the
+  // only mechanism used to update a cell's sort value. If your display value is
+  // different from your sort value, use jQuery's .text() or .html() to update
+  // the td contents, Assumes stupidtable has already been called for the table.
+  $.fn.updateSortVal = function(new_sort_val){
+  var $this_td = $(this);
+    if($this_td.is('[data-sort-value]')){
+      // For visual consistency with the .data cache
+      $this_td.attr('data-sort-value', new_sort_val);
+    }
+    $this_td.data("sort-value", new_sort_val);
+    return $this_td;
+  };
+
+
+  $.fn.stupidtable_build = function(){
+    return this.each(function() {
+      var $table = $(this);
+      var table_structure = [];
+      var trs = $table.children("tbody").children("tr");
+      trs.each(function(index,tr) {
+
+        // ====================================================================
+        // Transfer to using internal table structure
+        // ====================================================================
+        var ele = {
+            $tr: $(tr),
+            columns: [],
+            index: index
+        };
+
+        $(tr).children('td').each(function(idx, td){
+            var sort_val = $(td).data("sort-value");
+
+            // Store and read from the .data cache for display text only sorts
+            // instead of looking through the DOM every time
+            if(typeof(sort_val) === "undefined"){
+              var txt = $(td).text();
+              $(td).data('sort-value', txt);
+              sort_val = txt;
+            }
+            ele.columns.push(sort_val);
+        });
+        table_structure.push(ele);
+      });
+      $table.data('stupidsort_internaltable', table_structure);
+    });
+  };
+
+  // ====================================================================
+  // Private functions
+  // ====================================================================
+  var sortTable = function(sort_info){
+    var table_structure = sort_info.$table.data('stupidsort_internaltable');
+    var th_index = sort_info.th_index;
+    var $th = sort_info.$th;
+
+    var multicolumn_target_str = $th.data('sort-multicolumn');
+    var multicolumn_targets;
+    if(multicolumn_target_str){
+        multicolumn_targets = multicolumn_target_str.split(',');
+    }
+    else{
+        multicolumn_targets = [];
+    }
+    var multicolumn_th_targets = $.map(multicolumn_targets, function(identifier, i){
+        return get_th(sort_info.$table, identifier);
+    });
+
+    table_structure.sort(function(e1, e2){
+      var multicolumns = multicolumn_th_targets.slice(0); // shallow copy
+      var diff = sort_info.compare_fn(e1.columns[th_index], e2.columns[th_index]);
+      while(diff === 0 && multicolumns.length){
+          var multicolumn = multicolumns[0];
+          var datatype = multicolumn.$e.data("sort");
+          var multiCloumnSortMethod = sort_info.$table.data('sortFns')[datatype];
+          diff = multiCloumnSortMethod(e1.columns[multicolumn.index], e2.columns[multicolumn.index]);
+          multicolumns.shift();
+      }
+      // Sort by position in the table if values are the same. This enforces a
+      // stable sort across all browsers. See https://bugs.chromium.org/p/v8/issues/detail?id=90
+      if (diff === 0)
+        return e1.index - e2.index;
+      else
+        return diff;
+
+    });
+
+    if (sort_info.sort_dir != $.fn.stupidtable.dir.ASC){
+      table_structure.reverse();
+    }
+      return table_structure;
+  };
+
+  var get_th = function($table, identifier){
+      // identifier can be a th id or a th index number;
+      var $table_ths = $table.find('th');
+      var index = parseInt(identifier, 10);
+      var $th;
+      if(!index && index !== 0){
+          $th = $table_ths.siblings('#' + identifier);
+          index = $table_ths.index($th);
+      }
+      else{
+          $th = $table_ths.eq(index);
+      }
+      return {index: index, $e: $th};
+  };
+
+  var getTableRowsFromTableStructure = function(table_structure, sort_info){
+    // Gather individual column for callbacks
+    var column = $.map(table_structure, function(ele, i){
+        return [[ele.columns[sort_info.th_index], ele.$tr, i]];
+    });
+
+    /* Side effect */
+    sort_info.column = column;
+
+    // Replace the content of tbody with the sorted rows. Strangely
+    // enough, .append accomplishes this for us.
+    return $.map(table_structure, function(ele) { return ele.$tr; });
+
+  };
+
+  var updateElementData = function(sort_info){
+    var $table = sort_info.$table;
+    var $this_th = sort_info.$th;
+    var sort_dir = $this_th.data('sort-dir');
+    var th_index = sort_info.th_index;
+
+
+    // Reset siblings
+    $table.find("th").data("sort-dir", null).removeClass("sorting-desc sorting-asc");
+    $this_th.data("sort-dir", sort_dir).addClass("sorting-"+sort_dir);
+  };
+
+  var calculateSortDir = function(force_direction, sort_info){
+    var sort_dir;
+    var $this_th = sort_info.$th;
+    var dir = $.fn.stupidtable.dir;
+
+    if(!!force_direction){
+        sort_dir = force_direction;
+    }
+    else{
+        sort_dir = force_direction || $this_th.data("sort-default") || dir.ASC;
+        if ($this_th.data("sort-dir"))
+           sort_dir = $this_th.data("sort-dir") === dir.ASC ? dir.DESC : dir.ASC;
+    }
+    return sort_dir;
+  };
+
+  var calculateTHIndex = function(sort_info){
+    var th_index = 0;
+    var base_index = sort_info.$th.index();
+    sort_info.$th.parents("tr").find("th").slice(0, base_index).each(function() {
+      var cols = $(this).attr("colspan") || 1;
+      th_index += parseInt(cols,10);
+    });
+    return th_index;
+  };
+
+})(jQuery);
 
 ;
 //! moment.js
@@ -55046,7 +55829,7 @@ module.exports = function (element) {
 }).call(this);
 ;
 //! moment-timezone.js
-//! version : 0.5.17
+//! version : 0.5.23
 //! Copyright (c) JS Foundation and other contributors
 //! license : MIT
 //! github.com/moment/moment-timezone
@@ -55055,10 +55838,10 @@ module.exports = function (element) {
 	"use strict";
 
 	/*global define*/
-	if (typeof define === 'function' && define.amd) {
-		define(['moment'], factory);                 // AMD
-	} else if (typeof module === 'object' && module.exports) {
+	if (typeof module === 'object' && module.exports) {
 		module.exports = factory(require('moment')); // Node
+	} else if (typeof define === 'function' && define.amd) {
+		define(['moment'], factory);                 // AMD
 	} else {
 		factory(root.moment);                        // Browser
 	}
@@ -55071,14 +55854,18 @@ module.exports = function (element) {
 	// 	return moment;
 	// }
 
-	var VERSION = "0.5.17",
+	var VERSION = "0.5.23",
 		zones = {},
 		links = {},
 		names = {},
 		guesses = {},
-		cachedGuess,
+		cachedGuess;
 
-		momentVersion = moment.version.split('.'),
+	if (!moment || typeof moment.version !== 'string') {
+		logError('Moment Timezone requires Moment.js. See https://momentjs.com/timezone/docs/#/use-it/browser/');
+	}
+
+	var momentVersion = moment.version.split('.'),
 		major = +momentVersion[0],
 		minor = +momentVersion[1];
 
@@ -55440,6 +56227,7 @@ module.exports = function (element) {
 	}
 
 	function getZone (name, caller) {
+		
 		name = normalizeName(name);
 
 		var zone = zones[name];
@@ -55598,6 +56386,9 @@ module.exports = function (element) {
 
 	fn.tz = function (name, keepTime) {
 		if (name) {
+			if (typeof name !== 'string') {
+				throw new Error('Time zone name must be a string, got ' + name + ' [' + typeof name + ']');
+			}
 			this._z = getZone(name);
 			if (this._z) {
 				moment.updateOffset(this, keepTime);
@@ -55647,7 +56438,7 @@ module.exports = function (element) {
 	}
 
 	loadData({
-		"version": "2018e",
+		"version": "2018g",
 		"zones": [
 			"Africa/Abidjan|GMT|0|0||48e5",
 			"Africa/Nairobi|EAT|-30|0||47e5",
@@ -55655,7 +56446,7 @@ module.exports = function (element) {
 			"Africa/Lagos|WAT|-10|0||17e6",
 			"Africa/Maputo|CAT|-20|0||26e5",
 			"Africa/Cairo|EET EEST|-20 -30|01010|1M2m0 gL0 e10 mn0|15e6",
-			"Africa/Casablanca|WET WEST|0 -10|0101010101010101010101010101010101010101010|1H3C0 wM0 co0 go0 1o00 s00 dA0 vc0 11A0 A00 e00 y00 11A0 uM0 e00 Dc0 11A0 s00 e00 IM0 WM0 mo0 gM0 LA0 WM0 jA0 e00 Rc0 11A0 e00 e00 U00 11A0 8o0 e00 11A0 11A0 5A0 e00 17c0 1fA0 1a00|32e5",
+			"Africa/Casablanca|+00 +01|0 -10|0101010101010101010101010101|1H3C0 wM0 co0 go0 1o00 s00 dA0 vc0 11A0 A00 e00 y00 11A0 uM0 e00 Dc0 11A0 s00 e00 IM0 WM0 mo0 gM0 LA0 WM0 jA0 e00|32e5",
 			"Europe/Paris|CET CEST|-10 -20|01010101010101010101010|1GNB0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|11e6",
 			"Africa/Johannesburg|SAST|-20|0||84e5",
 			"Africa/Khartoum|EAT CAT|-30 -20|01|1Usl0|51e5",
@@ -55695,7 +56486,7 @@ module.exports = function (element) {
 			"America/Noronha|-02|20|0||30e2",
 			"America/Port-au-Prince|EST EDT|50 40|010101010101010101010|1GI70 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 3iN0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0|23e5",
 			"Antarctica/Palmer|-03 -04|30 40|010101010|1H3D0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0|40",
-			"America/Santiago|-03 -04|30 40|010101010101010101010|1H3D0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1Nb0 Dd0 1Nb0 Ap0|62e5",
+			"America/Santiago|-03 -04|30 40|010101010101010101010|1H3D0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0|62e5",
 			"America/Sao_Paulo|-02 -03|20 30|01010101010101010101010|1GCq0 1zd0 Lz0 1C10 Lz0 1C10 On0 1zd0 On0 1zd0 On0 1zd0 On0 1HB0 FX0 1HB0 FX0 1HB0 IL0 1HB0 FX0 1HB0|20e6",
 			"Atlantic/Azores|-01 +00|10 0|01010101010101010101010|1GNB0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|25e4",
 			"America/St_Johns|NST NDT|3u 2u|01010101010101010101010|1GI5u 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0|11e4",
@@ -55714,7 +56505,7 @@ module.exports = function (element) {
 			"Asia/Bangkok|+07|-70|0||15e6",
 			"Asia/Barnaul|+07 +06|-70 -60|010|1N7v0 3rd0",
 			"Asia/Beirut|EET EEST|-20 -30|01010101010101010101010|1GNy0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0|22e5",
-			"Asia/Manila|+08|-80|0||24e6",
+			"Asia/Kuala_Lumpur|+08|-80|0||71e5",
 			"Asia/Kolkata|IST|-5u|0||15e6",
 			"Asia/Chita|+10 +08 +09|-a0 -80 -90|012|1N7s0 3re0|33e4",
 			"Asia/Ulaanbaatar|+08 +09|-80 -90|01010|1O8G0 1cJ0 1cP0 1cJ0|12e5",
@@ -55739,10 +56530,11 @@ module.exports = function (element) {
 			"Asia/Krasnoyarsk|+08 +07|-80 -70|01|1N7u0|10e5",
 			"Asia/Magadan|+12 +10 +11|-c0 -a0 -b0|012|1N7q0 3Cq0|95e3",
 			"Asia/Makassar|WITA|-80|0||15e5",
+			"Asia/Manila|PST|-80|0||24e6",
 			"Europe/Athens|EET EEST|-20 -30|01010101010101010101010|1GNB0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|35e5",
 			"Asia/Novosibirsk|+07 +06|-70 -60|010|1N7v0 4eN0|15e5",
 			"Asia/Omsk|+07 +06|-70 -60|01|1N7v0|12e5",
-			"Asia/Pyongyang|KST KST|-90 -8u|010|1P4D0 6BAu|29e5",
+			"Asia/Pyongyang|KST KST|-90 -8u|010|1P4D0 6BA0|29e5",
 			"Asia/Rangoon|+0630|-6u|0||48e5",
 			"Asia/Sakhalin|+11 +10|-b0 -a0|010|1N7r0 3rd0|58e4",
 			"Asia/Seoul|KST|-90|0||23e6",
@@ -55761,7 +56553,7 @@ module.exports = function (element) {
 			"Australia/Eucla|+0845|-8J|0||368",
 			"Australia/Lord_Howe|+11 +1030|-b0 -au|01010101010101010101010|1GQf0 1fAu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1fAu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu|347",
 			"Australia/Perth|AWST|-80|0||18e5",
-			"Pacific/Easter|-05 -06|50 60|010101010101010101010|1H3D0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1Nb0 Dd0 1Nb0 Ap0|30e2",
+			"Pacific/Easter|-05 -06|50 60|010101010101010101010|1H3D0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0|30e2",
 			"Europe/Dublin|GMT IST|0 -10|01010101010101010101010|1GNB0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|12e5",
 			"Etc/GMT-1|+01|-10|0|",
 			"Pacific/Fakaofo|+13|-d0|0||483",
@@ -55776,20 +56568,21 @@ module.exports = function (element) {
 			"Pacific/Gambier|-09|90|0||125",
 			"Etc/UCT|UCT|0|0|",
 			"Etc/UTC|UTC|0|0|",
-			"Europe/Astrakhan|+04 +03|-40 -30|010|1N7y0 3rd0",
+			"Europe/Ulyanovsk|+04 +03|-40 -30|010|1N7y0 3rd0|13e5",
 			"Europe/London|GMT BST|0 -10|01010101010101010101010|1GNB0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|10e6",
 			"Europe/Chisinau|EET EEST|-20 -30|01010101010101010101010|1GNA0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|67e4",
 			"Europe/Kaliningrad|+03 EET|-30 -20|01|1N7z0|44e4",
-			"Europe/Volgograd|+04 +03|-40 -30|01|1N7y0|10e5",
+			"Europe/Kirov|+04 +03|-40 -30|01|1N7y0|48e4",
 			"Europe/Moscow|MSK MSK|-40 -30|01|1N7y0|16e6",
 			"Europe/Saratov|+04 +03|-40 -30|010|1N7y0 5810",
 			"Europe/Simferopol|EET EEST MSK MSK|-20 -30 -40 -30|0101023|1GNB0 1qM0 11A0 1o00 11z0 1nW0|33e4",
+			"Europe/Volgograd|+04 +03|-40 -30|010|1N7y0 9Jd0|10e5",
 			"Pacific/Honolulu|HST|a0|0||37e4",
 			"MET|MET MEST|-10 -20|01010101010101010101010|1GNB0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0",
 			"Pacific/Chatham|+1345 +1245|-dJ -cJ|01010101010101010101010|1GQe0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00|600",
 			"Pacific/Apia|+14 +13|-e0 -d0|01010101010101010101010|1GQe0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00|37e3",
 			"Pacific/Bougainville|+10 +11|-a0 -b0|01|1NwE0|18e4",
-			"Pacific/Fiji|+13 +12|-d0 -c0|01010101010101010101010|1Goe0 1Nc0 Ao0 1Q00 xz0 1SN0 uM0 1SM0 uM0 1VA0 s00 1VA0 s00 1VA0 uM0 1SM0 uM0 1SM0 uM0 1VA0 s00 1VA0|88e4",
+			"Pacific/Fiji|+13 +12|-d0 -c0|01010101010101010101010|1Goe0 1Nc0 Ao0 1Q00 xz0 1SN0 uM0 1SM0 uM0 1VA0 s00 1VA0 s00 1VA0 s00 1VA0 uM0 1SM0 uM0 1VA0 s00 1VA0|88e4",
 			"Pacific/Guam|ChST|-a0|0||17e4",
 			"Pacific/Marquesas|-0930|9u|0||86e2",
 			"Pacific/Pago_Pago|SST|b0|0||37e2",
@@ -56083,13 +56876,12 @@ module.exports = function (element) {
 			"Asia/Kamchatka|Pacific/Wallis",
 			"Asia/Kathmandu|Asia/Katmandu",
 			"Asia/Kolkata|Asia/Calcutta",
+			"Asia/Kuala_Lumpur|Asia/Brunei",
+			"Asia/Kuala_Lumpur|Asia/Kuching",
+			"Asia/Kuala_Lumpur|Asia/Singapore",
+			"Asia/Kuala_Lumpur|Etc/GMT-8",
+			"Asia/Kuala_Lumpur|Singapore",
 			"Asia/Makassar|Asia/Ujung_Pandang",
-			"Asia/Manila|Asia/Brunei",
-			"Asia/Manila|Asia/Kuala_Lumpur",
-			"Asia/Manila|Asia/Kuching",
-			"Asia/Manila|Asia/Singapore",
-			"Asia/Manila|Etc/GMT-8",
-			"Asia/Manila|Singapore",
 			"Asia/Rangoon|Asia/Yangon",
 			"Asia/Rangoon|Indian/Cocos",
 			"Asia/Seoul|ROK",
@@ -56143,7 +56935,6 @@ module.exports = function (element) {
 			"Etc/UTC|UTC",
 			"Etc/UTC|Universal",
 			"Etc/UTC|Zulu",
-			"Europe/Astrakhan|Europe/Ulyanovsk",
 			"Europe/Athens|Asia/Nicosia",
 			"Europe/Athens|EET",
 			"Europe/Athens|Europe/Bucharest",
@@ -56209,7 +57000,7 @@ module.exports = function (element) {
 			"Europe/Paris|Europe/Zagreb",
 			"Europe/Paris|Europe/Zurich",
 			"Europe/Paris|Poland",
-			"Europe/Volgograd|Europe/Kirov",
+			"Europe/Ulyanovsk|Europe/Astrakhan",
 			"Pacific/Auckland|Antarctica/McMurdo",
 			"Pacific/Auckland|Antarctica/South_Pole",
 			"Pacific/Auckland|NZ",
@@ -56711,7 +57502,7 @@ options:
     window.TimeSlider = function (input, options, pluginCount) {
         var _this = this;
 
-        this.VERSION = "6.1.1";
+        this.VERSION = "6.1.3";
 
         //Setting default options
         this.options = $.extend( true, {}, defaultOptions, options );
@@ -57236,6 +58027,207 @@ options:
 
 
 }(jQuery, this, document));
+;
+(function() {
+    var url = (function() {
+
+        function _t() {
+            return new RegExp(/(.*?)\.?([^\.]*?)\.(gl|com|net|org|biz|ws|in|me|co\.uk|co|org\.uk|ltd\.uk|plc\.uk|me\.uk|edu|mil|br\.com|cn\.com|eu\.com|hu\.com|no\.com|qc\.com|sa\.com|se\.com|se\.net|us\.com|uy\.com|ac|co\.ac|gv\.ac|or\.ac|ac\.ac|af|am|as|at|ac\.at|co\.at|gv\.at|or\.at|asn\.au|com\.au|edu\.au|org\.au|net\.au|id\.au|be|ac\.be|adm\.br|adv\.br|am\.br|arq\.br|art\.br|bio\.br|cng\.br|cnt\.br|com\.br|ecn\.br|eng\.br|esp\.br|etc\.br|eti\.br|fm\.br|fot\.br|fst\.br|g12\.br|gov\.br|ind\.br|inf\.br|jor\.br|lel\.br|med\.br|mil\.br|net\.br|nom\.br|ntr\.br|odo\.br|org\.br|ppg\.br|pro\.br|psc\.br|psi\.br|rec\.br|slg\.br|tmp\.br|tur\.br|tv\.br|vet\.br|zlg\.br|br|ab\.ca|bc\.ca|mb\.ca|nb\.ca|nf\.ca|ns\.ca|nt\.ca|on\.ca|pe\.ca|qc\.ca|sk\.ca|yk\.ca|ca|cc|ac\.cn|com\.cn|edu\.cn|gov\.cn|org\.cn|bj\.cn|sh\.cn|tj\.cn|cq\.cn|he\.cn|nm\.cn|ln\.cn|jl\.cn|hl\.cn|js\.cn|zj\.cn|ah\.cn|gd\.cn|gx\.cn|hi\.cn|sc\.cn|gz\.cn|yn\.cn|xz\.cn|sn\.cn|gs\.cn|qh\.cn|nx\.cn|xj\.cn|tw\.cn|hk\.cn|mo\.cn|cn|cx|cz|de|dk|fo|com\.ec|tm\.fr|com\.fr|asso\.fr|presse\.fr|fr|gf|gs|co\.il|net\.il|ac\.il|k12\.il|gov\.il|muni\.il|ac\.in|co\.in|org\.in|ernet\.in|gov\.in|net\.in|res\.in|is|it|ac\.jp|co\.jp|go\.jp|or\.jp|ne\.jp|ac\.kr|co\.kr|go\.kr|ne\.kr|nm\.kr|or\.kr|li|lt|lu|asso\.mc|tm\.mc|com\.mm|org\.mm|net\.mm|edu\.mm|gov\.mm|ms|nl|no|nu|pl|ro|org\.ro|store\.ro|tm\.ro|firm\.ro|www\.ro|arts\.ro|rec\.ro|info\.ro|nom\.ro|nt\.ro|se|si|com\.sg|org\.sg|net\.sg|gov\.sg|sk|st|tf|ac\.th|co\.th|go\.th|mi\.th|net\.th|or\.th|tm|to|com\.tr|edu\.tr|gov\.tr|k12\.tr|net\.tr|org\.tr|com\.tw|org\.tw|net\.tw|ac\.uk|uk\.com|uk\.net|gb\.com|gb\.net|vg|sh|kz|ch|info|ua|gov|name|pro|ie|hk|com\.hk|org\.hk|net\.hk|edu\.hk|us|tk|cd|by|ad|lv|eu\.lv|bz|es|jp|cl|ag|mobi|eu|co\.nz|org\.nz|net\.nz|maori\.nz|iwi\.nz|io|la|md|sc|sg|vc|tw|travel|my|se|tv|pt|com\.pt|edu\.pt|asia|fi|com\.ve|net\.ve|fi|org\.ve|web\.ve|info\.ve|co\.ve|tel|im|gr|ru|net\.ru|org\.ru|hr|com\.hr|ly|xyz)$/);
+        }
+
+        function _d(s) {
+          return decodeURIComponent(s.replace(/\+/g, ' '));
+        }
+
+        function _i(arg, str) {
+            var sptr = arg.charAt(0),
+                split = str.split(sptr);
+
+            if (sptr === arg) { return split; }
+
+            arg = parseInt(arg.substring(1), 10);
+
+            return split[arg < 0 ? split.length + arg : arg - 1];
+        }
+
+        function _f(arg, str) {
+            var sptr = arg.charAt(0),
+                split = str.split('&'),
+                field = [],
+                params = {},
+                tmp = [],
+                arg2 = arg.substring(1);
+
+            for (var i = 0, ii = split.length; i < ii; i++) {
+                field = split[i].match(/(.*?)=(.*)/);
+
+                // TODO: regex should be able to handle this.
+                if ( ! field) {
+                    field = [split[i], split[i], ''];
+                }
+
+                if (field[1].replace(/\s/g, '') !== '') {
+                    field[2] = _d(field[2] || '');
+
+                    // If we have a match just return it right away.
+                    if (arg2 === field[1]) { return field[2]; }
+
+                    // Check for array pattern.
+                    tmp = field[1].match(/(.*)\[([0-9]+)\]/);
+
+                    if (tmp) {
+                        params[tmp[1]] = params[tmp[1]] || [];
+
+                        params[tmp[1]][tmp[2]] = field[2];
+                    }
+                    else {
+                        params[field[1]] = field[2];
+                    }
+                }
+            }
+
+            if (sptr === arg) { return params; }
+
+            return params[arg2];
+        }
+
+        return function(arg, url) {
+            var _l = {}, tmp, tmp2;
+
+            if (arg === 'tld?') { return _t(); }
+
+            url = url || window.location.toString();
+
+            if ( ! arg) { return url; }
+
+            arg = arg.toString();
+
+            if (tmp = url.match(/^mailto:([^\/].+)/)) {
+                _l.protocol = 'mailto';
+                _l.email = tmp[1];
+            }
+            else {
+
+                // Ignore Hashbangs.
+                if (tmp = url.match(/(.*?)\/#\!(.*)/)) {
+                    url = tmp[1] + tmp[2];
+                }
+
+                // Hash.
+                if (tmp = url.match(/(.*?)#(.*)/)) {
+                    _l.hash = tmp[2];
+                    url = tmp[1];
+                }
+
+                // Return hash parts.
+                if (_l.hash && arg.match(/^#/)) { return _f(arg, _l.hash); }
+
+                // Query
+                if (tmp = url.match(/(.*?)\?(.*)/)) {
+                    _l.query = tmp[2];
+                    url = tmp[1];
+                }
+
+                // Return query parts.
+                if (_l.query && arg.match(/^\?/)) { return _f(arg, _l.query); }
+
+                // Protocol.
+                if (tmp = url.match(/(.*?)\:?\/\/(.*)/)) {
+                    _l.protocol = tmp[1].toLowerCase();
+                    url = tmp[2];
+                }
+
+                // Path.
+                if (tmp = url.match(/(.*?)(\/.*)/)) {
+                    _l.path = tmp[2];
+                    url = tmp[1];
+                }
+
+                // Clean up path.
+                _l.path = (_l.path || '').replace(/^([^\/])/, '/$1');
+
+                // Return path parts.
+                if (arg.match(/^[\-0-9]+$/)) { arg = arg.replace(/^([^\/])/, '/$1'); }
+                if (arg.match(/^\//)) { return _i(arg, _l.path.substring(1)); }
+
+                // File.
+                tmp = _i('/-1', _l.path.substring(1));
+
+                if (tmp && (tmp = tmp.match(/(.*?)\.([^.]+)$/))) {
+                    _l.file = tmp[0];
+                    _l.filename = tmp[1];
+                    _l.fileext = tmp[2];
+                }
+
+                // Port.
+                if (tmp = url.match(/(.*)\:([0-9]+)$/)) {
+                    _l.port = tmp[2];
+                    url = tmp[1];
+                }
+
+                // Auth.
+                if (tmp = url.match(/(.*?)@(.*)/)) {
+                    _l.auth = tmp[1];
+                    url = tmp[2];
+                }
+
+                // User and pass.
+                if (_l.auth) {
+                    tmp = _l.auth.match(/(.*)\:(.*)/);
+
+                    _l.user = tmp ? tmp[1] : _l.auth;
+                    _l.pass = tmp ? tmp[2] : undefined;
+                }
+
+                // Hostname.
+                _l.hostname = url.toLowerCase();
+
+                // Return hostname parts.
+                if (arg.charAt(0) === '.') { return _i(arg, _l.hostname); }
+
+                // Domain, tld and sub domain.
+                if (_t()) {
+                    tmp = _l.hostname.match(_t());
+
+                    if (tmp) {
+                        _l.tld = tmp[3];
+                        _l.domain = tmp[2] ? tmp[2] + '.' + tmp[3] : undefined;
+                        _l.sub = tmp[1] || undefined;
+                    }
+                }
+
+                // Set port and protocol defaults if not set.
+                _l.port = _l.port || (_l.protocol === 'https' ? '443' : '80');
+                _l.protocol = _l.protocol || (_l.port === '443' ? 'https' : 'http');
+            }
+
+            // Return arg.
+            if (arg in _l) { return _l[arg]; }
+
+            // Return everything.
+            if (arg === '{}') { return _l; }
+
+            // Default to undefined for no match.
+            return undefined;
+        };
+    })();
+
+	if (typeof window.define === 'function' && window.define.amd) {
+		window.define('js-url', [], function () {
+		    return url;
+		});
+	} else {
+		if(typeof window.jQuery !== 'undefined') {
+			window.jQuery.extend({
+				url: function(arg, url) { return window.url(arg, url); }
+			});
+		}
+
+		window.url = url;
+	}
+
+})();
+
 ;
 /* 
   @package NOTY - Dependency-free notification library 
@@ -60314,6 +61306,293 @@ module.exports = g;
 /******/ ]);
 });
 //# sourceMappingURL=noty.js.map
+;
+/*global ActiveXObject, window, console, define, module, jQuery */
+//jshint unused:false, strict: false
+
+/*
+    PDFObject v2.1.1
+    https://github.com/pipwerks/PDFObject
+    Copyright (c) 2008-2018 Philip Hutchison
+    MIT-style license: http://pipwerks.mit-license.org/
+    UMD module pattern from https://github.com/umdjs/umd/blob/master/templates/returnExports.js
+*/
+
+(function (root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        // AMD. Register as an anonymous module.
+        define([], factory);
+    } else if (typeof module === 'object' && module.exports) {
+        // Node. Does not work with strict CommonJS, but
+        // only CommonJS-like environments that support module.exports,
+        // like Node.
+        module.exports = factory();
+    } else {
+        // Browser globals (root is window)
+        root.PDFObject = factory();
+  }
+}(this, function () {
+
+    "use strict";
+    //jshint unused:true
+
+    //PDFObject is designed for client-side (browsers), not server-side (node)
+    //Will choke on undefined navigator and window vars when run on server
+    //Return boolean false and exit function when running server-side
+
+    if(typeof window === "undefined" || typeof navigator === "undefined"){ return false; }
+
+    var pdfobjectversion = "2.1.1",
+        ua = window.navigator.userAgent,
+
+        //declare booleans
+        supportsPDFs,
+        isIE,
+        supportsPdfMimeType = (typeof navigator.mimeTypes['application/pdf'] !== "undefined"),
+        supportsPdfActiveX,
+        isModernBrowser = (function (){ return (typeof window.Promise !== "undefined"); })(),
+        isFirefox = (function (){ return (ua.indexOf("irefox") !== -1); } )(),
+        isFirefoxWithPDFJS = (function (){
+            //Firefox started shipping PDF.js in Firefox 19.
+            //If this is Firefox 19 or greater, assume PDF.js is available
+            if(!isFirefox){ return false; }
+            //parse userAgent string to get release version ("rv")
+            //ex: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:57.0) Gecko/20100101 Firefox/57.0
+            return (parseInt(ua.split("rv:")[1].split(".")[0], 10) > 18);
+        })(),
+        isIOS = (function (){ return (/iphone|ipad|ipod/i.test(ua.toLowerCase())); })(),
+
+        //declare functions
+        createAXO,
+        buildFragmentString,
+        log,
+        embedError,
+        embed,
+        getTargetElement,
+        generatePDFJSiframe,
+        generateEmbedElement;
+
+
+    /* ----------------------------------------------------
+       Supporting functions
+       ---------------------------------------------------- */
+
+    createAXO = function (type){
+        var ax;
+        try {
+            ax = new ActiveXObject(type);
+        } catch (e) {
+            ax = null; //ensure ax remains null
+        }
+        return ax;
+    };
+
+    //IE11 still uses ActiveX for Adobe Reader, but IE 11 doesn't expose
+    //window.ActiveXObject the same way previous versions of IE did
+    //window.ActiveXObject will evaluate to false in IE 11, but "ActiveXObject" in window evaluates to true
+    //so check the first one for older IE, and the second for IE11
+    //FWIW, MS Edge (replacing IE11) does not support ActiveX at all, both will evaluate false
+    //Constructed as a method (not a prop) to avoid unneccesarry overhead -- will only be evaluated if needed
+    isIE = function (){ return !!(window.ActiveXObject || "ActiveXObject" in window); };
+
+    //If either ActiveX support for "AcroPDF.PDF" or "PDF.PdfCtrl" are found, return true
+    //Constructed as a method (not a prop) to avoid unneccesarry overhead -- will only be evaluated if needed
+    supportsPdfActiveX = function (){ return !!(createAXO("AcroPDF.PDF") || createAXO("PDF.PdfCtrl")); };
+
+    //Determines whether PDF support is available
+    supportsPDFs = (
+        //as of iOS 12, inline PDF rendering is still not supported in Safari or native webview
+        //3rd-party browsers (eg Chrome, Firefox) use Apple's webview for rendering, and thus the same result as Safari
+        //Therefore if iOS, we shall assume that PDF support is not available
+        !isIOS && (
+            //Modern versions of Firefox come bundled with PDFJS
+            isFirefoxWithPDFJS || 
+            //Browsers that still support the original MIME type check
+            supportsPdfMimeType || (
+                //Pity the poor souls still using IE
+                isIE() && supportsPdfActiveX()
+            )
+        )
+    );
+
+    //Create a fragment identifier for using PDF Open parameters when embedding PDF
+    buildFragmentString = function(pdfParams){
+
+        var string = "",
+            prop;
+
+        if(pdfParams){
+
+            for (prop in pdfParams) {
+                if (pdfParams.hasOwnProperty(prop)) {
+                    string += encodeURIComponent(prop) + "=" + encodeURIComponent(pdfParams[prop]) + "&";
+                }
+            }
+
+            //The string will be empty if no PDF Params found
+            if(string){
+
+                string = "#" + string;
+
+                //Remove last ampersand
+                string = string.slice(0, string.length - 1);
+
+            }
+
+        }
+
+        return string;
+
+    };
+
+    log = function (msg){
+        if(typeof console !== "undefined" && console.log){
+            console.log("[PDFObject] " + msg);
+        }
+    };
+
+    embedError = function (msg){
+        log(msg);
+        return false;
+    };
+
+    getTargetElement = function (targetSelector){
+
+        //Default to body for full-browser PDF
+        var targetNode = document.body;
+
+        //If a targetSelector is specified, check to see whether
+        //it's passing a selector, jQuery object, or an HTML element
+
+        if(typeof targetSelector === "string"){
+
+            //Is CSS selector
+            targetNode = document.querySelector(targetSelector);
+
+        } else if (typeof jQuery !== "undefined" && targetSelector instanceof jQuery && targetSelector.length) {
+
+            //Is jQuery element. Extract HTML node
+            targetNode = targetSelector.get(0);
+
+        } else if (typeof targetSelector.nodeType !== "undefined" && targetSelector.nodeType === 1){
+
+            //Is HTML element
+            targetNode = targetSelector;
+
+        }
+
+        return targetNode;
+
+    };
+
+    generatePDFJSiframe = function (targetNode, url, pdfOpenFragment, PDFJS_URL, id){
+
+        var fullURL = PDFJS_URL + "?file=" + encodeURIComponent(url) + pdfOpenFragment;
+        var scrollfix = (isIOS) ? "-webkit-overflow-scrolling: touch; overflow-y: scroll; " : "overflow: hidden; ";
+        var iframe = "<div style='" + scrollfix + "position: absolute; top: 0; right: 0; bottom: 0; left: 0;'><iframe  " + id + " src='" + fullURL + "' style='border: none; width: 100%; height: 100%;' frameborder='0'></iframe></div>";
+        targetNode.className += " pdfobject-container";
+        targetNode.style.position = "relative";
+        targetNode.style.overflow = "auto";
+        targetNode.innerHTML = iframe;
+        return targetNode.getElementsByTagName("iframe")[0];
+
+    };
+
+    generateEmbedElement = function (targetNode, targetSelector, url, pdfOpenFragment, width, height, id){
+
+        var style = "";
+
+        if(targetSelector && targetSelector !== document.body){
+            style = "width: " + width + "; height: " + height + ";";
+        } else {
+            style = "position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%;";
+        }
+
+        targetNode.className += " pdfobject-container";
+        targetNode.innerHTML = "<embed " + id + " class='pdfobject' src='" + url + pdfOpenFragment + "' type='application/pdf' style='overflow: auto; " + style + "'/>";
+
+        return targetNode.getElementsByTagName("embed")[0];
+
+    };
+
+    embed = function(url, targetSelector, options){
+
+        //Ensure URL is available. If not, exit now.
+        if(typeof url !== "string"){ return embedError("URL is not valid"); }
+
+        //If targetSelector is not defined, convert to boolean
+        targetSelector = (typeof targetSelector !== "undefined") ? targetSelector : false;
+
+        //Ensure options object is not undefined -- enables easier error checking below
+        options = (typeof options !== "undefined") ? options : {};
+
+        //Get passed options, or set reasonable defaults
+        var id = (options.id && typeof options.id === "string") ? "id='" + options.id + "'" : "",
+            page = (options.page) ? options.page : false,
+            pdfOpenParams = (options.pdfOpenParams) ? options.pdfOpenParams : {},
+            fallbackLink = (typeof options.fallbackLink !== "undefined") ? options.fallbackLink : true,
+            width = (options.width) ? options.width : "100%",
+            height = (options.height) ? options.height : "100%",
+            assumptionMode = (typeof options.assumptionMode === "boolean") ? options.assumptionMode : true,
+            forcePDFJS = (typeof options.forcePDFJS === "boolean") ? options.forcePDFJS : false,
+            PDFJS_URL = (options.PDFJS_URL) ? options.PDFJS_URL : false,
+            targetNode = getTargetElement(targetSelector),
+            fallbackHTML = "",
+            pdfOpenFragment = "",
+            fallbackHTML_default = "<p>This browser does not support inline PDFs. Please download the PDF to view it: <a href='[url]'>Download PDF</a></p>";
+
+        //If target element is specified but is not valid, exit without doing anything
+        if(!targetNode){ return embedError("Target element cannot be determined"); }
+
+
+        //page option overrides pdfOpenParams, if found
+        if(page){
+            pdfOpenParams.page = page;
+        }
+
+        //Stringify optional Adobe params for opening document (as fragment identifier)
+        pdfOpenFragment = buildFragmentString(pdfOpenParams);
+
+        //Do the dance
+
+        //If the forcePDFJS option is invoked, skip everything else and embed as directed
+        if(forcePDFJS && PDFJS_URL){
+
+            return generatePDFJSiframe(targetNode, url, pdfOpenFragment, PDFJS_URL, id);
+
+        //If traditional support is provided, or if this is a modern browser and not iOS (see comment for supportsPDFs declaration)
+        } else if(supportsPDFs || (assumptionMode && isModernBrowser && !isIOS)){
+
+            return generateEmbedElement(targetNode, targetSelector, url, pdfOpenFragment, width, height, id);
+
+        //If everything else has failed and a PDFJS fallback is provided, try to use it
+        } else if(PDFJS_URL){
+
+            return generatePDFJSiframe(targetNode, url, pdfOpenFragment, PDFJS_URL, id);
+
+        } else {
+
+            //Display the fallback link if available
+            if(fallbackLink){
+
+                fallbackHTML = (typeof fallbackLink === "string") ? fallbackLink : fallbackHTML_default;
+                targetNode.innerHTML = fallbackHTML.replace(/\[url\]/g, url);
+
+            }
+
+            return embedError("This browser does not support embedded PDFs");
+
+        }
+
+    };
+
+    return {
+        embed: function (a,b,c){ return embed(a,b,c); },
+        pdfobjectversion: (function () { return pdfobjectversion; })(),
+        supportsPDFs: (function (){ return supportsPDFs; })()
+    };
+
+}));
 ;
 /*!
  * Select2 4.0.5
@@ -66071,9 +67350,6 @@ S2.define('jquery.select2',[
 	https://github.com/fcoo/jquery-bootstrap
 	https://github.com/fcoo
 
-TODO:
-- More than one card open at the same time (apply to one or all card(s) )
-
 ****************************************************************************/
 
 (function ($ /*, window, document, undefined*/) {
@@ -66100,9 +67376,11 @@ TODO:
     //card_onShown_close_siblings: Close all open siblings when card is shown BUT without animation
     function card_onShown_close_siblings(){
         var $this = $(this);
-        $this.addClass('no-transition');
-        card_onShow_close_siblings.call(this);
-        $this.removeClass('no-transition');
+        if ($this.hasClass('show')){
+            $this.addClass('no-transition');
+            card_onShow_close_siblings.call(this);
+            $this.removeClass('no-transition');
+        }
     }
 
     /**********************************************************
@@ -66135,8 +67413,8 @@ TODO:
 
     function bsAccordion_asModal( options ){
         return $.bsModal( $.extend( {
-                              flex   : true,
-                              content: this,
+                              flexWidth: true,
+                              content  : this,
                           }, options)
                );
     }
@@ -66151,6 +67429,10 @@ TODO:
                 content     : ''
             });
 
+        if (options.neverClose){
+            options.multiOpen = true;
+            options.allOpen   = true;
+        }
 
         var $result = $('<div/>')
                         ._bsAddBaseClassAndSize( options )
@@ -66163,44 +67445,55 @@ TODO:
 
         //Adding the children {icon, text, content}
         $.each( options.list, function( index, opt ){
+
+
             //Create the header
             opt = $._bsAdjustOptions( opt );
 
             var headerId   = id + 'header'+index,
                 collapseId = id + 'collapse'+index,
+                isOpen     = !!options.allOpen || !!opt.selected,
                 $card = $('<div/>')
                             .addClass('card')
+                            .toggleClass('show', isOpen)
                             .attr({'data-user-id': opt.id || null})
                             .on( 'shown.bs.collapse',  card_onShown )
                             .on( 'hidden.bs.collapse', card_onHidden )
                             .on( 'show.bs.collapse',   options.multiOpen ? null : card_onShow_close_siblings )
-                            .on( 'shown.bs.collapse',  options.multiOpen ? null : card_onShown_close_siblings )
-                            .appendTo( $result );
+/*HER*/                            .on( 'shown.bs.collapse',  options.multiOpen ? null : card_onShown_close_siblings )
+                            .appendTo( $result ),
+                headerAttr = {
+                    'id'  : headerId,
+                    'role': 'tab',
+                };
 
             //Add header
+            if (!options.neverClose)
+                $.extend(headerAttr, {
+                    'data-toggle'  : "collapse",
+                    'data-parent'  : '#'+id,
+                    'href'         : '#'+collapseId,
+                    'aria-expanded': true,
+                    'aria-controls': collapseId,
+                    'aria-target': '#'+collapseId
+                });
+
             $card.append(
                 $('<div/>')
-                    .addClass('card-header collapsed')
-                    .attr({
-                        'id'           : headerId,
-                        'role'         : 'tab',
-                        'data-toggle'  : "collapse",
-                        'data-parent'  : '#'+id,
-                        'href'         : '#'+collapseId,
-                        'aria-expanded': true,
-                        'aria-controls': collapseId,
-                        'aria-target': '#'+collapseId
-                    })
+                    .addClass('card-header')
+                    .toggleClass('collapsed', !isOpen)
+                    .toggleClass('collapsible', !options.neverClose)
+                    .attr(headerAttr)
                     ._bsAddHtml( opt.header || opt )
                     //Add chevrolet-icon
-                    .append( $('<i/>').addClass('fa chevrolet') )
-
+                    .append( options.neverClose ? null : $('<i/>').addClass('fa chevrolet') )
             );
 
             //Add content-container
             var $outer =
                 $('<div/>')
                     .addClass('collapse')
+                    .toggleClass('show', isOpen)
                     .attr({
                         'id'             : collapseId,
                         'role'           : 'tabpanel',
@@ -66221,14 +67514,19 @@ TODO:
                     .appendTo( $outer );
 
             //Add content: string, element, function or children (=accordion)
-                if (opt.content)
-                    $contentContainer._bsAppendContent( opt.content, opt.contentContext );
+            if (opt.content)
+                $contentContainer._bsAppendContent( opt.content, opt.contentContext );
 
             //If opt.list exists => create a accordion inside $contentContainer
             if ($.isArray(opt.list))
-                $.bsAccordion( { list: opt.list } )
+                $.bsAccordion( {
+                    allOpen   : options.allOpen,
+                    multiOpen : options.multiOpen,
+                    neverClose: options.neverClose,
+                    list: opt.list
+                } )
                     .appendTo( $contentContainer );
-        });
+        }); //End of $.each( options.list, function( index, opt ){
 
         $result.collapse(/*options*/);
         $result.asModal = bsAccordion_asModal;
@@ -66300,9 +67598,15 @@ TODO:
 
         var result = $('<'+ options.tagName + ' tabindex="0"/>');
 
-        //Adding href that don't scroll to top to allow anchor to get focus
-        if (options.tagName == 'a')
-            result.prop('href', 'javascript:undefined');
+        if (options.tagName == 'a'){
+            if (options.link)
+                result
+                    .i18n($._bsAdjustText(options.link), 'href')
+                    .prop('target', '_blank');
+            else
+                //Adding href that don't scroll to top to allow anchor to get focus
+                result.prop('href', 'javascript:undefined');
+        }
 
         result
             ._bsAddIdAndName( options )
@@ -66328,7 +67632,7 @@ TODO:
         if (options.addOnClick && options.onClick)
             result.on('click', $.proxy( result._bsButtonOnClick, result ) );
 
-        result._bsAddHtml( options, true, true );
+        result._bsAddHtml( options, false, true );
 
         return result;
     };
@@ -66356,8 +67660,12 @@ TODO:
         options.class = 'allow-zero-selected';
 
         //Use modernizr-mode and classes if icon and/or text containe two values
-        if ($.isArray(options.icon)){
-            options.iconClassName = ['hide-for-active', 'show-for-active'];
+        if ($.isArray(options.icon) && (options.icon.length == 2)){
+            options.icon = [[
+                options.icon[0]+ ' icon-hide-for-active',
+                options.icon[1]+ ' icon-show-for-active'
+            ]];
+//HER             options.iconClassName = ['hide-for-active', 'show-for-active'];
             options.modernizr = true;
         }
         if ($.isArray(options.text)){
@@ -66510,6 +67818,152 @@ TODO:
 
 ;
 /****************************************************************************
+	jquery-bootstrap-file-view.js,
+
+	(c) 2017, FCOO
+
+	https://github.com/fcoo/jquery-bootstrap
+	https://github.com/fcoo
+
+    $.bsFileView creates a <div>-element with viewer of a file (if possible) and
+    buttons to view the file in bsModalFile and in a new Tab Page
+
+****************************************************************************/
+
+(function ($, i18next,  window /*, document, undefined*/) {
+	"use strict";
+
+    //fileViewModalList = list of {fileNames, bsModal}  where bsModal is the $.bsModalFile showing the file
+    var fileViewModalList = [];
+    function showFileInModal( fileName, header ){
+        var fileViewModal = null,
+            fileNames     = fileName.da + fileName.en;
+        $.each( fileViewModalList, function( index, fileView ){
+            if (fileView.fileNames == fileNames){
+                fileViewModal = fileView;
+                return false;
+            }
+        });
+
+        if (!fileViewModal){
+            fileViewModal = {
+                fileNames: fileNames,
+                bsModal  : $.bsModalFile( fileName, {header: header, show: false})
+            };
+            fileViewModalList.push(fileViewModal);
+        }
+        fileViewModal.bsModal.show();
+    }
+
+
+    /**********************************************************
+    **********************************************************/
+    $.bsFileView = $.bsFileview = function( options ){
+        options = options || {};
+        var fileName    = $._bsAdjustText(options.fileName),
+            theFileName = i18next.sentence(fileName),
+            fileNameExt = window.url('fileext', theFileName),
+            $result     = $('<div/>');
+
+        //Create the header (if any)
+        if (options.header)
+            $('<div/>')
+                .addClass('file-view-header')
+                ._bsAddHtml(options.header)
+                .appendTo($result);
+
+        //Create the view
+        var $container =
+                $('<div/>')
+                    .addClass('file-view-content text-center')
+                    .appendTo($result);
+
+        switch (fileNameExt){
+            //*********************************************
+            case 'jpg':
+            case 'jpeg':
+            case 'gif':
+            case 'png':
+            case 'tiff':
+            case 'bmp':
+            case 'ico':
+                $('<img src="' + theFileName + '"/>')
+                    .css('width', '100%')
+                    .appendTo($container);
+
+                break;
+
+            //*********************************************
+            default:
+                $container._bsAddHtml({ text: {
+                    da: 'Klik på <i class="far fa-window-maximize"/> for at se dokumentet i et nyt vindue<br>Klik på <i class="fas ' + $.bsExternalLinkIcon + '"/> for at se dokumentet i en ny fane',
+                    en: 'Click on <i class="far fa-window-maximize"/> to see the document in a new window<br>Click on <i class="fas ' + $.bsExternalLinkIcon + '"/> to see the document in a new Tab Page'
+                }});
+        }
+
+        //Create the Show and Open-buttons
+        $('<div/>')
+            .addClass('modal-footer')
+            .css('justify-content',  'center')
+            ._bsAppendContent([
+                $.bsButton( {icon:'far fa-window-maximize',  text: {da:'Vis',  en:'Show'},   onClick: function(){ showFileInModal( fileName, options.header ); } } ),
+                $.bsButton( {icon: $.bsExternalLinkIcon, text: {da: 'Åbne', en: 'Open'}, link: fileName } )
+            ])
+            .appendTo($result);
+
+        return $result;
+    };
+
+}(jQuery, this.i18next, this, document));
+;
+/****************************************************************************
+	jquery-bootstrap-fontawesome.js,
+
+	(c) 2017, FCOO
+
+	https://github.com/fcoo/jquery-bootstrap
+	https://github.com/fcoo
+
+****************************************************************************/
+
+(function ($/*, window, document, undefined*/) {
+	"use strict";
+
+    /*******************************************
+    $.bsMarkerIcon(colorClassName, borderColorClassName, options)
+    Return options to create a marker-icon = round icon with
+    inner color given as color in colorClassName and
+    border-color given as color in borderColorClassName
+    options:
+        faClassName: fa-class for symbol. Default = "fa-circle"
+        extraClassName: string or string[]. Extra class-name added
+        partOfList : true if the icon is part of a list => return [icon-name] instead of [[icon-name]]
+    ********************************************/
+    $.bsMarkerIcon = function(colorClassName, borderColorClassName, options){
+        options = $.extend({
+            faClassName   : 'fa-circle',
+            extraClassName: '',
+            partOfList    : false
+        }, options || {});
+
+        colorClassName       = colorClassName || 'text-white';
+        borderColorClassName = borderColorClassName || 'text-black';
+
+        var className =
+                options.faClassName + ' ' +
+                ($.isArray(options.extraClassName) ? options.extraClassName.join(' ') : options.extraClassName) +
+                ' ';
+        var result = [
+            'fas ' + className + colorClassName,
+            'far ' + className + borderColorClassName
+        ];
+
+        return options.partOfList ? result : [result];
+    };
+
+}(jQuery, this, document));
+;
+/****************************************************************************
 	jquery-bootstrap-form.js
 
 	(c) 2018, FCOO
@@ -66570,6 +68024,7 @@ TODO:
             this.radioGroup = this.radioGroup || this.getElement().data('radioGroup');
             return this.radioGroup;
         },
+
         /*******************************************************
         getFormGroup
         *******************************************************/
@@ -66577,7 +68032,6 @@ TODO:
             this.$formGroup = this.$formGroup || this.getElement().parents('.form-group').first();
             return this.$formGroup;
         },
-
 
         /*******************************************************
         setValue
@@ -66669,7 +68123,6 @@ TODO:
             return this;
         },
 
-
         /*******************************************************
         onChanging
         *******************************************************/
@@ -66710,7 +68163,6 @@ TODO:
             return this;
         },
     }; //End of BsModalInput.prototype
-
 
     /************************************************************************
     *************************************************************************
@@ -66785,13 +68237,11 @@ TODO:
         if (this.options.extended && this.options.useExtended){
             this.$form._bsAppendContent( this.options.extended.content, this.options.contentContext );
             this.options.extended.content = this.$form;
-
         }
         else {
             this.$form._bsAppendContent( this.options.content, this.options.contentContext );
             this.options.content = this.$form;
         }
-
 
         if (this.options.formValidation)
             this.$form.addClass('form-validation');
@@ -66816,13 +68266,11 @@ TODO:
             input.addValidation();
         });
 
-
         //Add onSubmit
         this._addOnSubmit( $.proxy(this.onSubmit, this) );
 
         return this;
     }
-
 
     /*******************************************************
     Export to jQuery
@@ -67088,11 +68536,16 @@ TODO:
     $.bsHeaderIcons = {
         back    : 'fa-chevron-left',
         forward : 'fa-chevron-right',
+
+        pin     : ['fas fa-thumbtack fa-inside-circle', 'far fa-circle'],
+        unpin   : 'fa-thumbtack',
+
         extend  : 'fa-chevron-up',
         diminish: 'fa-chevron-down',
-        pin     : ['fas fa-thumbtack fa-stack-1x fa-inside-circle', 'far fa-circle fa-stack-1x'],
-        unpin   : 'fa-thumbtack',
-        close   : ['far fa-times-circle fa-stack-1x hide-for-hover', 'fas fa-times-circle text-danger fa-stack-1x show-for-hover']
+
+        new     : ['far fa-window-maximize fa-inside-circle2', 'far fa-circle'],
+
+        close   : ['fas fa-circle back', 'far fa-times-circle middle', 'fas fa-times-circle front']
     };
 
     //mandatoryHeaderIconClass = mandatory class-names and title for the different icons on the header
@@ -67124,9 +68577,14 @@ TODO:
         options = $.extend( true, {headerClassName: '', inclHeader: true, icons: {} }, options );
         this.addClass( options.headerClassName );
 
-        if (options.inclHeader)
+        if (options.inclHeader){
+            options.header = $._bsAdjustIconAndText(options.header);
+            //If header contents more than one text => set the first to "fixed" so that only the following text are truncated
+            if ($.isArray(options.header) && (options.header.length > 1)){
+                options.header[0].textClass = 'fixed-header';
+            }
             this._bsAddHtml( options.header || $.EMPTY_TEXT );
-
+        }
         //Add icons (if any)
         if ( !$.isEmptyObject(options.icons) ) {
             //Container for icons
@@ -67139,11 +68597,11 @@ TODO:
                         .appendTo( this );
 
             //Add icons
-            $.each( ['back', 'forward', 'pin', 'unpin', 'extend', 'diminish', 'close'], function( index, id ){
+            $.each( ['back', 'forward', 'pin', 'unpin', 'extend', 'diminish', 'new', 'close'], function( index, id ){
                 var iconOptions = options.icons[id],
                     classAndTitle = mandatoryHeaderIconClassAndTitle[id] || {};
-                if (iconOptions && iconOptions.onClick){
 
+                if (iconOptions && iconOptions.onClick){
                     $._bsCreateIcon(
                         $.bsHeaderIcons[id],
                         $iconContainer,
@@ -67232,6 +68690,97 @@ TODO:
 }(jQuery, this, document));
 ;
 /****************************************************************************
+	jquery-bootstrap-list.js,
+
+	(c) 2017, FCOO
+
+	https://github.com/fcoo/jquery-bootstrap
+	https://github.com/fcoo
+
+****************************************************************************/
+
+(function ($/*, window, document, undefined*/) {
+	"use strict";
+
+/******************************************************************
+bsList( options )
+options
+    columns = [] of {
+        vfFormat,
+        vfOptions:  The content of a element can be set and updated using [jquery-value-format].
+                    The options vfFormat and (optional) vfOptions defines witch format used to display the content
+
+        align        :  'left','center','right'. Defalut = 'left'
+        verticalAlign: 'top', 'middle','bottom'. Default = 'middle'
+        noWrap       : false. If true the column will not be wrapped = fixed width
+    }
+
+    verticalBorder: [boolean] true. When true vertical borders are added together with default horizontal borders
+    noBorder      : [boolean] true. When true no borders are visible
+
+    align        : 'left','center','right'. Defalut = 'left' = default align for all columns
+    verticalAlign: 'top', 'middle','bottom'. Default = 'middle' = default verticalAlign for all columns
+
+
+
+*******************************************************************/
+    var defaultColunmOptions = {
+            align        : 'left',
+            verticalAlign: 'middle',
+            noWrap       : false,
+            truncate     : false,
+            sortable     : false
+        },
+
+        defaultOptions = {
+            showHeader      : false,
+            verticalBorder  : false,
+            noBorder        : true,
+            hoverRow        : false,
+            noPadding       : true,
+
+            align           : defaultColunmOptions.align,
+            verticalAlign   : defaultColunmOptions.verticalAlign,
+
+            content         : []
+        };
+
+    $.bsList = function( options ){
+        //Adjust options but without content since it isn't standard
+        var content = options.content;
+        options.content = [];
+        options = $._bsAdjustOptions( options, defaultOptions );
+        options.content = content;
+
+        var nofColumns = 1;
+        //Adjust options.content and count number of columns
+        $.each(options.content, function( index, rowContent ){
+            rowContent = $.isArray( rowContent ) ? rowContent : [rowContent];
+            nofColumns = Math.max(nofColumns, rowContent.length);
+
+            var rowContentObj = {};
+            $.each(rowContent, function( index, cellContent ){
+                rowContentObj['_'+index] = cellContent;
+            });
+
+            options.content[index] = rowContentObj;
+        });
+
+        options.columns = options.columns || [];
+        var optionsAlign = {
+                align        : options.align,
+                verticalAlign: options.verticalAlign
+            };
+
+        //Create columns-options for bsTable
+        for (var i=0; i<nofColumns; i++ )
+            options.columns[i] = $.extend({id:'_'+i}, defaultColunmOptions, optionsAlign, options.columns[i]);
+
+        return $.bsTable( options );
+    };
+}(jQuery, this, document));
+;
+/****************************************************************************
 	jquery-bootstrap-modal-backdrop.js,
 
 	(c) 2017, FCOO
@@ -67306,6 +68855,201 @@ TODO:
 }(jQuery, this, document));
 ;
 /****************************************************************************
+	jquery-bootstrap-modal-file.js,
+
+	(c) 2017, FCOO
+
+	https://github.com/fcoo/jquery-bootstrap
+	https://github.com/fcoo
+
+****************************************************************************/
+
+(function ($, i18next,  window /*, document, undefined*/) {
+	"use strict";
+
+
+
+    //$.bsHeaderIcons = class-names for the different icons on the header
+    $.bsExternalLinkIcon = 'fa-external-link-alt';
+
+    /**********************************************************
+    modalFileLink( fileName, bsModalOptions )
+    Return a link to bsModalFile
+    **********************************************************/
+    $.modalFileLink = function( fileName, bsModalOptions ){
+        fileName = $._bsAdjustText(fileName);
+        return window.PDFObject.supportsPDFs ?
+            function(){ return $.bsModalFile( fileName, bsModalOptions ); } :
+            fileName;
+    };
+
+
+    /**********************************************************
+    updateImgZoom( $im)
+    **********************************************************/
+    var ZoomControl = function( $img ){
+        this.$img = $img;
+        this.zooms = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
+        this.zoomIndex = this.zooms.indexOf(100);
+    };
+
+    ZoomControl.prototype = {
+        getButtons: function(){
+            var _this = this;
+            this.$zoomOutButton = $.bsButton({type:'button', icon:'fa-search-minus',  text:{da:'Zoom ud',  en:'Zoom Out'}, onClick: _this.zoomOut, context: _this });
+            this.$zoomInButton  = $.bsButton({type:'button', icon:'fa-search-plus',   text:{da:'Zoom ind', en:'Zoom In'},  onClick: _this.zoomIn,  context: _this });
+
+            return [this.$zoomOutButton, this.$zoomInButton];
+        },
+
+        zoomIn : function(){ this.update(false); },
+        zoomOut: function(){ this.update(true);  },
+
+        mousewheel: function( event ){
+            var delta =
+                    event.deltaX ? event.deltaX :
+                    event.deltaY ? event.deltaY :
+                    0;
+            if (delta)
+                this.update( delta < 0 );
+            event.stopPropagation();
+            event.preventDefault();
+        },
+
+        update: function(zoomOut){
+            this.zoomIndex = this.zoomIndex + (zoomOut ? -1 : + 1);
+            this.zoomIndex = Math.max( 0, Math.min( this.zoomIndex, this.zooms.length-1) );
+
+            this.$img.css('width', this.zooms[this.zoomIndex]+'%');
+            var isMin = this.zoomIndex == 0;
+            var isMax = this.zoomIndex == this.zooms.length-1;
+
+            this.$zoomOutButton.attr('disabled', isMin).toggleClass('disabled', isMin);
+            this.$zoomInButton.attr('disabled', isMax).toggleClass('disabled', isMax);
+         }
+    };
+
+
+    /**********************************************************
+    bsModalFile( fileName, options )
+    **********************************************************/
+    $.bsModalFile = function( fileName, options ){
+        options = options || {};
+        fileName = $._bsAdjustText(fileName);
+        var theFileName = i18next.sentence(fileName),
+            fileNameExt = window.url('fileext', theFileName),
+            $content,
+            footer = {
+                da: 'Hvis filen ikke kan vises, klik på <i class="fas ' + $.bsExternalLinkIcon + '"/> for at se dokumentet i en ny fane',
+                en: 'If the file doesn\'t show correctly click on <i class="fas ' + $.bsExternalLinkIcon + '"/> to see the document in a new Tab Page'
+            },
+            fullWidth       = true,
+            noPadding       = true,
+            scroll          = false,
+            alwaysMaxHeight = true;
+
+        fileNameExt = fileNameExt ? fileNameExt.toLowerCase() : 'unknown';
+
+        //Check for ext == 'pdf' and support for pdf
+        if ((fileNameExt == 'pdf') && !window.PDFObject.supportsPDFs){
+            $content =
+                $('<div/>')
+                    .addClass('text-center')
+                    ._bsAddHtml({text: {
+                        da: 'Denne browser understøtter ikke visning<br>af pdf-filer i popup-vinduer<br>Klik på <i class="fas ' + $.bsExternalLinkIcon + '"/> for at se dokumentet i en ny fane',
+                        en: 'This browser does not support<br>pdf-files in popup windows<br>Click on <i class="fas ' + $.bsExternalLinkIcon + '"/> to see the document<br>in a new Tab page'
+                    }});
+            fullWidth       = false;
+            footer          = null;
+            noPadding       = false;
+            alwaysMaxHeight = false;
+
+        }
+        else {
+            switch (fileNameExt){
+                //*********************************************
+                case 'pdf':
+                    //passes a jQuery object (HTML node) for target
+                    $content = $('<div/>').addClass('object-with-file');
+                    window.PDFObject.embed(
+                        theFileName,
+                        $content,
+                        { pdfOpenParams: { view: 'FitH' } }
+                    );
+                    break;
+
+                //*********************************************
+                case 'jpg':
+                case 'jpeg':
+                case 'gif':
+                case 'png':
+                case 'tiff':
+                case 'bmp':
+                case 'ico':
+                    var $iframe =
+                            $('<iframe></iframe>')
+                                .addClass('object-with-file'),
+                        $img =
+                            $('<img src="' + theFileName + '"/>')
+                                .css('width', '100%');
+
+                    //Create a ZoomControl to zoom in and out
+                    var zoomControl = new ZoomControl( $img );
+
+                    //Add the images to the iframe when the iframe is loaded into the DOM
+                    setTimeout( function(){
+                        var $iFrameBody = $iframe.contents().find('body');
+                        $iFrameBody.on('mousewheel', $.proxy( zoomControl.mousewheel, zoomControl ) );
+                        $iFrameBody.append($img);
+                    }, 200);
+
+
+                    $content = [
+                        $iframe,
+                        $('<div></div>')
+                            .addClass('modal-footer')
+                            .css('justify-content',  'center')
+                            ._bsAppendContent( zoomControl.getButtons() )
+                    ];
+
+                    scroll = false;
+                    break;
+
+                //*********************************************
+                case 'html':
+                case 'unknown':
+                    $content = $('<iframe src="' + theFileName + '"/>').addClass('object-with-file');
+                    break;
+
+                //*********************************************
+                default:
+                    //Try default <object> to display the file
+                    $content = $('<object data="' + theFileName + '"/>').addClass('object-with-file');
+
+            } //end of switch (fileNameExt){...
+        }
+
+        //Create the bsModal
+        return $.bsModal({
+                    header    : options.header,
+                    scroll    : scroll,
+                    flexWidth : fullWidth,
+                    megaWidth : fullWidth,
+
+                    noVerticalPadding  : noPadding,
+                    noHorizontalPadding: noPadding,
+                    alwaysMaxHeight    : alwaysMaxHeight,
+
+                    buttons   : [{text: {da: 'Åbne', en: 'Open'}, icon: $.bsExternalLinkIcon, link: fileName }],
+                    content   : $content,
+                    footer    : footer
+
+               });
+    };
+
+}(jQuery, this.i18next, this, document));
+;
+/****************************************************************************
 	jquery-bootstrap-modal.js,
 
 	(c) 2017, FCOO
@@ -67315,7 +69059,7 @@ TODO:
 
 ****************************************************************************/
 
-(function ($, window, document/*, undefined*/) {
+(function ($, window, document, undefined) {
 	"use strict";
 
     /**********************************************************
@@ -67323,21 +69067,28 @@ TODO:
 
     options
         header
+        modalContentClassName
         icons: {
             close   : {onClick, attr, className, attr, data }
             extend  : {onClick, attr, className, attr, data }
             diminish: {onClick, attr, className, attr, data }
 }       type //"", "alert", "success", "warning", "error", "info"
         fixedContent
-        flex
+
+        alwaysMaxHeight
+        flexWidth
+        extraWidth
+        megaWidth
         noVerticalPadding
+        noHorizontalPadding
         content
         scroll: boolean | 'vertical' | 'horizontal'
         extended: {
             type
             fixedContent
-            flex
             noVerticalPadding
+            noHorizontalPadding
+            alwaysMaxHeight
             content
             scroll: boolean | 'vertical' | 'horizontal'
             footer
@@ -67345,7 +69096,7 @@ TODO:
         isExtended: boolean
         footer
         buttons = [];
-        colseIcon
+        closeIcon
         closeText
         noCloseIconOnHeader
 
@@ -67361,20 +69112,47 @@ TODO:
     as expected/needed
     Instead a resize-event is added to update the max-height of
     elements with the current value of window.innerHeight
+    Sets both max-height and haight to allow always-max-heigth options
     **********************************************************/
-    function adjustModalMaxHeight( $modal ){
-        $modal = $modal || $('.modal');
-        var $modalDialog  = $modal.find('.modal-dialog'),
-            $modalContent = $modalDialog.find('.modal-content'),
-            windowInnerHeight = parseInt(window.innerHeight);
-
-        $modalDialog.css('max-height', windowInnerHeight+'px');
-        $modalContent.css('max-height', (windowInnerHeight - 2*modalVerticalMargin)+'px');
-
+    function adjustModalMaxHeight( $modalContent ){
+        $modalContent = $modalContent || $('.modal-content.modal-flex-height');
+        var maxHeight = parseInt(window.innerHeight) - 2*modalVerticalMargin;
+        $modalContent.css({
+            'max-height': maxHeight+'px',
+            'height'    : maxHeight+'px'
+        });
     }
+
     window.addEventListener('resize',            function(){ adjustModalMaxHeight(); }, false );
     window.addEventListener('orientationchange', function(){ adjustModalMaxHeight(); }, false );
 
+    /******************************************************
+    The height of a modal can be tre different modes
+    1: max-height is adjusted to window-height. Default
+    2: max-height. options.maxHeight
+    3: fixed height. options.height
+
+    The width of a modal is by default 300px.
+    options.flexWidth :  If true the width of the modal will adjust to the width of the browser up to 500px
+    options.extraWidth:  Only when flexWidth is set: If true the width of the modal will adjust to the width of the browser up to 800px
+    options.megaWidth :  Only when flexWidth is set: If true the width of the modal will adjust to the width of the browser up to 1200px
+    options.width     : Set if different from 300
+
+    ******************************************************/
+    function getHeightFromOptions( options ){
+        if (options.height)    return {height   : options.height+'px',    maxHeight: null};
+        if (options.maxHeight) return {maxHeight: options.maxHeight+'px', height   : 'auto'};
+        return null;
+    }
+
+    function getWidthFromOptions( options ){
+        return {
+            flexWidth : !!options.flexWidth,
+            extraWidth: !!options.extraWidth,
+            megaWidth: !!options.megaWidth,
+            width     : options.width ? options.width+'px' : null
+        };
+    }
 
     //******************************************************
     //show_bs_modal - called when a modal is opening
@@ -67403,19 +69181,13 @@ TODO:
                 return false;
             }
         });
-
     }
 
     //******************************************************
     //shown_bs_modal - called when a modal is opened
     function shown_bs_modal( /*event*/ ) {
-        var $this = $(this);
-
-        //Adjust max-height
-        adjustModalMaxHeight( $this );
-
         //Focus on focus-element
-        var $focusElement = $this.find('.init_focus').last();
+        var $focusElement = $(this).find('.init_focus').last();
         if ($focusElement.length){
             document.activeElement.blur();
             $focusElement.focus();
@@ -67457,14 +69229,15 @@ TODO:
     ******************************************************/
     var bsModal_prototype = {
 
-        show: function(){
-            this.modal('show');
-        },
+        show  : function(){
+                    this.modal('show');
 
-        _close: function(){
-            this.modal('hide');
-        },
+                    this.data('bsModalDialog')._bsModalSetHeightAndWidth();
 
+                    if (this.bsModal.onChange)
+                        this.bsModal.onChange( this.bsModal );
+                },
+        _close: function(){ this.modal('hide'); },
 
         close: function(){
 
@@ -67518,26 +69291,19 @@ TODO:
                 $('<div/>')
                     .addClass('modal-body-fixed ' + (noClassNameForFixed ? '' : className) + (hasScroll ? ' scrollbar-'+scrollDirection : ''))
                     .appendTo( this );
-        if (options.fixedContent){
-            if ($.isFunction( options.fixedContent ))
-                options.fixedContent( $modalFixedContent );
-            else
-                $modalFixedContent.append( options.fixedContent );
-        }
+        if (options.fixedContent)
+            $modalFixedContent._bsAddHtml( options.fixedContent, true );
 
         //Append body and content
         var $modalBody = parts.$body =
                 $('<div/>')
                     .addClass('modal-body ' + className)
+                    .toggleClass('modal-body-always-max-height', !!options.alwaysMaxHeight)
                     .toggleClass('modal-type-' + options.type, !!options.type)
                     .appendTo( this );
 
         if (!options.content || (options.content === {}))
             $modalBody.addClass('modal-body-no-content');
-
-        if (!isTabs && options.height)
-            $modalBody.height(options.height);
-
 
         var $modalContent = parts.$content =
                 hasScroll ?
@@ -67546,8 +69312,6 @@ TODO:
 
         //Add content
         $modalContent._bsAppendContent( options.content, options.contentContext );
-
-
 
         //Add footer
         parts.$footer =
@@ -67559,19 +69323,60 @@ TODO:
     };
 
     /******************************************************
+    _bsModalSetHeightAndWidth - Set the height and width according to current cssHeight and cssWidth
+    ******************************************************/
+    $.fn._bsModalSetHeightAndWidth = function(){
+        var bsModal = this.bsModal,
+            $modalContent = bsModal.$modalContent,
+            $modalDialog = $modalContent.parent(),
+            isExtended = $modalContent.hasClass('modal-extended'),
+            cssHeight = isExtended ? bsModal.cssExtendedHeight : bsModal.cssHeight,
+            cssWidth = isExtended ? bsModal.cssExtendedWidth : bsModal.cssWidth;
+
+        //Set height
+        $modalContent
+            .toggleClass('modal-fixed-height', !!cssHeight)
+            .toggleClass('modal-flex-height', !cssHeight)
+            .css( cssHeight ? cssHeight : {height: 'auto', maxHeight: null});
+        if (!cssHeight)
+            adjustModalMaxHeight( bsModal.$modalContent );
+
+        //Set width
+        $modalDialog
+            .toggleClass('modal-flex-width', cssWidth.flexWidth )
+            .toggleClass('modal-extra-width', cssWidth.extraWidth )
+            .toggleClass('modal-mega-width', cssWidth.megaWidth )
+            .css('width', cssWidth.width );
+
+        //Call onChange (if any)
+        if (bsModal.onChange)
+            bsModal.onChange( bsModal );
+    };
+
+    /******************************************************
     _bsModalExtend, _bsModalDiminish, _bsModalToggleHeight
     Methods to change extended-mode
     ******************************************************/
     $.fn._bsModalExtend = function( event ){
-        if (this.bsModal.$container.hasClass('no-modal-extended'))
+        if (this.bsModal.$modalContent.hasClass('no-modal-extended'))
             this._bsModalToggleHeight( event );
     };
     $.fn._bsModalDiminish = function( event ){
-        if (this.bsModal.$container.hasClass('modal-extended'))
+        if (this.bsModal.$modalContent.hasClass('modal-extended'))
             this._bsModalToggleHeight( event );
     };
     $.fn._bsModalToggleHeight = function( event ){
-        var $this = this.bsModal.$container,
+        this.bsModal.$modalContent.modernizrToggle('modal-extended');
+
+        this._bsModalSetHeightAndWidth();
+
+        if (event && event.stopPropagation)
+            event.stopPropagation();
+        return false;
+    };
+
+/* TODO: animate changes in height and width
+       var $this = this.bsModal.$container,
             oldHeight = $this.outerHeight(),
             newHeight;
 
@@ -67581,11 +69386,7 @@ TODO:
         $this.height(oldHeight);
 
         $this.animate({height: newHeight}, 'fast', function() { $this.height('auto'); });
-
-        if (event && event.stopPropagation)
-            event.stopPropagation();
-        return false;
-    };
+*/
 
     /******************************************************
     _bsModalPin, _bsModalUnpin, _bsModalTogglePin
@@ -67600,9 +69401,9 @@ TODO:
             this._bsModalTogglePin( event );
     };
     $.fn._bsModalTogglePin = function( event ){
-        var $container = this.bsModal.$container;
+        var $modalContent = this.bsModal.$modalContent;
         this.bsModal.isPinned = !this.bsModal.isPinned;
-        $container.modernizrToggle('modal-pinned', !!this.bsModal.isPinned);
+        $modalContent.modernizrToggle('modal-pinned', !!this.bsModal.isPinned);
         this.bsModal.onPin( this.bsModal.isPinned );
 
         if (event && event.stopPropagation)
@@ -67623,13 +69424,49 @@ TODO:
         //this.bsModal contains all created elements
         this.bsModal = {};
 
-        var $modalContainer = this.bsModal.$container =
+        this.bsModal.onChange = options.onChange || null;
+
+        //Set bsModal.cssHeight and (optional) bsModal.cssExtendedHeight
+        this.bsModal.cssHeight = getHeightFromOptions( options );
+        if (options.extended){
+            if (options.extended.height == true)
+                this.bsModal.cssExtendedHeight = this.bsModal.cssHeight;
+            else
+                this.bsModal.cssExtendedHeight = getHeightFromOptions( options.extended );
+        }
+
+        //Set bsModal.cssWidth and (optional) bsModal.cssExtendedWidth
+        this.bsModal.cssWidth = getWidthFromOptions( options );
+        if (options.extended){
+            //If options.extended.width == true or none width-options is set in extended => use same width as normal-mode
+            if ( (options.extended.width == true) ||
+                 ( (options.extended.flexWidth == undefined) &&
+                   (options.extended.extraWidth == undefined) &&
+                   (options.extended.megaWidth == undefined) &&
+                   (options.extended.width == undefined)
+                 )
+              )
+                this.bsModal.cssExtendedWidth = this.bsModal.cssWidth;
+            else
+                this.bsModal.cssExtendedWidth = getWidthFromOptions( options.extended );
+        }
+
+
+        var $modalContent = this.bsModal.$modalContent =
                 $('<div/>')
                     .addClass('modal-content')
+                    .addClass(options.modalContentClassName)
                     .modernizrToggle('modal-extended', !!options.isExtended )
+
+                    .toggleClass('modal-content-always-max-height',          !!options.alwaysMaxHeight)
+                    .toggleClass('modal-extended-content-always-max-height', !!options.extended && !!options.extended.alwaysMaxHeight)
+
                     .modernizrOff('modal-pinned')
                     .appendTo( this );
 
+
+
+        this._bsModalSetHeightAndWidth();
 
         var modalExtend       = $.proxy( this._bsModalExtend,       this),
             modalDiminish     = $.proxy( this._bsModalDiminish,     this),
@@ -67656,7 +69493,8 @@ TODO:
                 pin     : { className: 'hide-for-modal-pinned',   onClick: options.onPin    ? modalPin      : null },
                 unpin   : { className: 'show-for-modal-pinned',   onClick: options.onPin    ? modalUnpin    : null },
                 extend  : { className: 'hide-for-modal-extended', onClick: options.extended ? modalExtend   : null, altEvents:'swipeup'   },
-                diminish: { className: 'show-for-modal-extended', onClick: options.extended ? modalDiminish : null, altEvents:'swipedown' }
+                diminish: { className: 'show-for-modal-extended', onClick: options.extended ? modalDiminish : null, altEvents:'swipedown' },
+                new     : { className: '',                        onClick: options.onNew    ? $.proxy(options.onNew, this) : null },
             }
         }, options );
 
@@ -67691,7 +69529,7 @@ TODO:
             var $modalHeader = this.bsModal.$header =
                     $('<div/>')
                         ._bsHeaderAndIcons( options )
-                        .appendTo( $modalContainer );
+                        .appendTo( $modalContent );
 
             //Add dbl-click on header to change to/from extended
             if (options.extended)
@@ -67700,7 +69538,7 @@ TODO:
                     .on('doubletap', modalToggleHeight );
         }
         else
-            $modalContainer.addClass('no-modal-header');
+            $modalContent.addClass('no-modal-header');
 
         //If options.extended.fixedContent == true and/or options.extended.footer == true => normal and extended uses same fixed and/or footer content
         var noClassNameForFixed = false,
@@ -67722,12 +69560,12 @@ TODO:
         }
 
         //Create normal content
-        $modalContainer._bsModalBodyAndFooter(options, this.bsModal, 'hide-for-modal-extended', noClassNameForFixed, false );
+        $modalContent._bsModalBodyAndFooter(options, this.bsModal, 'hide-for-modal-extended', noClassNameForFixed, false );
 
         //Create extended content (if any)
         if (options.extended){
             this.bsModal.extended = {};
-            $modalContainer._bsModalBodyAndFooter( options.extended, this.bsModal.extended, 'show-for-modal-extended', false, noClassNameForFooter );
+            $modalContent._bsModalBodyAndFooter( options.extended, this.bsModal.extended, 'show-for-modal-extended', false, noClassNameForFooter );
         }
 
         //Add buttons (if any)
@@ -67735,7 +69573,7 @@ TODO:
                 $('<div/>')
                     .addClass('modal-footer')
                     .toggleClass('modal-footer-vertical', !!options.verticalButtons)
-                    .appendTo( $modalContainer ),
+                    .appendTo( $modalContent ),
             $modalButtons = this.bsModal.$buttons = [],
 
             buttons = options.buttons || [],
@@ -67779,15 +69617,14 @@ TODO:
     bsModal
     ******************************************************/
     $.bsModal = function( options ){
-        var $result, $modalDialog,
-            id = options.id || '_bsModal'+ modalId++,
-            classNames = (options.noVerticalPadding   ? 'no-vertical-padding'    : '') +
-                         (options.noHorizontalPadding ? ' no-horizontal-padding' : '');
+        var $result, $modalDialog;
+
         //Adjust options
         options =
             $._bsAdjustOptions( options, {
-                baseClass: 'modal',
-                class    : classNames,
+                baseClass: 'modal-dialog',
+                class    : (options.noVerticalPadding   ? 'no-vertical-padding'    : '') +
+                           (options.noHorizontalPadding ? ' no-horizontal-padding' : ''),
 
                 //Header
                 noHeader : false,
@@ -67804,13 +69641,12 @@ TODO:
                 show       : true
             });
 
-
         //Create the modal
         $result =
             $('<div/>')
-                ._bsAddBaseClassAndSize( options )
+                .addClass('modal')
                 .attr({
-                    'id'         : id,
+                    'id'         : options.id || '_bsModal'+ modalId++,
                     'tabindex'   : -1,
                     'role'       : "dialog",
                     'aria-hidden': true
@@ -67818,9 +69654,7 @@ TODO:
 
         $modalDialog =
             $('<div/>')
-                .addClass('modal-dialog')
-                .addClass(options.flex ? 'modal-flex' : '')
-                .addClass(options.flex && options.extraWidth ? 'extra-width' : '')
+                ._bsAddBaseClassAndSize( options )
                 .attr( 'role', 'document')
                 .appendTo( $result );
 
@@ -68096,7 +69930,7 @@ TODO:
                 $barDom.addClass('no-header');
 
             //Replace content with text as object {icon, txt,etc}
-            $body._bsAddHtml( options.content );
+            $body._bsAddHtml( options.content, true );
             $body.addClass('text-'+options.textAlign);
 
             //Add buttons (if any)
@@ -68550,7 +70384,7 @@ TODO:
     //Setting defaults for select2
     function formatSelectOption( options ) {
         options.text = options._text;
-        var $result = $('<span/>')._bsAddHtml( options, true );
+        var $result = $('<span/>')._bsAddHtml( options/*, true */);
         options.text = '';
         return $result;
     }
@@ -68773,7 +70607,7 @@ TODO:
                 .addClass( isItem ? 'dropdown-item' : 'dropdown-header' )
                 .addClass( options.center ? 'text-center' : '')
                 .appendTo( $result )
-                ._bsAddHtml( itemOptions, true )
+                ._bsAddHtml( itemOptions/*, true */)
                 .on('mouseenter', $.proxy($item._selectlist_onMouseenter, $item) )
                 .on('mouseleave', $.proxy($item._selectlist_onMouseleave, $item) );
 
@@ -68813,32 +70647,57 @@ options
         vfOptions:  The content of a element can be set and updated using [jquery-value-format].
                     The options vfFormat and (optional) vfOptions defines witch format used to display the content
 
-        align        :  'left','center','right'. Defalut = 'left'
+        align        : 'left','center','right'. Defalut = 'left'
         verticalAlign: 'top', 'middle','bottom'. Default = 'middle'
         noWrap       : false. If true the column will not be wrapped = fixed width
-TODO:         truncate     : false. If true the column will be truncated. Normally only one column get truncate: true
+TODO:   truncate     : false. If true the column will be truncated. Normally only one column get truncate: true
+        fixedWidth   : false. If true the column will not change width when the tables width is changed
 
-        sortable :  [boolean] false
+        sortable     :  [boolean] false
+        sortBy       : [string or function(e1, e2): int] "string". Possible values: "int" (sort as float), "moment", "moment_date", "moment_time" (sort as moment-obj) or function(e1, e2) return int
+        sortIndex    : [int] null. When sorting and to values are equal the values from an other column is used.
+                                   The default order of the other columns to test is given by the its index in options.columns. Default sortIndex is (column-index+1)*100 (first column = 100). sortIndex can be set to alter the order.
+        sortDefault  : [string or boolean]. false. Possible values = false, true, "asc" or "desc". true => "asc"
+        sortHeader   : [boolean] false. If true a header-row is added every time the sorted value changes
+
     }
-    showHeader: [boolean] true
-    verticalBorder [boolean] true
-    selectable [boolean] false
-    selectedId [string] "" id for selected row
-    onChange          [function(id, selected, trElement)] null Called when a row is selected or unselected (if options.allowZeroSelected == true)
-	allowZeroSelected [boolean] false. If true it is allowed to un-select a selected row
-    allowReselect     [Boolean] false. If true the onChange is called when a selected item is reselected/clicked
 
-TODO
-Add sort-functions + save col-index for sorted column
+    showHeader          [boolean] true
+    verticalBorder      [boolean] true. When true vertical borders are added together with default horizontal borders
+    noBorder            [boolean] false. When true no borders are visible
+    hoverRow            [boolean] true. When true the row get hightlightet when hovered
+    noPadding           [boolean] false. When true the vertical padding of all cells are 0px
+
+    notFullWidth        [boolean] false. When true the table is not 100% width and will adjust to it content
+    centerInContainer   [boolean] false. When true the table is centered inside its container. Normaally it require notFullWidth: true
+
+    selectable          [boolean] false
+    selectedId          [string] "" id for selected row
+    onChange            [function(id, selected, trElement)] null Called when a row is selected or unselected (if options.allowZeroSelected == true)
+	allowZeroSelected   [boolean] false. If true it is allowed to un-select a selected row
+    allowReselect       [Boolean] false. If true the onChange is called when a selected item is reselected/clicked
+
+    defaultColunmOptions: {}. Any of the options for columns to be used as default values
+
+    rowClassName      : [] of string. []. Class-names for each row
+
+    Sorting is done by https://github.com/joequery/Stupid-Table-Plugin
 
 
 *******************************************************************/
     var defaultOptions = {
-            baseClass     : 'table',
-            styleClass    : 'fixed',
-            showHeader    : true,
-            verticalBorder: true,
-            useTouchSize  : true
+            baseClass           : 'table',
+            styleClass          : 'fixed',
+            showHeader          : true,
+            verticalBorder      : true,
+            noBorder            : false,
+            hoverRow            : true,
+            noPadding           : false,
+            notFullWidth        : false,
+            centerInContainer   : false,
+            useTouchSize        : true,
+            defaultColunmOptions: {},
+            rowClassName        : []
 
         },
 
@@ -68847,6 +70706,8 @@ Add sort-functions + save col-index for sorted column
             verticalAlign: 'middle',
             noWrap       : false,
             truncate     : false,
+            fixedWidth   : false,
+            sortBy       : 'string',
             sortable     : false
         },
 
@@ -68872,6 +70733,37 @@ Add sort-functions + save col-index for sorted column
         return $element;
     }
 
+    /********************************************************************
+    Different sort-functions for moment-objects: (a,b) return a-b
+    ********************************************************************/
+    function momentSort(m1, m2){
+        if (m1.isSame(m2)) return 0;
+        if (m1.isBefore(m2)) return -1;
+        return 1;
+    }
+
+    //momentDateSort - sort by date despide the time
+    function momentDateSort(m1, m2){
+        return momentSort(
+            moment(m1).startOf('day'),
+            moment(m2).startOf('day')
+        );
+    }
+
+    //momentTimeSort - sort by time despide ther date
+    function momentTimeSort(m1, m2){
+        return momentSort(
+            moment(m1).date(1).month(0).year(2000),
+            moment(m2).date(1).month(0).year(2000)
+        );
+    }
+
+    var stupidtableOptions = {
+            'moment'     : momentSort,
+            'moment_date': momentDateSort,
+            'moment_time': momentTimeSort
+        };
+
     /**********************************************************
     Prototype for bsTable
     **********************************************************/
@@ -68884,14 +70776,23 @@ Add sort-functions + save col-index for sorted column
                 $tbody  = this.find('tbody').first(),
                 $tr     = $('<tr/>').appendTo( $tbody );
 
+            if (options.rowClassName.length){
+                var rowIndex = $tbody.children('tr').length - 1;
+                if (options.rowClassName.length > rowIndex)
+                    $tr.addClass(options.rowClassName[rowIndex]);
+            }
+
             if (options.selectable)
                 $tr.attr('id', rowContent.id || 'rowId_'+rowId++);
 
             $.each( options.columns, function( index, columnOptions ){
                 var content = rowContent[columnOptions.id],
-                    $td = $('<td/>')
-                            .appendTo($tr);
+                    $td = $('<td/>').appendTo($tr);
+
                 adjustThOrTd( $td, columnOptions, !options.showHeader );
+
+                if ($.isPlainObject(content) && content.className)
+                    $td.addClass(content.className);
 
                 //Build the content using _bsAppendContent or jquery-value-format
                 if (columnOptions.vfFormat)
@@ -68907,9 +70808,96 @@ Add sort-functions + save col-index for sorted column
                 $tr
                     .on('mouseenter', $.proxy($tr._selectlist_onMouseenter, $tr) )
                     .on('mouseleave', $.proxy($tr._selectlist_onMouseleave, $tr) );
+            }
+        },
 
-//            .on('mouseleave', $.proxy($result._selectlist_onMouseleaveList, $result) )
 
+        /**********************************************************
+        _getColumn - Return the column with id or index
+        **********************************************************/
+        _getColumn: function( idOrIndex ){
+            return $.isNumeric(idOrIndex) ? this.columns[idOrIndex] : this.columnIds[idOrIndex];
+        },
+
+        /**********************************************************
+        sortBy - Sort the table
+        **********************************************************/
+        sortBy: function( idOrIndex, dir ){
+            var column = this._getColumn(idOrIndex);
+            if (column)
+                column.$th.stupidsort( dir );
+        },
+
+        /**********************************************************
+        beforeTableSort - Called before the table is being sorted by StupidTable
+        **********************************************************/
+        beforeTableSort: function(event, sortInfo){
+            var column          = this._getColumn(sortInfo.column),
+                sortMulticolumn = column.$th.data('sort-multicolumn') || '',
+                _this           = this;
+
+            //Remove all group-header-rows
+            this.find('.table-sort-group-header').remove();
+
+            //Convert sortMulticolumn to array
+            sortMulticolumn = sortMulticolumn.split(',');
+            sortMulticolumn.push(''+column.index);
+
+            $.each( sortMulticolumn, function( dummy, columnIndex ){
+                var column = _this._getColumn( parseInt( columnIndex ) );
+                //If cell-content is vfFormat-object => Set 'sort-value' from vfFormat
+                if (column.vfFormat){
+                    _this.find('td:nth-child('+(column.index+1)+')').each( function( dummy, td ){
+                        var $td = $(td);
+                        $td.data( 'sort-value', $td.data('vf-value') );
+                    });
+                }
+            });
+        },
+
+        /**********************************************************
+        afterTableSort - Called after the table is being sorted by StupidTable
+        **********************************************************/
+        afterTableSort: function(event, sortInfo){
+            //Update the class-names of the cloned <thead>
+            var cloneThList = this.$theadClone.find('th');
+            this.find('thead th').each( function( index, th ){
+                $(cloneThList[index])
+                    .removeClass()
+                    .addClass( $(th).attr('class') );
+            });
+
+            var column = this._getColumn( sortInfo.column );
+
+            //Marks first row of changed value
+            if (column.sortHeader) {
+
+                //$tdBase = a <td> as $-object acting as base for all tds in header-row
+                var $tdBase =
+                        $('<td/>')
+                            .addClass('container-icon-and-text')
+                            .attr('colspan', this.columns.length );
+                column.$th.contents().clone().appendTo( $tdBase );
+                $tdBase.append( $('<span>:</span>') );
+
+                var lastText = "Denne her text kommer sikkert ikke igen";
+                this.find('tbody tr td:nth-child(' + (sortInfo.column+1) +')').each( function( index, td ){
+                    var $td = $(td),
+                        nextText = $td.text();
+                    if (nextText != lastText){
+                        //Create a clone of $tdBase and 'copy' all children from $td to $newTd
+                        var $newTd = $tdBase.clone(true);
+                        $td.contents().clone().appendTo( $newTd );
+
+                        //Create new row and insert before current row
+                        $('<tr/>')
+                            .addClass('table-sort-group-header')
+                            .append( $newTd )
+                            .insertBefore( $td.parent() );
+
+                        lastText = nextText;
+                    }
+                });
             }
         },
 
@@ -68919,26 +70907,33 @@ Add sort-functions + save col-index for sorted column
         asModal: function( modalOptions ){
             var showHeader = this.find('.no-header').length == 0,
                 _this      = this,
-                $theadClone,
                 $tableWithHeader = null,
                 $result, $thead, count;
 
             if (showHeader){
                 //Clone the header and place them in fixed-body of the modal. Hide the original header by padding the table
-                $theadClone = this.find('thead').clone( true );
+                //Add on-click on the clone to 'pass' the click to the original header
+                this.$theadClone = this.find('thead').clone( true, false );
+
+                this.$theadClone.find('th').on('click', function( event ){
+                    var columnIndex = $(event.delegateTarget).index();
+                    _this.sortBy( columnIndex );
+                });
+
                 $tableWithHeader =
                     $('<table/>')
                         ._bsAddBaseClassAndSize( this.data(dataTableId) )
                         .addClass('table-with-header')
-                        .append( $theadClone );
+                        .append( this.$theadClone );
                 $thead = this.find('thead');
                 count  = 20;
             }
 
 
+
             $result = $.bsModal(
                             $.extend( modalOptions || {}, {
-                                flex             : true,
+                                flexWidth        : true,
                                 noVerticalPadding: true,
                                 content          : this,
                                 fixedContent     : $tableWithHeader
@@ -68967,7 +70962,7 @@ Add sort-functions + save col-index for sorted column
 
                     setHeaderWidth = function(){
                         $thead.find('th').each(function( index, th ){
-                            $theadClone.find('th:nth-child(' + (index+1) + ')')
+                            _this.$theadClone.find('th:nth-child(' + (index+1) + ')')
                                 .width( $(th).width()+'px' );
                         });
                         $tableWithHeader.width( _this.width()+'px' );
@@ -68982,19 +70977,6 @@ Add sort-functions + save col-index for sorted column
 
     }; //end of bsTable_prototype = {
 
-    //**********************************************************
-    function table_th_onClick( event ){
-        var $th = $( event.currentTarget ),
-            sortable = $th.hasClass('sortable'),
-            newClass = $th.hasClass('desc') ? 'asc' : 'desc'; //desc = default
-
-        if (sortable){
-            //Remove .asc and .desc from all th
-            $th.parent().find('th').removeClass('asc desc');
-            $th.addClass(newClass);
-        }
-    }
-
     /**********************************************************
     bsTable( options ) - create a Bootstrap-table
     **********************************************************/
@@ -69006,17 +70988,31 @@ Add sort-functions + save col-index for sorted column
         options = $._bsAdjustOptions( options, defaultOptions );
         options.class =
 //Removed because useTouchSize added to options            (options.small ? 'table-sm ' : '' ) +
-            (options.verticalBorder ? 'table-bordered ' : '' ) +
+            (options.verticalBorder && !options.noBorder ? 'table-bordered ' : '' ) +
+            (options.noBorder ? 'table-no-border ' : '' ) +
+            (options.hoverRow ? 'table-hover ' : '' ) +
+            (options.noPadding ? 'table-no-padding ' : '' ) +
+            (options.notFullWidth ? 'table-not-full-width ' : '' ) +
+            (options.centerInContainer ? 'table-center-in-container ' : '' ) +
             (options.selectable ? 'table-selectable ' : '' ) +
-            (options.allowZeroSelected ? 'allow-zero-selected ' : '' ),
+            (options.allowZeroSelected ? 'allow-zero-selected ' : '' );
 
-        //Adjust text-style for each column
-        $.each( options.columns, function( index, column ){
-            column = $.extend( true, {}, defaultColunmOptions, column );
+        //Adjust each column
+        var columnIds = {};
+        $.each( options.columns, function( index, columnOptions ){
+            columnOptions.sortable = columnOptions.sortable || columnOptions.sortBy;
+            columnOptions = $.extend( true,
+                {
+                    index    : index,
+                    sortIndex: (index+1)*100
+                },
+                defaultColunmOptions,
+                options.defaultColunmOptions,
+                columnOptions
+            );
 
-            column.index = index;
-
-            options.columns[index] = column;
+            columnIds[columnOptions.id] = columnOptions;
+            options.columns[index] = columnOptions;
         });
 
         var id = 'bsTable'+ tableId++,
@@ -69034,17 +71030,66 @@ Add sort-functions + save col-index for sorted column
         //Extend with prototype
         $table.init.prototype.extend( bsTable_prototype );
 
+        $table.columns = options.columns;
+        $table.columnIds = columnIds;
+
+        //Create colgroup
+        var $colgroup = $('<colgroup/>').appendTo($table);
+        $.each( options.columns, function( index, columnOptions ){
+            var $col = $('<col/>').appendTo( $colgroup );
+            if (columnOptions.fixedWidth)
+                $col.attr('width', '1');
+        });
+
+        var sortableTable  = false,
+            sortDefaultId  = '',
+            sortDefaultDir = 'asc',
+            multiSortList  = [];
+
+        /* From https://github.com/joequery/Stupid-Table-Plugin:
+            "A multicolumn sort allows you to define secondary columns to sort by in the event of a tie with two elements in the sorted column.
+                Specify a comma-separated list of th identifiers in a data-sort-multicolumn attribute on a <th> element..."
+
+            multiSortList = []{columnIndex, sortIndex} sorted by sortIndex. Is used be each th to define alternative sort-order
+        */
+        $.each( options.columns, function( index, columnOptions ){
+            if (columnOptions.sortable)
+                multiSortList.push( {columnIndex: index, sortIndex: columnOptions.sortIndex });
+        });
+        multiSortList.sort(function( c1, c2){ return c1.sortIndex - c2.sortIndex; });
+
         //Create headers
         if (options.showHeader)
-            $.each( options.columns, function( index, columnOptions ){
-                var $th = $('<th/>')
-                            .toggleClass('sortable', !!columnOptions.sortable )
-                            .on('click', table_th_onClick )
-                            .appendTo( $tr );
+            $.each( $table.columns, function( index, columnOptions ){
+                columnOptions.$th = $('<th/>').appendTo( $tr );
 
-                adjustThOrTd( $th, columnOptions, true );
+                if (columnOptions.sortable){
+                    columnOptions.$th
+                        .addClass('sortable')
+                        .attr('data-sort', columnOptions.sortBy);
 
-                $th._bsAddHtml( columnOptions.header );
+                    if (columnOptions.sortDefault){
+                        sortDefaultId  = columnOptions.id;
+                        sortDefaultDir = columnOptions.sortDefault == 'desc' ? 'desc' : sortDefaultDir;
+                    }
+
+                    //Create alternative/secondary columns to sort by
+                    var sortMulticolumn = '';
+                    $.each( multiSortList, function( index, multiSort ){
+                        if (multiSort.columnIndex != columnOptions.index)
+                            sortMulticolumn = (sortMulticolumn ? sortMulticolumn + ',' : '') + multiSort.columnIndex;
+                    });
+
+                    if (sortMulticolumn)
+                        columnOptions.$th.attr('data-sort-multicolumn', sortMulticolumn);
+
+                    sortableTable = true;
+                }
+
+
+                adjustThOrTd( columnOptions.$th, columnOptions, true );
+
+                columnOptions.$th._bsAddHtml( columnOptions.header );
             });
 
         if (options.selectable){
@@ -69069,8 +71114,19 @@ Add sort-functions + save col-index for sorted column
                 .find('.active').addClass('highlighted');
 
 
+        if (sortableTable){
+            $table.stupidtable =
+                $table.stupidtable( stupidtableOptions )
+                    .bind('beforetablesort', $.proxy( $table.beforeTableSort, $table ) )
+                    .bind('aftertablesort',  $.proxy( $table.afterTableSort,  $table ) );
+
+            if (sortDefaultId)
+                $table.sortBy(sortDefaultId, sortDefaultDir);
+        }
         return $table;
     };
+
+
 
 }(jQuery, this, document));
 ;
@@ -69203,7 +71259,7 @@ Add sort-functions + save col-index for sorted column
         var $result =
                 $.bsModal(
                     $.extend( {
-                        flex               : true,
+                        flexWidth          : true,
                         noVerticalPadding  : true,
                         noHorizontalPadding: true,
                         scroll             : false,
@@ -69245,7 +71301,7 @@ Add sort-functions + save col-index for sorted column
 
 ****************************************************************************/
 
-(function ($, window/*, document, undefined*/) {
+(function ($, i18next, window /*, document, undefined*/) {
 	"use strict";
 
     /*
@@ -69312,6 +71368,17 @@ Add sort-functions + save col-index for sorted column
 
     };
 
+    //$._bsAdjustText: Adjust options to fit with {da:"...", en:"..."}
+    // options == {da:"..", en:".."} => return options
+    // options == STRING             => return {da: options}
+    $._bsAdjustText = function( options ){
+        if (!options)
+            return options;
+        if ($.type( options ) == "string")
+            return {da: options, en:options};
+        return options;
+    };
+
     //$._bsAdjustOptions: Adjust options to allow text/name/title/header etc.
     $._bsAdjustOptions = function( options, defaultOptions, forceOptions ){
         //*********************************************************************
@@ -69341,7 +71408,7 @@ Add sort-functions + save col-index for sorted column
 
         options = $.extend( true, {}, defaultOptions || {}, options, forceOptions || {} );
 
-        options.selected = options.selected || options.checked || options.active;
+        options.selected = options.selected || options.checked || options.active || options.open || options.isOpen;
         options.list     = options.list     || options.buttons || options.items || options.children;
 
         options = adjustContentAndContextOptions( options, options.context );
@@ -69393,7 +71460,7 @@ Add sort-functions + save col-index for sorted column
     /****************************************************************************************
     $._bsCreateElement = internal method to create $-element
     ****************************************************************************************/
-    $._bsCreateElement = function( tagName, link, title, textStyle, className ){
+    $._bsCreateElement = function( tagName, link, title, textStyle, className, data ){
         var $result;
         if (link){
             $result = $('<a/>');
@@ -69417,13 +71484,16 @@ Add sort-functions + save col-index for sorted column
         if (className)
             $result.addClass( className );
 
+        if (data)
+            $result.data( data );
+
         return $result;
     };
 
     /****************************************************************************************
     $._bsCreateIcon = internal method to create $-icon
     ****************************************************************************************/
-    $._bsCreateIcon = function( options, $appendTo, title, className ){
+    $._bsCreateIcon = function( options, $appendTo, title, className/*, insideStack*/ ){
         var $icon;
 
         if ($.type(options) == 'string')
@@ -69431,11 +71501,15 @@ Add sort-functions + save col-index for sorted column
 
         if ($.isArray( options)){
             //Create a stacked icon
-            $icon = $._bsCreateElement( 'span', null, title, null, 'fa-stack ' + (className || '')  );
+             $icon = $._bsCreateElement( 'div', null, title, null, 'container-stacked-icons ' + (className || '')  );
 
             $.each( options, function( index, opt ){
-                $._bsCreateIcon( opt, $icon );
+                $._bsCreateIcon( opt, $icon, null, 'stacked-icon' );
             });
+
+            //If any of the stacked icons have class fa-no-margin => set if on the container
+            if ($icon.find('.fa-no-margin').length)
+                $icon.addClass('fa-no-margin');
         }
         else {
             var allClassNames = options.icon || options.class || '';
@@ -69447,11 +71521,11 @@ Add sort-functions + save col-index for sorted column
             allClassNames = allClassNames + ' ' + (className || '');
 
             $icon = $._bsCreateElement( 'i', null, title, null, allClassNames );
+
         }
         $icon.appendTo( $appendTo );
         return $icon;
     };
-
 
 
     $.fn.extend({
@@ -69558,19 +71632,41 @@ Add sort-functions + save col-index for sorted column
             title    : String or array of String
             iconClass: string or array of String
             textClass: string or array of String
+            textData : obj or array of obj
         }
         checkForContent: [Boolean] If true AND options.content exists => use options.content instead
         ****************************************************************************************/
 
-        _bsAddHtml:  function( options, checkForContent, ignoreLink ){
+        _bsAddHtml:  function( options, /*checkForContent*/htmlInDiv, ignoreLink ){
             //**************************************************
             function getArray( input ){
                 return input ? $.isArray( input ) ? input : [input] : [];
             }
             //**************************************************
+            function isHtmlString( str ){
+                if (!htmlInDiv || ($.type(str) != 'string')) return false;
 
-            if (checkForContent && (options.content != null))
-                return this._bsAddHtml( options.content );
+                var isHtml = false,
+                    $str = null;
+                try       { $str = $(str); }
+                catch (e) { $str = null;   }
+
+                if ($str && $str.length){
+                    isHtml = true;
+                    $str.each( function( index, elem ){
+                        if (!elem.nodeType || (elem.nodeType != 1)){
+                            isHtml = false;
+                            return false;
+                        }
+                    });
+                }
+                return isHtml;
+            }
+
+            //**************************************************
+//Removed since no content is given
+//            if (checkForContent && (options.content != null))
+//                return this._bsAddHtml( options.content );
 
             options = options || '';
 
@@ -69579,14 +71675,10 @@ Add sort-functions + save col-index for sorted column
             //options = array => add each
             if ($.isArray( options )){
                 $.each( options, function( index, textOptions ){
-                    _this._bsAddHtml( textOptions );
+                    _this._bsAddHtml( textOptions, htmlInDiv, ignoreLink );
                 });
                 return this;
             }
-
-            //Adjust icon and/or text if iot is not at format-options
-            if (!options.vfFormat)
-                options = $._bsAdjustIconAndText( options );
 
             this.addClass('container-icon-and-text');
 
@@ -69595,6 +71687,16 @@ Add sort-functions + save col-index for sorted column
                 this.append( options );
                 return this;
             }
+
+            //If the content is a string containing html-code => append it and return
+            if (isHtmlString(options)){
+                this.append( $(options) );
+                return this;
+            }
+
+            //Adjust icon and/or text if it is not at format-options
+            if (!options.vfFormat)
+                options = $._bsAdjustIconAndText( options );
 
             //options = simple textOptions
             var iconArray       = getArray( options.icon ),
@@ -69606,7 +71708,8 @@ Add sort-functions + save col-index for sorted column
                 linkArray       = getArray( ignoreLink ? [] : options.link || options.onClick ),
                 titleArray      = getArray( options.title ),
                 iconClassArray  = getArray( options.iconClass ),
-                textClassArray  = getArray( options.textClass );
+                textClassArray  = getArray( options.textClass ),
+                textDataArray   = getArray( options.textData );
 
             //Add icons (optional)
             $.each( iconArray, function( index, icon ){
@@ -69618,23 +71721,30 @@ Add sort-functions + save col-index for sorted column
                 _this.addClass('text-'+ options.color);
 
             //Add text
+
             $.each( textArray, function( index, text ){
-                var $text = $._bsCreateElement( 'span', linkArray[ index ], titleArray[ index ], textStyleArray[ index ], textClassArray[index] );
+                //If text ={da,en} and both da and is html-stirng => build inside div
+                var tagName = 'span';
+                if ( (text.hasOwnProperty('da') && isHtmlString(text.da)) || (text.hasOwnProperty('en') && isHtmlString(text.en)) )
+                    tagName = 'div';
+
+                var $text = $._bsCreateElement( tagName, linkArray[ index ], titleArray[ index ], textStyleArray[ index ], textClassArray[index], textDataArray[index] );
                 if ($.isFunction( text ))
                     text( $text );
                 else
                     if (text == $.EMPTY_TEXT)
                         $text.html( '&nbsp;');
                     else
-                        $text.i18n( text, 'html' );
+                        if (text != ""){
+                            //If text is a string and not a key to i18next => just add the text
+                            if ( ($.type( text ) == "string") && !i18next.exists(text) )
+                                $text.html( text );
+                            else
+                                $text.i18n( text, 'html' );
+                        }
 
                 if (index < textClassArray.length)
                     $text.addClass( textClassArray[index] );
-
-                //If the text is 'together' with an icon => add class "after-icon"
-                if (index < iconArray.length)
-                    $text.addClass( 'after-icon' );
-
 
                 $text.appendTo( _this );
             });
@@ -69739,10 +71849,12 @@ Add sort-functions + save col-index for sorted column
                         case 'checkbox'     :   buildFunc = $.bsCheckbox;       insideFormGroup = true; break;
                         case 'tabs'         :   buildFunc = $.bsTabs;           break;
                         case 'table'        :   buildFunc = $.bsTable;          break;
+                        case 'list'         :   buildFunc = $.bsList;           break;
                         case 'accordion'    :   buildFunc = $.bsAccordion;      break;
                         case 'slider'       :   buildFunc = buildBaseSlider;    insideFormGroup = true; addBorder = true; buildInsideParent = true; break;
                         case 'timeslider'   :   buildFunc = buildTimeSlider;    insideFormGroup = true; addBorder = true; buildInsideParent = true; break;
                         case 'text'         :   buildFunc = buildText;          insideFormGroup = true; addBorder = true; noValidation = true; break;
+                        case 'fileview'     :   buildFunc = $.bsFileView;       break;
                         case 'hidden'       :   buildFunc = buildHidden;        noValidation = true; break;
 //                        case 'xx'           :   buildFunc = $.bsXx;               break;
                     }
@@ -69807,7 +71919,7 @@ Add sort-functions + save col-index for sorted column
     }); //$.fn.extend
 
 
-}(jQuery, this, document));
+}(jQuery, this.i18next, this, document));
 ;
 /****************************************************************************
     leaflet-control-topcenter.js,
@@ -69932,12 +72044,16 @@ Create leaflet-control for jquery-bootstrap modal-content:
             show: function() { this.$outerContainer.show(); },
             hide: function() { this.$outerContainer.hide(); },
 
-            //_createModal
+            /********************************************************
+            _createModal
+            ********************************************************/
             _createModal: function(){
                 //this.bsModal = ...;
             },
 
-            //onAdd
+            /********************************************************
+            onAdd
+            ********************************************************/
             onAdd: function() {
                 this.options = $._bsAdjustOptions(
                     this.options,
@@ -69951,11 +72067,19 @@ Create leaflet-control for jquery-bootstrap modal-content:
                 this.options.show = false;
 
                 //Create the element
-                var $result = $('<div/>').addClass('leaflet-control'),
-                    $modalContainer = $('<div/>')
-                        .addClass('modal-dialog modal-inline modal-sm')
-                        .append( this.$container )
-                        .appendTo( $result );
+                var $result =
+                        $('<div/>')
+                            .addClass('leaflet-control'),
+                    $modalContainer =
+                        $('<div/>')
+                            ._bsAddBaseClassAndSize({
+                                baseClass   : 'modal-dialog',
+                                class       : 'modal-dialog-inline',
+                                useTouchSize: true,
+                                small       : false
+                            })
+                            .append( this.$modalContent )
+                            .appendTo( $result );
 
 
                 //Prevent different events from propagating to the map
@@ -69964,7 +72088,6 @@ Create leaflet-control for jquery-bootstrap modal-content:
                     event.stopPropagation();
                     return false;
                 });
-
 
                 //Add copy of _attachCloseHandler from select2 to close dropdown on mousedown on control
                 $result.on('mousedown', function( event ) {
@@ -69977,25 +72100,23 @@ Create leaflet-control for jquery-bootstrap modal-content:
                     });
                 });
 
-
-                //Create the this.bsModal and this.$container
+                //Create this.bsModal and this.$modalContent
                 this._createModal();
-                this.$container  = this.bsModal.bsModal.$container;
+
+                this.$modalContent = this.bsModal.bsModal.$modalContent;
+
+                $modalContainer.bsModal = this.bsModal.bsModal;
 
                 //'Move the container into the control
-                this.$container.detach();
-                $modalContainer.append( this.$container );
+                this.$modalContent.detach();
+                $modalContainer.append( this.$modalContent );
 
                 //Adjust this.bsModal
                 this.bsModal.show   = $.proxy(this.show, this);
                 this.bsModal._close = $.proxy(this.hide, this);
 
-                if (this.options.maxHeight)
-                    this.$container.css('max-height', this.options.maxHeight);
-                if (this.options.minWidth)
-                    this.$container.css('min-width', this.options.minWidth);
-                if (this.options.width)
-                    this.$container.css('width', this.options.width);
+                //ASdjust width and height
+                $modalContainer._bsModalSetHeightAndWidth();
 
                 var result = $result.get(0);
                 L.DomEvent.disableClickPropagation( result );
@@ -70044,185 +72165,9 @@ Create leaflet-control for jquery-bootstrap modal-content:
 
         });
 
-
         //*************************************
         L.control.bsModal     = function(options){ return new L.control.BsModal(options); };
         L.control.bsModalForm = function(options){ return new L.control.BsModalForm(options); };
-
-}(jQuery, L, this, document));
-
-
-;
-/****************************************************************************
-leaflet-bootstrap-marker.js,
-
-Create L.bsMarker = a round marker with options for color, shadow and pulsart
-
-****************************************************************************/
-(function ($, L/*, window, document, undefined*/) {
-    "use strict";
-
-    var bsMarkerIcon = L.divIcon({
-            iconSize : [14, 14],    //Size of the icon image in pixels.
-            className: 'lbm-icon',  //A custom class name to assign to both icon and shadow images. Empty by default.
-    });
-
-    var bigBsMarkerIcon = L.divIcon({
-            iconSize : [24, 24],    //Size of the icon image in pixels.
-            className: 'lbm-icon',  //A custom class name to assign to both icon and shadow images. Empty by default.
-    });
-
-
-
-
-    //Extend L.Map with ignoreNextEvent(type) and includeNextEvent(type) to prevent the next firing of a event
-    L.Map.prototype.fire = function ( fire ){
-        return function ( type ) {
-            return this._ignoreNextEvent[type] ? this.includeNextEvent( type ) : fire.apply(this, arguments);
-        };
-    } (L.Map.prototype.fire);
-
-    L.Map.prototype.initialize = function (initialize) {
-        return function () {
-            this._ignoreNextEvent = {};
-            return initialize.apply(this, arguments);
-        };
-    } (L.Map.prototype.initialize);
-
-
-    L.Map.prototype.ignoreNextEvent = function( type ){
-        this._ignoreNextEvent[type] = true;
-        return this;
-    };
-    L.Map.prototype.includeNextEvent = function( type ){
-        this._ignoreNextEvent[type] = false;
-        return this;
-    };
-
-    var classNames = {
-            transparent  : 'lbm-transparent',
-            bigShadow    : 'lbm-big-shadow',
-            whiteBorder  : 'lbm-border-white',
-            puls         : 'lbm-puls'
-        };
-
-    L.BsMarker = L.Marker.extend({
-        options: {
-            draggable       : false,           //Whether the marker is draggable with mouse/touch or not.
-            autoPan         : true,            //Sit to true if you want the map to do panning animation when marker hits the edges.
-            icon            : bsMarkerIcon,
-            bigIcon         : bigBsMarkerIcon,
-            useBigIcon      : false,           //True to make the icon big
-            bigIconWhenTouch: false,           //True to make big icon when window.bsIsTouch == true and options.draggable == true
-            transparent     : false,           //True to make the marker semi-transparent
-            bigShadow       : false,           //true to add big shadow to the marker
-            whiteBorder     : false,           //true to have a white border
-            puls            : false,           //true to have a pulsart icon
-            color           : '',              //Name of color: "primary", "secondary", "success", "info", "warning", "danger", "standard". "primary"-"danger"=Bootstrap colors. "standard" = Google Maps default iocn color
-
-            tooltip                : null,  //Content of tooltip
-            tooltipPermanent       : false, //Whether to open the tooltip permanently or only on mouseover.
-            tooltipHideWhenDragging: false  //True and tooltipPermanent: false => the tooltip is hidden when dragged
-        },
-
-        /*****************************************************
-        initialize
-        *****************************************************/
-        initialize: function(latLng, options){
-            L.Marker.prototype.initialize.call(this, latLng, options);
-
-            //Create $icon to hold class-names
-            this.$icon = $('<div/>');
-
-            this.toggleOption('transparent', !!this.options.transparent );
-            this.toggleOption('bigShadow',   !!this.options.bigShadow );
-            this.toggleOption('whiteBorder', !!this.options.whiteBorder );
-            this.toggleOption('puls',        !!this.options.puls );
-            if (this.options.color)
-                this.setColor(this.options.color);
-
-            if (this.options.useBigIcon)
-                this._setBigIcon();
-
-            this.on('dragstart', this._bsMarker_onDragStart, this );
-            this.on('dragend',   this._bsMarker_onDragEnd,   this );
-        },
-
-        /*****************************************************
-        _setBigIcon
-        *****************************************************/
-        _setBigIcon: function(){
-            this.setIcon( this.options.bigIcon );
-            this.$icon.addClass('lbm-big');
-        },
-
-        /*****************************************************
-        onAdd
-        *****************************************************/
-        onAdd: function( map ){
-            L.Marker.prototype.onAdd.call(this, map);
-
-            //Change to big icon if bigIconWhenTouch == false and window.bsIsTouch == true and options.draggable == true
-            if (this.options.bigIconWhenTouch && this.options.draggable && window.bsIsTouch)
-                this._setBigIcon();
-
-            var classNames = this.$icon[0].className;
-            this.$icon = $(this._icon);
-            this.$icon.addClass( classNames );
-
-            if (this.options.tooltip)
-                this.bindTooltip(this.options.tooltip, {
-                    sticky          : !this.options.tooltipPermanent,       //If true, the tooltip will follow the mouse instead of being fixed at the feature center.
-                    interactive     : false,                                //If true, the tooltip will listen to the feature events.
-                    permanent       : this.options.tooltipPermanent,        //Whether to open the tooltip permanently or only on mouseover.
-                    hideWhenDragging: this.options.tooltipHideWhenDragging  //True and tooltipPermanent: false => the tooltip is hidden when dragged
-                });
-        },
-
-        /*****************************************************
-        addClass, removeClass, toggleClass
-        *****************************************************/
-        addClass   : function(){ this.$icon.addClass.apply   ( this.$icon, arguments ); },
-        removeClass: function(){ this.$icon.removeClass.apply( this.$icon, arguments ); },
-        toggleClass: function(){ this.$icon.toggleClass.apply( this.$icon, arguments ); },
-
-        /*****************************************************
-        toggleOption(optionId) - Toggle the state of options[optionId]
-        *****************************************************/
-        toggleOption: function( optionId, state ){
-            this.options[optionId] = typeof state === "boolean" ? state : !this.options[optionId];
-            this.toggleClass( classNames[optionId], this.options[optionId]);
-        },
-
-        /*****************************************************
-        setColor( colorName )
-        *****************************************************/
-        setColor: function( colorName ){
-            if (this.colorName)
-                this.removeClass('lbm-'+this.colorName);
-            this.colorName = colorName;
-            if (this.colorName)
-                this.addClass('lbm-'+this.colorName);
-        },
-
-        /*****************************************************
-        _bsMarker_onDragStart - Fired when the drag starts: Mark the map to ignore next click
-        _bsMarker_onDragEnd - Fired when the drag ends: Mark the map to include click within 10ms
-        *****************************************************/
-        _bsMarker_onDragStart: function(){
-            this._map.ignoreNextEvent('click');
-        },
-
-        _bsMarker_onDragEnd  : function(){
-            setTimeout( $.proxy( this._map.includeNextEvent, this._map, 'click'), 100 );
-        },
-
-    });
-
-
-    L.bsMarker = function bsMarker(latlng, options) {
-        return new L.BsMarker(latlng, options);
-    };
 
 }(jQuery, L, this, document));
 
@@ -70247,9 +72192,9 @@ Adjust standard Leaflet popup to display as Bootstrap modal
         this._pinned = pinned = !!pinned;
 
         //Update pin-icon (if avaiable)
-        if (this.bsModal && this.bsModal.$container){
+        if (this.bsModal && this.bsModal.$modalContent){
             this.bsModal.isPinned = pinned;
-            this.bsModal.$container.modernizrToggle('modal-pinned', pinned );
+            this.bsModal.$modalContent.modernizrToggle('modal-pinned', pinned );
         }
 
         //Update related options
@@ -70265,7 +72210,6 @@ Adjust standard Leaflet popup to display as Bootstrap modal
         if (this._map && this._map._popup && this._map._popup !== this && !this._map._popup._pinned)
             this._map.closePopup(this._map._popup);
     };
-
 
     /*********************************************************
     Adjust Popup._close and Popup._onCloseButtonClick
@@ -70287,27 +72231,11 @@ Adjust standard Leaflet popup to display as Bootstrap modal
         };
     } (L.Popup.prototype._onCloseButtonClick);
 
-
-
-
     /*********************************************************
     Extend L.Popup._initLayout to create popup with Bootstrap-components
     *********************************************************/
     L.Popup.prototype._initLayout = function (_initLayout) {
         return function () {
-            //Some options can be given in this._content
-            if ($.isPlainObject(this._content)){
-                this.options.minWidth  = this._content.minWidth  || this.options.minWidth;
-                this.options.maxWidth  = this._content.maxWidth  || this.options.maxWidth;
-                this.options.maxHeight = this._content.maxHeight || this.options.maxHeight;
-                this.options.width     = this._content.width     || this.options.width;
-            }
-            //Set fixed width
-            if (this.options.width){
-                this.options.minWidth = this.options.width;
-                this.options.maxWidth = this.options.width;
-            }
-
             //Original function/method
             _initLayout.apply(this, arguments);
 
@@ -70315,7 +72243,12 @@ Adjust standard Leaflet popup to display as Bootstrap modal
             $(this._wrapper).addClass('modal-wrapper');
 
             //Set class-name for _contentNode to make it a 'small' bsModal
-            $(this._contentNode).addClass('modal-inline modal-sm');
+            $(this._contentNode)._bsAddBaseClassAndSize({
+                baseClass   : 'modal-dialog',
+                class       : 'modal-dialog-inline',
+                useTouchSize: true,
+                small       : true
+            });
 
             //Close open popup and brint to front when "touched"
             L.DomEvent.on(this._contentNode, 'mousedown', this._brintToFocus, this );
@@ -70323,6 +72256,26 @@ Adjust standard Leaflet popup to display as Bootstrap modal
             return this;
         };
     } (L.Popup.prototype._initLayout);
+
+
+    /*********************************************************
+    Overwrite L.Popup._updateLayout to simple get _containerWidth
+    as the width of the container
+    *********************************************************/
+    L.Popup.prototype._updateLayout = function(){
+        this._containerWidth = $(this._container).width();
+    };
+
+    /*********************************************************
+    Overwrite L.Popup._updatePosition to get correct width every time
+    *********************************************************/
+    L.Popup.prototype._updatePosition = function(_updatePosition){
+        return function () {
+            this._updateLayout();
+            _updatePosition.apply(this, arguments);
+        };
+    } (L.Popup.prototype._updatePosition);
+
 
 
     /*********************************************************
@@ -70345,22 +72298,29 @@ Adjust standard Leaflet popup to display as Bootstrap modal
                         onClick: $.proxy(this._onCloseButtonClick, this)
                     }
                 },
-                closeButton   : contentAsModalOptions.closeButton,
+                closeButton   : contentAsModalOptions.closeButton === true, //Change default to false
                 noHeader      : !contentAsModalOptions.header,
                 contentContext: this,
+
+                onChange: $.proxy( this._updatePosition, this )
             },
             contentAsModalOptions );
-
-
 
         if (modalOptions.fixable){
             this.options.fixable = true;
             modalOptions.onPin = $.proxy( this._setPinned, this);
         }
 
-        //Adjust options for leaflet popup
-        if (modalOptions.scroll)
-            this.options.maxHeight = this.options.maxHeight || 300; //maxHeight must be set if content is inside a scroll
+        //Adjust options for bsModal
+        if (modalOptions.extended){
+            modalOptions.extended.scroll = true;
+            //If no extended height or width is given => use same as not-extended
+            if (!modalOptions.extended.height && !modalOptions.extended.maxHeight)
+                modalOptions.extended.height = true;
+
+            if (!modalOptions.extended.width && !modalOptions.extended.maxWidth)
+                modalOptions.extended.width = true;
+        }
 
         //Save modal-options and content
         this.modalOptions = modalOptions;
@@ -70373,10 +72333,6 @@ Adjust standard Leaflet popup to display as Bootstrap modal
 
         //Save the modal-object
         this.bsModal = $contentNode.bsModal;
-
-        //Set max-height of inner modal-container
-        if (this.options.maxHeight)
-            $contentNode.bsModal.$container.css('max-height', this.options.maxHeight);
 
         this._setPinned(isPinned);
 
@@ -70418,7 +72374,7 @@ Adjust standard Leaflet popup to display as Bootstrap modal
 
 ;
 /****************************************************************************
-    leaflet-bootstrap.js,
+    leaflet-bootstrap-tooltip.js,
 
     (c) 2017, FCOO
 
@@ -70444,9 +72400,12 @@ Adjust standard Leaflet popup to display as Bootstrap modal
                 this.options.className +=  ' leaflet-tooltip-hide-when-dragging';
 
 
-            if (this._source && this._source.$icon && this._source.$icon.hasClass('lbm-big'))
-                this.options.className += ' leaflet-tooltip-big-icon';
-
+            if (this._source && this._source.$icon){
+                if (this._source.$icon.hasClass('lbm-number'))
+                    this.options.className += ' leaflet-tooltip-number-icon';
+                if (this._source.$icon.hasClass('lbm-big'))
+                    this.options.className += ' leaflet-tooltip-big-icon';
+            }
 
             _initLayout.apply( this, arguments );
         };
@@ -70459,11 +72418,64 @@ Adjust standard Leaflet popup to display as Bootstrap modal
     L.Tooltip.prototype._updateContent = function () {
         $(this._contentNode)
             .empty()
-            ._bsAddHtml( this._content );
+            ._bsAddHtml( this._content, true );
 
 		this.fire('contentupdate');
     };
 
+
+
+    /*********************************************************
+    Extend L.Layer with methods to show and hide tooltip
+    *********************************************************/
+    L.Layer.prototype.showTooltip = function() {
+        var tooltip = this.getTooltip();
+        if (tooltip)
+            tooltip.setOpacity(this._saveTooltipOpacity);
+        return this;
+    };
+
+    L.Layer.prototype.hideTooltip = function() {
+        var tooltip = this.getTooltip();
+        if (tooltip){
+            this._saveTooltipOpacity = tooltip.options.opacity;
+            tooltip.setOpacity(0);
+        }
+        return this;
+    };
+
+    /*********************************************************
+    Overwrite L.Layer.bindTooltip to check for this.options
+    regarding tooltip and add events to hide tooltips when
+    popup is open
+    *********************************************************/
+    L.Layer.prototype.bindTooltip = function( bindTooltip ){
+        return function(content, options){
+            if (this && this.options){
+                options =
+                    $.extend({
+                        sticky          : !this.options.tooltipPermanent,       //If true, the tooltip will follow the mouse instead of being fixed at the feature center.
+                        interactive     : false,                                //If true, the tooltip will listen to the feature events.
+                        permanent       : this.options.tooltipPermanent,        //Whether to open the tooltip permanently or only on mouseover.
+                        hideWhenDragging: this.options.tooltipHideWhenDragging  //True and tooltipPermanent: false => the tooltip is hidden when dragged
+                    }, options);
+
+                this.on('popupopen',  this._hideTooltipWhenPopupOpen,  this);
+                this.on('popupclose', this._showTooltipWhenPopupClose, this);
+            }
+            return bindTooltip.call( this, content, options );
+        };
+    }( L.Layer.prototype.bindTooltip );
+
+    L.Layer.prototype._hideTooltipWhenPopupOpen = function(){
+        if (this && this.options && this.options.tooltipHideWhenPopupOpen && !this.options.tooltipPermanent)
+            this.hideTooltip();
+    };
+
+    L.Layer.prototype._showTooltipWhenPopupClose = function(){
+        if (this && this.options && this.options.tooltipHideWhenPopupOpen && !this.options.tooltipPermanent)
+            this.showTooltip();
+    };
 
 }(jQuery, L, this, document));
 
@@ -70480,13 +72492,298 @@ Adjust standard Leaflet popup to display as Bootstrap modal
     https://github.com/FCOO
 
 ****************************************************************************/
-(function (/*$, L/*, window, document, undefined*/) {
+(function (/*$, L, window, document, undefined*/) {
     "use strict";
-
 
 }(jQuery, L, this, document));
 
 
+
+
+;
+/****************************************************************************
+leaflet-bootstrap-marker.js,
+
+Create L.bsMarker = a round marker with options for color, shadow and pulsart
+
+****************************************************************************/
+(function ($, L, window, document, undefined) {
+    "use strict";
+
+    /*****************************************************
+    L.bsMarkerAsIcon
+    Return the options to create a icon locking like a bsMarker
+    with the given color and border-color
+    *****************************************************/
+    L.bsMarkerAsIcon = function(colorName, borderColorName, options){
+        colorName = colorName || 'white';
+        borderColorName = borderColorName || 'black';
+        return $.bsMarkerIcon('fa-lbm-icon-'+colorName, 'fa-lbm-icon-border-'+borderColorName, options);
+    };
+
+
+    var markerSizeList = [14, 20, 24], //MUST match $markerSizeList in _leaflet-bootstrap-marker.scss AND _leaflet-bootstrap-tooltip.scss
+        iconList = [];
+    $.each( markerSizeList, function( index, size ){
+        iconList.push( L.divIcon({iconSize: [size, size], className: 'lbm-icon lbm-icon-'+index }) );
+    });
+
+
+    //Extend L.Map with ignoreNextEvent(type) and includeNextEvent(type) to prevent the next firing of a event
+    L.Map.prototype.fire = function ( fire ){
+        return function ( type ) {
+            return this._ignoreNextEvent[type] ? this.includeNextEvent( type ) : fire.apply(this, arguments);
+        };
+    } (L.Map.prototype.fire);
+
+    L.Map.prototype.initialize = function (initialize) {
+        return function () {
+            this._ignoreNextEvent = {};
+            return initialize.apply(this, arguments);
+        };
+    } (L.Map.prototype.initialize);
+
+
+    L.Map.prototype.ignoreNextEvent = function( type ){
+        this._ignoreNextEvent[type] = true;
+        return this;
+    };
+    L.Map.prototype.includeNextEvent = function( type ){
+        this._ignoreNextEvent[type] = false;
+        return this;
+    };
+
+    var classNames = {
+            round        : 'lbm-round',
+            transparent  : 'lbm-transparent',
+            shadow       : 'lbm-shadow',
+            hover        : 'lbm-hover',
+            puls         : 'lbm-puls',
+            thickBorder  : 'lbm-thick-border'
+        };
+
+    /*****************************************************
+    L.BsMarker
+    *****************************************************/
+    L.BsMarker = L.Marker.extend({
+        options: {
+            icon            : iconList[0],
+
+            iconSize        : 0,         //0: normal, 1. larger with icon or umber, 2: Very large (touch-mode)
+            iconClass       : '',        //Fontawesome Font class-name ("fa-home") for icon inside the marker
+            round           : true,      //If false the icon is square
+            number          : undefined, //Number inside the marker
+
+            draggable       : false,     //Whether the marker is draggable with mouse/touch or not.
+            autoPan         : true,      //Set to true if you want the map to do panning animation when marker hits the edges.
+
+            useBigIcon      : false,     //True to make the icon big
+            bigIconWhenTouch: false,     //True to make big icon when window.bsIsTouch == true and options.draggable == true
+            transparent     : false,     //True to make the marker semi-transparent
+            hover           : false,     //True to show shadow and 0.9 opacuity for lbm-transparent when hover
+            shadow          : false,     //true to add a shadow to the marker
+            puls            : false,     //true to have a pulsart icon
+            colorName       : '',    	 //Class-name to give the color of the marker
+            borderColorName : '',        //Class-name to give the border-color
+            thickBorder     : false,    //true to have thicker border
+
+
+            tooltip                 : null,     //Content of tooltip
+            tooltipPermanent        : false,    //Whether to open the tooltip permanently or only on mouseover.
+            tooltipHideWhenDragging : false,    //True and tooltipPermanent: false => the tooltip is hidden when dragged
+            tooltipHideWhenPopupOpen: false,    //True and tooltipPermanent: false => the tooltip is hidden when popup is displayed
+            shadowWhenPopupOpen     : true      //When true a big-sdhadow is shown when the popup for the marker is open
+        },
+
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function(latLng, options){
+            L.Marker.prototype.initialize.call(this, latLng, options);
+
+            if (this.options.useBigIcon)
+                this.iconSizeIndex = 2;
+            else
+                //Change to big icon if bigIconWhenTouch == false and window.bsIsTouch == true and options.draggable == true
+                if (this.options.bigIconWhenTouch && this.options.draggable && window.bsIsTouch)
+                    this.iconSizeIndex = 2;
+                else
+                    this.iconSizeIndex = this.options.iconSize || 0;
+
+            //Create $icon to hold class-names
+            this.$icon = $('<div/>');
+
+            var _this = this;
+            $.each(['round', 'transparent', 'shadow', 'hover', 'puls', 'thickBorder'], function( index, id ){
+                _this.toggleOption(id, !!_this.options[id] );
+            });
+
+            if (this.options.colorName)
+                this.setColor(this.options.colorName);
+            if (this.options.borderColorName)
+                this.setBorderColor(this.options.borderColorName);
+
+            //this.setSize(this.iconSizeIndex);
+
+            this.on('dragstart', this._bsMarker_onDragStart, this );
+            this.on('dragend',   this._bsMarker_onDragEnd,   this );
+
+            this.on('popupopen',  this._popupopen, this);
+            this.on('popupclose', this._popupclose, this);
+        },
+
+        /*****************************************************
+        setSize
+        *****************************************************/
+        setSize: function(sizeIndex){
+
+            this.$icon.removeClass('lbm-icon-'+this.iconSizeIndex);
+            var className = this.$icon.get(0).className,
+                tooltip = this.getTooltip();
+            if (tooltip)
+                $(tooltip._container).removeClass('leaflet-tooltip-icon-'+this.iconSizeIndex);
+
+            this.iconSizeIndex = sizeIndex;
+
+            this.setIcon( iconList[sizeIndex] );
+            this.$icon = $(this._icon);
+            this.$icon.addClass(className+' lbm-icon-'+sizeIndex);
+            if (tooltip)
+                $(tooltip._container).addClass('leaflet-tooltip-icon-'+this.iconSizeIndex);
+        },
+
+
+        /*****************************************************
+        onAdd
+        *****************************************************/
+        onAdd: function( map ){
+            L.Marker.prototype.onAdd.call(this, map);
+
+            this.$content = null;
+
+            if (this.options.tooltip)
+                this.bindTooltip(this.options.tooltip);
+
+            this.setSize(this.iconSizeIndex);
+            if (this.options.number !== undefined)
+                this.setNumber(this.options.number);
+            if (this.options.iconClass)
+                this.setIconClass(this.options.iconClass);
+
+        },
+
+        /*****************************************************
+        addClass, removeClass, toggleClass
+        *****************************************************/
+        addClass   : function(){ this.$icon.addClass.apply   ( this.$icon, arguments ); },
+        removeClass: function(){ this.$icon.removeClass.apply( this.$icon, arguments ); },
+        toggleClass: function(){ this.$icon.toggleClass.apply( this.$icon, arguments ); },
+
+        /*****************************************************
+        toggleOption(optionId) - Toggle the state of options[optionId]
+        *****************************************************/
+        toggleOption: function( optionId, state ){
+            this.options[optionId] = typeof state === "boolean" ? state : !this.options[optionId];
+            this.toggleClass( classNames[optionId], this.options[optionId]);
+        },
+
+        /*****************************************************
+        setColor( colorName )
+        *****************************************************/
+        setColor: function( colorName ){
+            if (this.colorName)
+                this.removeClass('lbm-'+this.colorName);
+            this.colorName = colorName;
+            if (this.colorName)
+                this.addClass('lbm-'+this.colorName);
+        },
+
+        /*****************************************************
+        setBorderColor( borderColorName )
+        *****************************************************/
+        setBorderColor: function( borderColorName ){
+            if (this.borderColorName)
+                this.removeClass('lbm-border-'+this.colorName);
+            this.borderColorName = borderColorName;
+            if (this.borderColorName)
+                this.addClass('lbm-border-'+this.borderColorName);
+        },
+
+        /*****************************************************
+        setIconClass( icon )
+        *****************************************************/
+        setIconClass: function( icon, minSize ){
+            if (minSize && (minSize > this.iconSizeIndex))
+                this.setSize( minSize );
+            this.$icon.empty();
+            $._bsCreateIcon('fa-home', this.$icon);
+        },
+        /*****************************************************
+        setNumber( number )
+        *****************************************************/
+        setNumber: function( number, minSize ){
+            if (minSize && (minSize > this.iconSizeIndex))
+                this.setSize( minSize );
+            this.$icon.empty();
+            $('<div/>')
+                .addClass('inner-text')
+                .text(number)
+                .appendTo( this.$icon );
+        },
+
+
+        /*****************************************************
+        asIcon()
+        *****************************************************/
+        asIcon: function( options ){
+            options = $.extend(
+                        this.options.round ? {} : {baseClass: 'fa-square'},
+                        options || {}
+                      );
+            return L.bsMarkerAsIcon(this.colorName, this.borderColorName, options);
+        },
+
+        /*****************************************************
+
+        *****************************************************/
+        _popupopen: function(){
+            this._bringToFront();
+            if (this.options.shadowWhenPopupOpen && !this.options.shadow)
+                this.addClass( classNames['shadow'] );
+            if (this.options.transparent)
+                this.removeClass( classNames['transparent'] );
+            if (this.options.hover)
+                this.removeClass( classNames['hover'] );
+        },
+        _popupclose: function(){
+            if (this.options.shadowWhenPopupOpen && !this.options.shadow)
+                this.removeClass( classNames['shadow'] );
+            if (this.options.transparent)
+                this.addClass( classNames['transparent'] );
+            if (this.options.hover)
+                this.addClass( classNames['hover'] );
+        },
+
+        /*****************************************************
+        _bsMarker_onDragStart - Fired when the drag starts: Mark the map to ignore next click
+        _bsMarker_onDragEnd - Fired when the drag ends: Mark the map to include click within 10ms
+        *****************************************************/
+        _bsMarker_onDragStart: function(){
+            this._map.ignoreNextEvent('click');
+        },
+
+        _bsMarker_onDragEnd  : function(){
+            setTimeout( $.proxy( this._map.includeNextEvent, this._map, 'click'), 100 );
+        },
+
+    });
+
+
+    L.bsMarker = function bsMarker(latlng, options) {
+        return new L.BsMarker(latlng, options);
+    };
+
+}(jQuery, L, this, document));
 
 
 ;
@@ -71662,25 +73959,87 @@ ctx.fillRect(0, 0, shapeDim, shapeDim);
     Extend L.Polyline with options to draw "shadow" and "interactive"-zone
 
 ****************************************************************************/
-(function ($, L/*, window, document, undefined*/) {
+(function ($, L, window, document, undefined) {
     "use strict";
-    var beforeAndAfter = function(methodName, method, reverseOrder) {
-            method = method || L.Polyline.prototype[methodName];
-            return function(){
-                var firstLayerGroup = reverseOrder ? this.interactiveLayerGroup : this.shadowLayerGroup,
-                    lastLayerGroup  = reverseOrder ? this.shadowLayerGroup : this.interactiveLayerGroup;
+//    var beforeAndAfter = function(methodName, method, reverseOrder, notForLayerGroup) {
+    function beforeAndAfter(methodName, method, reverseOrder, notForLayerGroup) {
+        method = method || L.Polyline.prototype[methodName];
+        return function(){
+            function applyToInteractiveLayerGroup(arg){
+                if (this.interactiveLayerGroup && !notForLayerGroup)
+                    this.interactiveLayerGroup[methodName].apply(this.interactiveLayerGroup, arg);
+            }
 
-                if (firstLayerGroup)
-                    firstLayerGroup[methodName].apply(firstLayerGroup, arguments);
+            if (this.polylineList){
+                var length = this.polylineList.length-1,
+                    firstIndex = reverseOrder ? length : 0,
+                    lastIndex  = reverseOrder ? 0 : length,
+                    result, i;
 
-                var result = method.apply(this, arguments);
+                if (reverseOrder)
+                    applyToInteractiveLayerGroup.call( this, arguments );
 
-                if (lastLayerGroup)
-                    lastLayerGroup[methodName].apply(lastLayerGroup, arguments);
+                 for (i=firstIndex; reverseOrder ? i >= lastIndex : i <= lastIndex; reverseOrder ? i-- : i++ )
+                    if (i == thisIndex)
+                        result = method.apply(this, arguments);
+                    else
+                        this.polylineList[i][methodName].apply(this.polylineList[i], arguments);
+
+                if (!reverseOrder)
+                    applyToInteractiveLayerGroup.call( this, arguments );
+
                 return result;
-            };
+            }
+            else
+                return method.apply(this, arguments);
         };
+    };
 
+    function applyOnInteractivePolyline( methodName ){
+        return function( prototypeMethod ){
+                   return function(){
+                       return prototypeMethod.apply(this.interactivePolyline || this, arguments);
+                   };
+               }( L.Polyline.prototype[methodName] );
+    };
+
+
+    var defaultOptions = {
+            weight         : 2,  //The width of the line
+            colorName      : '', //Class-name to give the fill color
+            fillColorName  : '', //Same as colorName
+            borderColorName: '',  //Class-name to give the border color. "none" will hide the border
+            LineColorName  : '',  //Same as borderColorName
+
+
+            //fill       : false,  //True to add fill colored by fillColor or SOMETHING ELSE TODO
+            border         : false,  //True to add a semi-transparent white border to the line
+            transparent    : false,  //True to make the line semi-transparent
+            hover          : false,  //True to show big-shadow and 0.9 opacuity for lpl-transparent when hover
+            onlyShowOnHover: false,  //When true the polyline/polygon is only visible on hover and popup-open. Need {shadow: false, hover: true}
+
+            shadow               : false,  //true to add big shadow to the line
+            shadowWhenInteractive: false,  //When true a shadow is shown when the polyline is interactive
+            shadowWhenPopupOpen  : false,  //When true a big-sdhadow is shown when the popup for the marker is open
+
+            addInteractiveLayerGroup: false, //true to add this.interactiveLayerGroup to hold layers only visible when interactive is on
+            onSetInteractive        : null,  //function( on ) called when interactive is set on or off
+
+            //TODO zIndexWhenHover         : null,   //zIndex applied when the polyline/polygon is hover
+            //TODO zIndexWhenPopupOpen     : null,   //zIndex applied when the a popup is open on the polyline/polygon
+
+            className       : 'lpl-base',
+
+            borderWidth     : 1, //Width of border
+            shadowWidth     : 3, //Width of shadow
+            interactiveWidth: 5, //Width of interactive area
+
+        },
+
+        shadowIndex      = 0,
+        borderIndex      = 1,
+        thisIndex        = 2,
+        interactiveIndex = 3;
 
     L.Polyline.include({
         /*****************************************************
@@ -71688,94 +74047,311 @@ ctx.fillRect(0, 0, shapeDim, shapeDim);
         *****************************************************/
         initialize: function( initialize ){
             return function( latLngs, options ){
-                options = options || {};
+                var _this = this;
+                function getOptions( className, interactive ){
+                    return $.extend({}, _this.options, defaultOptions, {
+                               className     : className,
+                               addInteractive: false,
+                               interactive   : interactive,
+                            });
+                }
 
-                if (options.addInteractive)
-                    options.interactive = true;
+                options = options || {};
+                if (!options.addInteractive)
+                    return initialize.call(this, latLngs, options );
+
+                options.weight = options.weight || options.width || defaultOptions.weight;
 
                 initialize.call(this, latLngs, options );
 
-                this.options = $.extend(true, {},
-                    {
-                        shadowStyle: {
-                            width: 1,
-                            color: 'white',
-                            opacity: 0.5
-                        },
-/*
-                        _interactiveStyle: {
-                            width: 14,
-                            color: 'yellow',
-                            opacity: .5,
-                        },
-*/
-                        interactiveStyle: {
-                            width  : 4,
-                            color  : 'transparent',
-                            opacity: 1
-                        },
-                    },
-                    this.options
-                );
+                this.currentOptions = {};
 
-                function extendOptions( options, style, interactive ){
-                    var result = $.extend({}, options);
-                    return $.extend(result, {
-                        weight : options.weight+2*style.width,
-                        color  : style.color,
-                        opacity: style.opacity,
-                        addShadow: false,
-                        addInteractive: false,
-                        interactive: interactive,
-                    });
-                }
+                //polylineList contains the up to four different polyline/polygon used to create the border, shadow and interactive zones
+                this.polylineList = [null, null, null, null];
 
-                if (this.options.addShadow){
-                    this.shadowLayerGroup = L.layerGroup();
-                    this.shadowPolyline = L.polyline(this.getLatLngs(), extendOptions(this.options, this.options.shadowStyle, false) );
-                    this.shadowLayerGroup.addLayer(  this.shadowPolyline );
-                }
+                var thisConstructor = this instanceof L.Polygon ? L.polygon : L.polyline;
 
-                if (this.options.addInteractive){
+                this.polylineList[borderIndex]      = thisConstructor( latLngs, getOptions('lpl-border',      false) );
+                this.polylineList[shadowIndex]      = thisConstructor( latLngs, getOptions('lpl-shadow',      false) );
+                this.polylineList[thisIndex]        = this;
+                this.polylineList[interactiveIndex] = thisConstructor( latLngs, getOptions('lpl-interactive', true ) );
+
+                this.interactivePolyline = this.polylineList[interactiveIndex]; //Easy access
+                this.interactivePolyline._parentPolyline = this;
+
+                if (this.options.addInteractiveLayerGroup)
                     this.interactiveLayerGroup = L.layerGroup();
-                    this.interactivePolyline = L.polyline(this.getLatLngs(), extendOptions(this.options, this.options.interactiveStyle, true) );
-                    this.interactiveLayerGroup.addLayer(  this.interactivePolyline );
-                    this.on('add remove', this.setInteractiveOff, this );
-                }
+
+                this.on( 'add', this.setStyle, this );
+                this.on( 'remove', this.setInteractiveOff, this );
+
+                this.interactivePolyline
+                        .on( 'mouseover',    this._mouseover,    this )
+                        .on( 'mouseout',     this._mouseout,     this )
+                        .on( 'popupopen',    this._popupopen,    this )
+                        .on( 'popupclose',   this._popupclose,   this );
+
+
                 return this;
             };
         }(L.Polyline.prototype.initialize),
+
+
+        /*****************************************************
+        setStyle
+        *****************************************************/
+        setStyle: function(setStyle){
+            return function( style ){
+                function adjust(options){
+                    options = $.extend({}, options || {});
+                    options.weight = options.width || options.weight;
+                    options.colorName = options.colorName || options.fillColorName || options.colorName;
+                    options.borderColorName = options.borderColorName || options.lineColorName || options.borderColorName;
+                    return options;
+                }
+
+                if (!this.options.addInteractive)
+                    return setStyle.call(this, style );
+
+                this.options = $.extend(true,  adjust(defaultOptions), adjust(this.options), adjust(style) );
+
+                //Create the current options in a flat object
+                var options = $.extend({},  this.options );
+
+                //If there are options in options.polyline or options.LineString for polyline etc. => copy them into options.
+                //This makes it possible to add options in geoJSON-layer with different options for polygons and lines
+                $.each(this instanceof L.Polygon ? ['polygon', 'Polygon'] : ['polyline', 'Polyline', 'lineString', 'LineString'], function(index, name){
+                    if (options[name])
+                        $.extend(options, adjust(options[name]));
+                });
+
+                var saveAddInteractive = this.options.addInteractive;
+                this.options.addInteractive = false;
+
+                this.currentOptions = options;
+
+                ///Set line-width of the differnet polyline
+                this.polylineList[thisIndex].setStyle(       {weight: options.weight });
+                this.polylineList[borderIndex].setStyle(     {weight: options.weight + 2*options.borderWidth     });
+                this.polylineList[shadowIndex].setStyle(     {weight: options.weight + 2*options.shadowWidth     });
+                this.polylineList[interactiveIndex].setStyle({weight: options.weight + 2*options.interactiveWidth});
+
+                //Add class and colors to this and shadow
+                this._addClass(thisIndex, options.className);
+                this.setColor(options.colorName);
+                this.setBorderColor(options.borderColorName);
+                this._toggleClass(thisIndex, 'lpl-transparent', !!options.transparent);
+
+                //Show or hide border
+                this.setBorder( options.border );
+
+                //Show or hide shadow
+                this.setShadow( options.shadow );
+
+                //Only show on hover
+                this._toggleClass(null, 'lpl-only-show-on-hover', !!options.onlyShowOnHover);
+
+                this.options.addInteractive = saveAddInteractive;
+
+                this.options.interactive = options.interactive;
+
+                //Check and set active-status if polyline is added to a map
+                 if (this._map)
+                    this.setInteractive(this.options.interactive);
+
+                return this;
+            };
+        }(L.Polyline.prototype.setStyle),
 
         /*****************************************************
         onAdd - Add Polyline, shadow- and inertactive LayerGroup
         *****************************************************/
         onAdd: beforeAndAfter( 'addTo', L.Polyline.prototype.onAdd ),
 
+
+
         /*****************************************************
-        Bind tooltip to interactivePolyline (if any)
+        bindTooltip(), bindPopup(), unbindPopup(), closePopup(),
+        togglePopup(), isPopupOpen(), setPopupContent(),
+        getPopup() from interactivePolyline (if any)
         *****************************************************/
-        bindTooltip: function(bindTooltip){
-            return function(){
-                bindTooltip.apply(this.interactivePolyline || this, arguments);
+        bindTooltip    : applyOnInteractivePolyline( 'bindTooltip'     ),
+        bindPopup      : applyOnInteractivePolyline( 'bindPopup'       ),
+        unbindPopup    : applyOnInteractivePolyline( 'unbindPopup'     ),
+        closePopup     : applyOnInteractivePolyline( 'closePopup'      ),
+        togglePopup    : applyOnInteractivePolyline( 'togglePopup'     ),
+        isPopupOpen    : applyOnInteractivePolyline( 'isPopupOpen'     ),
+        setPopupContent: applyOnInteractivePolyline( 'setPopupContent' ),
+        getPopup       : applyOnInteractivePolyline( 'getPopup'        ),
+/*
+        bindTooltip
+        bindPopup
+        unbindPopup
+        closePopup      : function(closePopup)      { return function(){ return closePopup.apply(this.interactivePolyline      || this, arguments); }; }( L.Polyline.prototype.closePopup      ),
+        togglePopup     : function(togglePopup)     { return function(){ return togglePopup.apply(this.interactivePolyline     || this, arguments); }; }( L.Polyline.prototype.togglePopup     ),
+        isPopupOpen     : function(isPopupOpen)     { return function(){ return isPopupOpen.apply(this.interactivePolyline     || this, arguments); }; }( L.Polyline.prototype.isPopupOpen     ),
+        setPopupContent : function(setPopupContent) { return function(){ return setPopupContent.apply(this.interactivePolyline || this, arguments); }; }( L.Polyline.prototype.setPopupContent ),
+        getPopup        : function(getPopup)        { return function(){ return getPopup.apply(this.interactivePolyline        || this, arguments); }; }( L.Polyline.prototype.getPopup        ),
+
+*/
+
+        /*****************************************************
+        Open popup inside polygon or on polyline
+        *****************************************************/
+        openPopup: function(openPopup){
+            return function(layer, latlng){
+                var _this = this._parentPolyline || this;
+
+                //If not inside a filled polygon => adjust latlng to be on the line
+                if (latlng && (!(_this instanceof L.Polygon) ||  !_this.currentColorName) )
+                    latlng = L.GeometryUtil.closest(_this._map, _this, latlng);
+
+                openPopup.call(this, layer, latlng);
             };
-        }(L.Polyline.prototype.bindTooltip),
+        }(L.Polyline.prototype.openPopup),
+
+        /*****************************************************
+        setColor( colorName )
+        *****************************************************/
+        setColor: function( colorName ){
+            if (this.currentColorName)
+                this._removeClass(this, 'lpl-'+this.currentColorName);
+            if (colorName)
+                this._addClass(this, 'lpl-'+colorName);
+
+            this._toggleClass(interactiveIndex, 'lpl-fill', !!colorName);
+
+            this.currentColorName = colorName;
+        },
+
+        /*****************************************************
+        setBorderColor( borderColorName )
+        setLineColor( lineColorName )
+        *****************************************************/
+        setBorderColor: function( borderColorName ){
+            if (this.currentBorderColorName)
+                this._removeClass(this, 'lpl-border-'+this.currentBorderColorName);
+            if (borderColorName){
+                this._addClass(this, 'lpl-border-'+borderColorName);
+                if (this.polylineList && this.polylineList[shadowIndex])
+                    this.polylineList[shadowIndex].setBorderColor(borderColorName);
+            }
+            this.currentBorderColorName = borderColorName;
+        },
+        setLineColor: function( lineColorName ){
+            return this.setBorderColor( lineColorName );
+        },
+
+        /*****************************************************
+        setBorder( show )
+        Show or hide border
+        *****************************************************/
+        setBorder: function( show ){
+            this._toggleClass(borderIndex, 'lpl-show', !!show);
+        },
+
+        /*****************************************************
+        setBorder( show )
+        Show or hide shadow
+        *****************************************************/
+        setShadow: function( show ){
+            this._toggleClass(shadowIndex, 'lpl-show', !!show);
+        },
+
+        /*****************************************************
+        _addClass, _removeClass, _toggleClass:
+        Add, remove and toggle class from a polyline
+        *****************************************************/
+        _eachPolyline: function( onlyPolyline, methodName, arg ){
+            var _this = this;
+            if (onlyPolyline != null){
+                if ($.isNumeric(onlyPolyline))
+                    onlyPolyline = this.polylineList[onlyPolyline];
+                if (onlyPolyline){
+                    var $path = $(onlyPolyline._path);
+                    $path[methodName].apply($path, arg);
+                }
+            }
+            else
+                $.each(this.polylineList, function( index, polyline ){
+                   _this._eachPolyline( polyline, methodName, arg );
+                });
+        },
+
+        _addClass: function( polyline, className ){
+            this._eachPolyline( polyline, 'addClass', [className] );
+        },
+
+        _removeClass: function( polyline, className ){
+            this._eachPolyline( polyline, 'removeClass', [className] );
+        },
+
+        _toggleClass: function( polyline, className, state ){
+
+            this._eachPolyline( polyline, 'toggleClass', [className, state] );
+        },
+
+        /*****************************************************
+        _mouseover and _mouseout: Highlight polyline
+        *****************************************************/
+        _mouseover: function(/* mouseEvent */){
+             if (this.currentOptions.hover)
+                 this._addClass(null, 'lpl-hover');
+             if (this.currentOptions.onlyShowOnHover)
+                 this._removeClass(null, 'lpl-only-show-on-hover');
+        },
+
+        _mouseout: function(/* mouseEvent */){
+            if (this.currentOptions.hover)
+                 this._removeClass(null, 'lpl-hover');
+             if (this.currentOptions.onlyShowOnHover)
+                 this._addClass(null, 'lpl-only-show-on-hover');
+        },
+
+        /*****************************************************
+        _popupopen and _popupclose: Highlight polyline
+        *****************************************************/
+        _popupopen: function(){
+            if (this.currentOptions.shadowWhenPopupOpen && !this.currentOptions.shadow)
+                this._addClass(shadowIndex, 'lpl-show');
+             this._addClass(null, 'lpl-popup-open' );
+        },
+
+        _popupclose: function(){
+            if (this.currentOptions.shadowWhenPopupOpen && !this.currentOptions.shadow && !this.currentOptions.shadowWhenInteractive)
+                this._removeClass(shadowIndex, 'lpl-show');
+             this._removeClass(null, 'lpl-popup-open' );
+        },
 
         /*****************************************************
         If polyline has addInteractive => All mouse-evnets on polyline get caught
         by interactivePolyline and fired on this on clostes point
         *****************************************************/
         onMouseEventsOnInteractivePolyline: function( fn, context, mouseEvent ){
-            //Adjust mouseEvent to closest latlng on this
-            mouseEvent.latlng         = L.GeometryUtil.closest(this._map, this, mouseEvent.latlng);
-            mouseEvent.layerPoint     = this._map.latLngToLayerPoint( mouseEvent.latlng );
-            mouseEvent.containerPoint = this._map.latLngToContainerPoint( mouseEvent.latlng );
-
+            //If event has latLng (==MouseEvent) => Adjust mouseEvent to closest latlng on this
+            if (mouseEvent.latlng){
+                //If not inside a filled polygon => adjust latlng to be on the line
+                if (!(this instanceof L.Polygon) ||  !this.currentColorName){
+                    mouseEvent.latlng         = L.GeometryUtil.closest(this._map, this, mouseEvent.latlng);
+                    mouseEvent.layerPoint     = this._map.latLngToLayerPoint( mouseEvent.latlng );
+                    mouseEvent.containerPoint = this._map.latLngToContainerPoint( mouseEvent.latlng );
+                }
+            }
             fn.call(context || this, mouseEvent );
         },
 
         _on: function( _on ){
             return function(type, fn, context){
-                if (this.interactivePolyline && (['click', 'dblclick', 'mousedown', 'mouseup', 'mouseover', 'mouseout', 'mousemove', 'contextmenu'].indexOf(type) != -1))
+                if (this.interactivePolyline &&
+                    ([
+                        'click', 'dblclick',
+                        'mousedown', 'mouseup', 'mouseover', 'mouseout', 'mousemove',
+                        'contextmenu',
+                        'popupopen', 'popupclose',
+                        'tooltipopen', 'tooltipclose'
+                    ].indexOf(type) != -1)
+                   ){
+
                     //Create a function to re-direct the event from this.interactivePolyline to this with latLng corrected to closest to this
                     return _on.call(
                         this.interactivePolyline,
@@ -71783,6 +74359,7 @@ ctx.fillRect(0, 0, shapeDim, shapeDim);
                         $.proxy(this.onMouseEventsOnInteractivePolyline, this, fn, context),
                         this
                     );
+                    }
                 else
                     return _on.apply(this, arguments );
             };
@@ -71801,47 +74378,45 @@ ctx.fillRect(0, 0, shapeDim, shapeDim);
         setInteractiveOff    - set the polyline interactive off
         *****************************************************/
         setInteractive: function( on ){
-            if (!this.interactivePolyline) return;
+            if (!this.options.addInteractive) return this;
+            var originalIsInteractive = this.isInteractive;
+            if (on === undefined)
+                on = !this.isInteractive;
+
             this.isInteractive = !!on;
-            if (on)
-                this._map.addLayer(this.interactiveLayerGroup);
-            else
-                this._map.removeLayer(this.interactiveLayerGroup);
 
             //Toggle class "leaflet-interactive"
-            $(this._path).toggleClass( "leaflet-interactive",  this.isInteractive);
-            if (this.interactivePolyline)
-                $(this.interactivePolyline._path).toggleClass( "leaflet-interactive",  this.isInteractive);
+            this._toggleClass( thisIndex,        "leaflet-interactive",  this.isInteractive);
+            this._toggleClass( interactiveIndex, "leaflet-interactive",  this.isInteractive, true);
 
-            this.onSetInteractive( this.isInteractive );
+            if (this.options.shadowWhenInteractive)
+                this.setShadow( this.isInteractive );
+
+
+            //Add or remove interactiveLayerGroup
+            if (this.interactiveLayerGroup && this._map)
+                this._map[on ? 'addLayer' : 'removeLayer'](this.interactiveLayerGroup);
+
+            if (originalIsInteractive !== this.isInteractive){
+                this.onSetInteractive( this.isInteractive );
+                if (this.options.onSetInteractive)
+                    $.proxy(this.options.onSetInteractive, this.options.context || this)( this.isInteractive );
+            }
+
+            return this;
         },
 
-        setInteractiveOn : function(){ this.setInteractive( true  ); },
-        setInteractiveOff: function(){ this.setInteractive( false ); },
+        setInteractiveOn : function(){ return this.setInteractive( true  ); },
+        setInteractiveOff: function(){ return this.setInteractive( false ); },
 
         /*****************************************************
-        setLatLngs - also called for shadowPolyline and interactivePolyline
+        setLatLngs, bringToFront, bringToBack, removeFrom:
+        All called for all polylines
         *****************************************************/
-        setLatLngs: function( setLatLngs ){
-            return function(){
-                setLatLngs.apply(this, arguments);
-                if (this.shadowPolyline)
-                    setLatLngs.apply(this.shadowPolyline, arguments);
-                if (this.interactivePolyline)
-                    setLatLngs.apply(this.interactivePolyline, arguments);
-            };
-        }(L.Polyline.prototype.setLatLngs ),
-
-        /*****************************************************
-        bringToFront, bringToBack, removeFrom:
-        All called for shadowLayerGroup and interactiveLayerGroup
-        *****************************************************/
-        bringToFront: beforeAndAfter('bringToFront'),
-        bringToBack : beforeAndAfter('bringToBack', null, true),
-        removeFrom  : beforeAndAfter('removeFrom'),
-
-
-
+        setLatLngs  : beforeAndAfter('setLatLngs'  , null, false, true),
+        bringToFront: beforeAndAfter('bringToFront'                   ),
+        bringToBack : beforeAndAfter('bringToBack' , null, true       ),
+        removeFrom  : beforeAndAfter('removeFrom'                     ),
     });
 
 }(jQuery, L, this, document));

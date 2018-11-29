@@ -43,3 +43,15 @@ L.LatLngPointMarkerList - Extend L.LatLngPointList with drag-events
 *** TODO ***
 L.GeoPolyline = L.Geodesic.extend
     L.Route - Extend L.GeoPolyline with vessels (L.VesselMarker)
+
+
+*** PACKAGES ***
+fcoo/leaflet-polyline: Extend L.Polyline with border, shadow and interactive zone
+    leaflet.GeometryUtil : Utilities for lweaflet eq. find nearest point or line etc.
+
+fcoo/leaflet-latlng-point: Double linked lists of LatLngPoint = with info on bearing, distance etc. to next and previuos point and total
+    fcoo/leaflet-latlng-geodecy: Leaflet-version of latlon-spherical.js from https://github.com/chrisveness/geodesy with methods for latLng-points eq. bearingTo( latLng )
+
+fcoo/leaflet-bootstrap-draw: Display and edit routs, circle etc.
+    leaflet.Geodesic: Draw Leaflet polylines and geodesic-lines incl. circle
+    fcoo/leaflet-polyline: See above
