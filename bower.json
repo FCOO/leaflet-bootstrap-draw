@@ -1,6 +1,6 @@
 {
   "name": "leaflet-bootstrap-draw",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "homepage": "https://github.com/FCOO/leaflet-bootstrap-draw",
   "authors": [
     "Niels Holt"
@@ -22,7 +22,8 @@
     "leaflet-bootstrap-marker": "fcoo/leaflet-bootstrap-marker#^1.0.0",
     "leaflet-marker-vessel": "fcoo/leaflet-marker-vessel#^1.0.0",
     "leaflet-latlng-point": "fcoo/leaflet-latlng-point#^1.0.0",
-    "leaflet-polyline": "fcoo/leaflet-polyline#^2.3.0"
+    "leaflet-polyline": "fcoo/leaflet-polyline#^2.3.0",
+    "leaflet-freeze": "fcoo/leaflet-freeze#^2.0.0"
   },
   "overrides": {
     "Leaflet.Geodesic": {

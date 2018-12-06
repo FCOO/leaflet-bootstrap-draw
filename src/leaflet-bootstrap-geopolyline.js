@@ -24,6 +24,7 @@ Object representing a polyline or polygon as Geodesic
 
             //options for L.Polyline
             addInteractive          : true,
+            interactive             : false,
             addInteractiveLayerGroup: true,
             weight                  : 2,
             lineColorName           : "black",
@@ -73,6 +74,15 @@ Object representing a polyline or polygon as Geodesic
 
         },
 
+
+        /*****************************************************
+        TODO - getHtmlElements - used by leaflet-freeze to exclude elements from freezze
+        *****************************************************/
+        /*
+        getHtmlElements: function(){
+            return [this.editMarker, this.polylineList];
+        },
+        */
         /*****************************************************
         onAdd
         *****************************************************/
@@ -85,7 +95,6 @@ Object representing a polyline or polygon as Geodesic
             });
 
             this.update();
-            this._map.on('click', this._map_onClick, this );
 
             //Add a pane just under the pane with the polyline and put the editMarker there
             var paneName = this.editMarkerPaneName = 'under-overlay';
@@ -113,8 +122,8 @@ Object representing a polyline or polygon as Geodesic
         onRemove
         *****************************************************/
         onRemove: function(){
+            this.setInteractiveOff();
             L.Geodesic.prototype.onRemove.apply(this, arguments );
-            this._map.off('click', this._map_onClick, this );
         },
 
         /*****************************************************
@@ -162,15 +171,44 @@ Object representing a polyline or polygon as Geodesic
 
 
         /*****************************************************
-        onSetInteractive
+        beforeSetInteractive
+        Freez all other elements
         *****************************************************/
-/*
-        onSetInteractive: function( onSetInteractive ){
+        beforeSetInteractive: function( beforeSetInteractive ){
             return function( on ){
-                onSetInteractive.call( this, on );
+                if (on){
+                    this._map.freeze({
+                        allowZoomAndPan : true,  //If true zoom and pan is allowed
+                        disableMapEvents: '',    //Names of events on the map to be disabled
+                        hideControls    : false, //If true all leaflet-controls are hidden
+                        hidePopups      : true,  //If true all open popups are closed on freeze
+                        //beforeFreeze    : function(map, options) (optional) to be called before the freezing
+                        //afterThaw       : function(map, options) (optional) to be called after the thawing
+                        //dontFreeze      : this  //leaflet-object, html-element or array of ditto with element or "leaflet-owner" no to be frozen
+                    });
+
+                    this._map.on('click', this._map_onClick, this );
+                }
+                beforeSetInteractive.call( this, on );
+                return this;
             };
-        }( L.Geodesic.prototype.onSetInteractive ),
-*/
+        }( L.Geodesic.prototype.beforeSetInteractive ),
+
+        /*****************************************************
+        afterSetInteractive
+        Thaw all other elements
+        *****************************************************/
+        afterSetInteractive: function( afterSetInteractive ){
+            return function( on ){
+                if (!on){
+                    this._map.thaw();
+                    this._map.off('click', this._map_onClick, this );
+                }
+
+                afterSetInteractive.call( this, on );
+                return this;
+            };
+        }( L.Geodesic.prototype.afterSetInteractive ),
 
         /*****************************************************
         setBorderColor
@@ -336,18 +374,18 @@ Object representing a polyline or polygon as Geodesic
         },
 
         /*****************************************************
-        onSetInteractive
+        afterSetInteractive
         *****************************************************/
-        onSetInteractive: function( onSetInteractive ){
+        afterSetInteractive: function( afterSetInteractive ){
             return function( on ){
-                onSetInteractive.call( this, on );
+                afterSetInteractive.call( this, on );
                 if (on)
                     this.backup();
                 var pane = this._map && this.vesselMarkerPaneName ? this._map.getPane(this.vesselMarkerPaneName) : null;
                 if (pane)
                     $(pane).css('z-index', this.vesselPaneZIndex + (on ? 0 : 2 ));
             };
-        }( L.GeoPolyline.prototype.onSetInteractive ),
+        }( L.GeoPolyline.prototype.afterSetInteractive ),
 
         /*****************************************************
         _updateVesselIndex

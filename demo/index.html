@@ -35,37 +35,52 @@
     window.bsIsTouch = false;
     window.bsIsTouch = (window.location.search =='?touch');
 
-		$(function() {
-            i18next.init();
-            i18next.changeLanguage('en');
+//HER		$(function() {
+    i18next.init();
+    i18next.changeLanguage('en');
 
-            var map = L.map('map', {
+    var map = L.map('map', {
                 drawControl: false,
                 noWrap: true,
                 maxZoom: 18,
                 minZoom: 3
             }).setView([37.77, 22.43], 6);
 
-            L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {noWrap: false, minZoom: 3, maxZoom: 18,attribution: '&copy; <a href="http://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors</a>'}).addTo(map);
+    L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {noWrap: false, minZoom: 3, maxZoom: 18,attribution: '&copy; <a href="http://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors</a>'}).addTo(map);
 
-$(map._container)
+    $(map._container)
     .removeClass('leaflet-grab')
 
-var latlngs = [
-        [37.77, 22.43],
-        [34.04, 18.2],
-        [40.78, 3.91],
-        [41.83, 7.62],
-        [32.76, 6.72]
-];
-var latlngs2 = [
-    [45.51, -122.68],
-    [40.78, -73.91],
-     [32.76, -96.72]
-];
 
 
-var route = new L.Route({
+    var polygon = L.polygon([[34.5, 1+10.5], [37,2+12], [36,14]], {
+           colorName: 'green',
+           borderColorName: 'black',
+           border: true,
+           shadow: true,
+           shadowWidth: 10,
+           hover: true,
+           transparent: true,
+           shadowWhenPopupOpen: true,
+           shadowWhenInteractive: true,
+           addInteractive: true,
+           interactive: true,
+           onSetInteractive: function( on ){ console.log( 'polygon is ' + (on ? 'ACTIVE' : 'INactive')); }
+        }).addTo(map);
+        polygon.bindTooltip('Tooltip2')
+        polygon.bindPopup('Popup2')
+
+
+
+    var latlngs = [
+            [37.77, 22.43],
+            [34.04, 18.2],
+            [40.78, 3.91],
+            [41.83, 7.62],
+            [32.76, 6.72]
+        ];
+
+    var route = new L.Route({
         list: latlngs,
         isPolygon: false,
         lineColorName: 'red',
@@ -83,71 +98,68 @@ var route = new L.Route({
         }
     });
 
-route.addVessel(1000*1000, {color: "red", shape: 'airplane'});
-var pinkBoat = route.addVessel(2000*1000, {color: "pink", shape: 'boat'});
-var greenPlaneIndex;
-route.addVessel(3000*1000, {color: "yellow", shape: 'airplane'});
-
-route.addTo(map);
-
-L.control.bsButton({text:'Rediger v. 1', onClick: function(){
-    route.setInteractiveOn();
-}}).addTo(map);
-
-L.control.bsButton({text:'OK (Stop redigering)', onClick: function(){
-    route.setInteractiveOff();
-}}).addTo(map);
-
-L.control.bsButton({text:'Cancel (Afbryd redigering)', onClick: function(){
-    route.setInteractiveOff();
-    route.restore();
-}}).addTo(map);
-
-L.control.bsButton({text:'Skift polygon', onClick: function(){
-    route.setPolygon();
-}}).addTo(map);
-
-L.control.bsButton({text:'Skift rhumb', onClick: function(){
-    route.setRhumb();
-}}).addTo(map);
-
-L.control.bsButton({text:'Add to map', onClick: function(){
-    route.addTo(map);
-}}).addTo(map);
-
-L.control.bsButton({text:'Remove from map', onClick: function(){
-    route.remove();
-}}).addTo(map);
-
-L.control.bsButton({text:'Add 35,20', onClick: function(){
-    route.appendLatLng([35,20]);
-}}).addTo(map);
+    route.addVessel(1000*1000, {color: "red", shape: 'airplane'});
+    var pinkBoat = route.addVessel(2000*1000, {color: "pink", shape: 'boat'});
+    var greenPlaneIndex;
+    route.addVessel(3000*1000, {color: "yellow", shape: 'airplane'});
 
 
-L.control.bsButton({text:'Pink boat + 100km', onClick: function(){
-    pinkBoat = route.vesselList[1];
-    pinkBoat.distance = pinkBoat.distance + 100*1000;
-    pinkBoat.update();
-}}).addTo(map);
-L.control.bsButton({text:'Pink boat - 100km', onClick: function(){
-    pinkBoat = route.vesselList[1];
-    pinkBoat.distance = pinkBoat.distance - 100*1000;
-    pinkBoat.update();
-}}).addTo(map);
+    L.control.bsButton({text:'Rediger v. 1', onClick: function(){
+        route.setInteractiveOn();
+    }}).addTo(map);
+
+    L.control.bsButton({text:'OK (Stop redigering)', onClick: function(){
+        route.setInteractiveOff();
+    }}).addTo(map);
+
+    L.control.bsButton({text:'Cancel (Afbryd redigering)', onClick: function(){
+        route.setInteractiveOff();
+        route.restore();
+    }}).addTo(map);
+
+    L.control.bsButton({text:'Skift polygon', onClick: function(){
+        route.setPolygon();
+    }}).addTo(map);
+
+    L.control.bsButton({text:'Skift rhumb', onClick: function(){
+        route.setRhumb();
+    }}).addTo(map);
+
+    L.control.bsButton({text:'Add to map', onClick: function(){
+        route.addTo(map);
+    }}).addTo(map);
+
+    L.control.bsButton({text:'Remove from map', onClick: function(){
+        route.remove();
+    }}).addTo(map);
+
+    L.control.bsButton({text:'Add 35,20', onClick: function(){
+        route.appendLatLng([35,20]);
+    }}).addTo(map);
 
 
-L.control.bsButton({text:'Add green airplane', onClick: function(){
-    greenPlaneIndex = route.addVessel(2500*1000, {color: "green", shape: 'airplane'});
-}}).addTo(map);
+    L.control.bsButton({text:'Pink boat + 100km', onClick: function(){
+        pinkBoat = route.vesselList[1];
+        pinkBoat.distance = pinkBoat.distance + 100*1000;
+        pinkBoat.update();
+    }}).addTo(map);
 
-L.control.bsButton({text:'Remove green airplane', onClick: function(){
-    route.removeVessel(greenPlaneIndex);
-}}).addTo(map);
+    L.control.bsButton({text:'Pink boat - 100km', onClick: function(){
+        pinkBoat = route.vesselList[1];
+        pinkBoat.distance = pinkBoat.distance - 100*1000;
+        pinkBoat.update();
+    }}).addTo(map);
 
 
+    L.control.bsButton({text:'Add green airplane', onClick: function(){
+        greenPlaneIndex = route.addVessel(2500*1000, {color: "green", shape: 'airplane'});
+    }}).addTo(map);
 
+    L.control.bsButton({text:'Remove green airplane', onClick: function(){
+        route.removeVessel(greenPlaneIndex);
+    }}).addTo(map);
 
-});
+//});
 
     </script>
 </body>
