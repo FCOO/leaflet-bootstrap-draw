@@ -8,7 +8,7 @@ Object representing a marker on a geopolyline
 
     /******************************************************************
     NOTE
-    Due to a bug in Chrome the edit-mrker and tooltips are only added on
+    Due to a bug in Chrome the edit-marker and tooltips are not added on
     mobile devices.
     The bug make Chrome fire mouseover on touch devices leaving the tooltip 'hanging'
     because no mouseout is fired
