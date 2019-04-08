@@ -52,7 +52,6 @@
     .removeClass('leaflet-grab')
 
 
-
     var polygon = L.polygon([[34.5, 1+10.5], [37,2+12], [36,14]], {
            colorName: 'green',
            borderColorName: 'black',
@@ -83,8 +82,8 @@
     var route = new L.Route({
         list: latlngs,
         isPolygon: false,
-        lineColorName: 'red',
-        //borderColorName: 'yellow',
+        lineColorName: 'blue',
+
         onUpdate: function( list, currentPoint ){
             //console.log(list.getDistance());
         },

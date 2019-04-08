@@ -44,6 +44,7 @@ Object representing a polyline or polygon as Geodesic
         initialize
         *****************************************************/
         initialize: function(options){
+
             options = L.setOptions(this, options );
 
             options.addInteractive = true;
@@ -59,7 +60,8 @@ Object representing a polyline or polygon as Geodesic
                 onUpdate        : $.proxy(this.update, this)
             }, this);
 
-            this.bindTooltip(this.options.tooltip);
+            if (!L.Browser.mobile)
+                this.bindTooltip(this.options.tooltip);
 
             this.editMarker = null; //Created on add to map
 
@@ -108,8 +110,9 @@ Object representing a polyline or polygon as Geodesic
                 });
             }
 
-            if (this.options.addInteractive && !this.editMarker){
+            if (!L.Browser.mobile && this.options.addInteractive && !this.editMarker){
                 this.editMarker = new L.LatLngEditMarker([0,0], {pane: paneName}, this);
+
                 this.editMarker.$icon.addClass('hide-for-leaflet-dragging');
                 this.editMarker.setOpacity(0);
 
@@ -508,11 +511,11 @@ Object representing a polyline or polygon as Geodesic
             L.GeoPolyline.prototype.updatePolyline.apply(this, arguments );
 
             //Set colors of first and last marker
-            this.latLngPointMarkerList.lastPoint.marker.setColor( this.options.isPolygon ? null : 'danger');
+            this.latLngPointMarkerList.lastPoint.setColor(this.options.isPolygon ? 'white' : 'danger');
 
             if (this.latLngPointMarkerList.lastPoint.prevPoint)
-                this.latLngPointMarkerList.lastPoint.prevPoint.marker.setColor();
-            this.latLngPointMarkerList.firstPoint.marker.setColor('success');
+                this.latLngPointMarkerList.lastPoint.prevPoint.setColor('white');
+            this.latLngPointMarkerList.firstPoint.setColor('success');
 
             //Update vessels
             this.updateVesselList();

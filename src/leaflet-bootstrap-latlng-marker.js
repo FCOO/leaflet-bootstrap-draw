@@ -7,26 +7,42 @@ Object representing a marker on a geopolyline
     "use strict";
 
     /******************************************************************
+    NOTE
+    Due to a bug in Chrome the edit-mrker and tooltips are only added on
+    mobile devices.
+    The bug make Chrome fire mouseover on touch devices leaving the tooltip 'hanging'
+    because no mouseout is fired
+    ******************************************************************/
+
+
+    /*****************************************************************
     *******************************************************************
     L.LatLngMarker     = Marker for points in GeoPolyline
     L.LatLngEditMarker = Marker for hover over line segment
     *******************************************************************
     ******************************************************************/
-    L.LatLngMarker = L.BsMarker.extend({
+    L.LatLngMarker = L.BsMarkerCircle.extend({
         options: {
             draggable       : true,
+            size            : 'sm',
             colorName       : 'white',
-            bigIconWhenTouch: true,
+            round           : true,
+            useTouchSize    : true,
             hover           : true,
             thickBorder     : true,
 
-            tooltip  : {
+            tooltip  : L.Browser.mobile ? null : {
                 da:'Træk for at ændre, klik for at fjerne',
                 en:'Drag to change, click to remove'
             },
             tooltipHideWhenDragging : true,
             tooltipHideWhenPopupOpen: true
 
+        },
+
+        initialize: function(latLng, options){
+            L.BsMarkerCircle.prototype.initialize.call(this, latLng, options);
+            this.updateIcon();
         }
     });
 
@@ -78,7 +94,6 @@ Object representing a marker on a geopolyline
         initialize: function( latLng, latLngPointlist ){
             L.LatLngPoint.prototype.initialize.call(this, latLng, latLngPointlist);
             this.marker = new L.LatLngMarker(latLng);
-
             this.marker.on('dragstart', this.onDragstart, this);
 
             this.marker.on('drag',      this.onDrag,      this);
