@@ -102,59 +102,59 @@
     var greenPlaneIndex;
     route.addVessel(3000*1000, {color: "yellow", shape: 'airplane'});
 
-
-    L.control.bsButton({text:'Rediger v. 1', onClick: function(){
+    
+    L.control.bsButton({text:'Rediger v. 1', square: false, onClick: function(){
         route.setInteractiveOn();
     }}).addTo(map);
 
-    L.control.bsButton({text:'OK (Stop redigering)', onClick: function(){
+    L.control.bsButton({text:'OK (Stop redigering)', square: false, onClick: function(){
         route.setInteractiveOff();
     }}).addTo(map);
 
-    L.control.bsButton({text:'Cancel (Afbryd redigering)', onClick: function(){
+    L.control.bsButton({text:'Cancel (Afbryd redigering)', square: false, onClick: function(){
         route.setInteractiveOff();
         route.restore();
     }}).addTo(map);
 
-    L.control.bsButton({text:'Skift polygon', onClick: function(){
+    L.control.bsButton({text:'Skift polygon', square: false, onClick: function(){
         route.setPolygon();
     }}).addTo(map);
 
-    L.control.bsButton({text:'Skift rhumb', onClick: function(){
+    L.control.bsButton({text:'Skift rhumb', square: false, onClick: function(){
         route.setRhumb();
     }}).addTo(map);
 
-    L.control.bsButton({text:'Add to map', onClick: function(){
+    L.control.bsButton({text:'Add to map', square: false, onClick: function(){
         route.addTo(map);
     }}).addTo(map);
 
-    L.control.bsButton({text:'Remove from map', onClick: function(){
+    L.control.bsButton({text:'Remove from map', square: false, onClick: function(){
         route.remove();
     }}).addTo(map);
 
-    L.control.bsButton({text:'Add 35,20', onClick: function(){
+    L.control.bsButton({text:'Add 35,20', square: false, onClick: function(){
         route.appendLatLng([35,20]);
     }}).addTo(map);
 
 
-    L.control.bsButton({text:'Pink boat + 100km', onClick: function(){
+    L.control.bsButton({text:'Pink boat + 100km', square: false, onClick: function(){
         pinkBoat = route.vesselList[1];
         pinkBoat.distance = pinkBoat.distance + 100*1000;
         pinkBoat.update();
     }}).addTo(map);
 
-    L.control.bsButton({text:'Pink boat - 100km', onClick: function(){
+    L.control.bsButton({text:'Pink boat - 100km', square: false, onClick: function(){
         pinkBoat = route.vesselList[1];
         pinkBoat.distance = pinkBoat.distance - 100*1000;
         pinkBoat.update();
     }}).addTo(map);
 
 
-    L.control.bsButton({text:'Add green airplane', onClick: function(){
+    L.control.bsButton({text:'Add green airplane', square: false, onClick: function(){
         greenPlaneIndex = route.addVessel(2500*1000, {color: "green", shape: 'airplane'});
     }}).addTo(map);
 
-    L.control.bsButton({text:'Remove green airplane', onClick: function(){
+    L.control.bsButton({text:'Remove green airplane', square: false, onClick: function(){
         route.removeVessel(greenPlaneIndex);
     }}).addTo(map);
 
