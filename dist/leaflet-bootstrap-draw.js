@@ -1,4 +1,208 @@
 /****************************************************************************
+leaflet-bootstrap-draw-route.js
+
+L.Route - Extend L.GeoPolyline with vessels (L.VesselMarker)
+
+****************************************************************************/
+(function ($, L/*, window, document, undefined*/) {
+    "use strict";
+
+    L.Route = L.GeoPolyline.extend({
+        /*****************************************************
+        initialize
+        *****************************************************/
+        initialize: function(options){
+            L.GeoPolyline.prototype.initialize.call(this, options );
+            this.options.vesselPane = this.id+'VesselPane';
+
+            this.vesselList = [];
+        },
+
+        /*****************************************************
+        addTo
+        *****************************************************/
+        addTo: function(map){
+            //Get/create pane for all vessels
+            this.$vesselPane = $(map._createSubMarkerPane(this.options.vesselPane, this.zIndex + 1));
+            this.$vesselPane.css('pointer-events', 'none');
+
+            return L.GeoPolyline.prototype.addTo.apply(this, arguments );
+        },
+
+
+        /*****************************************************
+        beforeSetInteractive
+        *****************************************************/
+        beforeSetInteractive: function( beforeSetInteractive ){
+            return function( on ){
+                beforeSetInteractive.call( this, on );
+                if (on){
+                    //Move vesselPane below pane with polyline
+                    this.$vesselPane
+                        .detach()
+                        .css('z-index', this.index)
+                        .appendTo( this._map.geoPolylineEdit_Pane );
+
+                }
+            };
+        }( L.GeoPolyline.prototype.beforeSetInteractive ),
+
+        /*****************************************************
+        afterSetInteractive
+        *****************************************************/
+        afterSetInteractive: function( afterSetInteractive ){
+            return function( on ){
+                afterSetInteractive.call( this, on );
+                if (on)
+                    this.backup();
+                else
+                    //Move vessel-pane back
+                    this.$vesselPane
+                        .detach()
+                        .css('z-index', this.zIndex + 1)
+                        .appendTo( this._map.getPane('markerPane') );
+            };
+        }( L.GeoPolyline.prototype.afterSetInteractive ),
+
+        /*****************************************************
+        _updateVesselIndex
+        *****************************************************/
+        _updateVesselIndex: function() {
+            $.each( this.vesselList, function(index, vessel){
+                vessel.index = index;
+            });
+        },
+
+        /*****************************************************
+        addVessel
+        *****************************************************/
+        addVessel: function( distance, options ){
+            var vessel = new L.LatLngDistancePointVessel( distance, this.latLngPointMarkerList, options  );
+            vessel.options = options;
+            this.vesselList.push( vessel );
+            this._updateVesselIndex();
+
+            if (this.vesselMarkerLayerGroup)
+                vessel.addToLayerGroup(this.vesselMarkerLayerGroup, this.options.vesselPane);
+            vessel.update();
+            return vessel;
+        },
+
+        /*****************************************************
+        removeVessel
+        *****************************************************/
+        removeVessel: function( indexOrVessel ){
+            var index = typeof indexOrVessel == 'number' ? indexOrVessel : indexOrVessel.index,
+                vessel = this.vesselList[index];
+
+            this.vesselList.splice(index, 1);
+            this.updateVesselList();
+            vessel.remove();
+        },
+
+        /*****************************************************
+        onAdd
+        *****************************************************/
+        onAdd: function(){
+            L.GeoPolyline.prototype.onAdd.apply(this, arguments );
+
+            var _this = this;
+
+            //Create layerGroup for vessels
+            if (!this.vesselMarkerLayerGroup)
+                this.vesselMarkerLayerGroup = L.layerGroup();
+            this.vesselMarkerLayerGroup.addTo(this._map);
+
+            $.each( this.vesselList, function(index, vessel){
+                vessel.addToLayerGroup(_this.vesselMarkerLayerGroup, _this.options.vesselPane);
+            });
+        },
+
+        /*****************************************************
+        onRemove
+        *****************************************************/
+        onRemove: function(){
+            L.GeoPolyline.prototype.onRemove.apply(this, arguments );
+
+            //Remove vessels
+            this.vesselMarkerLayerGroup.remove();
+        },
+
+        /*****************************************************
+        updateVesselList
+        *****************************************************/
+        updateVesselList: function(){
+            $.each( this.vesselList, function(index, vessel){
+                vessel.update();
+            });
+        },
+
+
+        /*****************************************************
+        onBackup
+        *****************************************************/
+        onBackup: function( backupObj ){
+            backupObj.vesselList = this.vesselList.slice();
+        },
+
+        /*****************************************************
+        onRestore
+        *****************************************************/
+        onRestore: function( backupObj ){
+            //Remove current vessels
+            $.each( this.vesselList, function( index, vessel ){
+                vessel.remove();
+            });
+            this.vesselList = [];
+
+            //Restore vesselList
+            var _this = this;
+            $.each( backupObj.vesselList, function( dummy, vessel ){
+                _this.addVessel( vessel.distance, vessel.marker.options );
+            });
+            this.updateVesselList();
+        },
+
+        /*****************************************************
+        updatePolyline
+        *****************************************************/
+        updatePolyline: function(){
+            L.GeoPolyline.prototype.updatePolyline.apply(this, arguments );
+
+            //Set colors of first and last marker
+            this.latLngPointMarkerList.lastPoint.setColor(this.options.isPolygon ? 'white' : 'danger');
+
+            if (this.latLngPointMarkerList.lastPoint.prevPoint)
+                this.latLngPointMarkerList.lastPoint.prevPoint.setColor('white');
+            this.latLngPointMarkerList.firstPoint.setColor('success');
+
+            //Update vessels
+            this.updateVesselList();
+
+        },
+
+        /*****************************************************
+        onSetAsCurrentOn, onSetAsCurrentOff
+        Called by the map when the geoPolyline is set on/off as
+        current geoPolyline
+        *****************************************************/
+        onSetAsCurrentOn: function(){
+            this.$vesselPane.css('z-index', 1);
+            return L.GeoPolyline.prototype.onSetAsCurrentOn.apply(this, arguments );
+        },
+        onSetAsCurrentOff: function(){
+            this.$vesselPane.css('z-index', 0);
+            return L.GeoPolyline.prototype.onSetAsCurrentOff.apply(this, arguments );
+        },
+
+
+
+    });
+
+
+}(jQuery, L, this, document));
+;
+/****************************************************************************
     leaflet-bootstrap-draw.js,
 
     (c) 2018, FCOO
@@ -23,7 +227,7 @@
 
     //Default options
         options: {
-            VERSION: "2.0.3"
+            VERSION: "2.1.0"
 
         },
 
@@ -91,11 +295,90 @@ Object representing a polyline or polygon as Geodesic
 (function ($, L, window, document, undefined) {
     "use strict";
 
+    //Default z-index for L.GeoPolyline
+    window.L_GEOPOLYLINE_ZINDEX = 100;
+
+    var geoPolylineEdit_Pane       = 'geoPolylineEdit',
+        geoPolylineEdit_MarkerPane = 'geoPolylineEdit_Marker';
+
+    //Create a pane and markerPane above 'normal' markerPane to be used when a L.GeoPolyline is been edited
+    L.Map.addInitHook(function () {
+        this.interactiveGeoPolylines = 0;
+        this.geoPolylines = {};
+
+        var markerPane_zIndex = parseInt( $(this.getPane('markerPane')).css('z-index') );
+
+        this.geoPolylineEdit_Pane = this.createPane(geoPolylineEdit_Pane);
+        $(this.geoPolylineEdit_Pane).css({
+            'pointer-events': 'none',
+            'z-index'       : parseInt(markerPane_zIndex) + 1
+        });
+        this.geoPolylineEdit_MarkerPane = this.createPane(geoPolylineEdit_MarkerPane);
+        $(this.geoPolylineEdit_MarkerPane).css({
+            'pointer-events': 'none',
+            'z-index'       : parseInt(markerPane_zIndex) + 1 + 20
+        });
+
+        this.on('click', this._onClick_geoPolyline, this);
+
+    });
+
+    L.Map.include({
+        /***********************************************************
+        Map.createSubPane - Creates a new pane under the main pane
+        ***********************************************************/
+        _createSubPane: function(name, parentPaneName, zIndex, classNames=''){
+            var newPane = this.getPane(name);
+            if (!newPane){
+                var parentPane = this.getPane(parentPaneName) || this.getPane(parentPaneName+'Pane');
+                newPane = this.createPane(name, parentPane);
+                newPane.style.zIndex = zIndex;
+                $(newPane).addClass(classNames);
+            }
+            return newPane;
+        },
+
+        _createSubMarkerPane: function(name, zIndex, classNames=''){
+            return this._createSubPane(name, 'markerPane', zIndex, classNames);
+        },
+
+        _createSubOverlayPane: function(name, zIndex, classNames=''){
+            return this._createSubPane(name, 'overlayPane', zIndex, classNames);
+        },
+
+        /***********************************************************
+        Map._currentGeoPolyline = the L.GeoPolyline having 'focus'
+        Map._setCurrentGeoPolyline( geoPolyline ) - Sets and update the current
+        ***********************************************************/
+        _setCurrentGeoPolyline: function( geoPolyline ) {
+            if (this._currentGeoPolyline === geoPolyline)
+                return;
+            if (this._currentGeoPolyline)
+                this._currentGeoPolyline.onSetAsCurrentOff();
+            this._currentGeoPolyline = geoPolyline;
+            if (this._currentGeoPolyline)
+                this._currentGeoPolyline.onSetAsCurrentOn();
+        },
+
+        /***********************************************************
+        ***********************************************************/
+        _onClick_geoPolyline: function(mouseEvent){
+            if (this._currentGeoPolyline)
+                this._currentGeoPolyline._map_onClick(mouseEvent);
+            else {
+//MANGLER - find nærmeste geoPolyline (if any)
+            }
+        }
+
+    });
+
+
     /******************************************************************
     *******************************************************************
     L.GeoPolyline
     *******************************************************************
     ******************************************************************/
+    var geoPolylineCount = 0;
     L.GeoPolyline = L.Geodesic.extend({
         options: {
             //options for leaflet-bootstrap
@@ -123,17 +406,26 @@ Object representing a polyline or polygon as Geodesic
             //options for GeoPolyline
             isPolygon       : false,
             isRhumb         : true,
+
+            //options for edit-marker = marker on line when mouse is oer to mark "Add new point"
+            hasEditMarker : true
         },
 
         /*****************************************************
         initialize
         *****************************************************/
         initialize: function(options){
+            this.index = geoPolylineCount++;
+            this.id = 'geopolyline' + this.index;
+            this.zIndex = this.options.zIndex || window.L_GEOPOLYLINE_ZINDEX + 10*this.index;
 
             options = L.setOptions(this, options );
 
             options.addInteractive = true;
             options.events = options.events || {};
+
+            options.pane = this.id+'Pane';
+            options.markerPane = this.id+'MarkerPane';
 
             L.Geodesic.prototype.initialize.call(this, [[]], options );
 
@@ -171,46 +463,59 @@ Object representing a polyline or polygon as Geodesic
         },
         */
         /*****************************************************
+        addTo
+        *****************************************************/
+        addTo: function(map){
+            //Get/create all panes
+            this.$pane = $(map._createSubOverlayPane(this.options.pane, this.zIndex));
+            this.$markerPane = $(map._createSubMarkerPane(this.options.markerPane, this.zIndex));
+
+            map.geoPolylines[this.id] = this;
+
+            return L.Geodesic.prototype.addTo.apply(this, arguments );
+        },
+
+        /*****************************************************
         onAdd
         *****************************************************/
-        onAdd: function(){
+        onAdd: function(map){
+            var _this = this;
+
+            this.isInteractive = false;
+
             L.Geodesic.prototype.onAdd.apply(this, arguments );
 
-            var _this = this;
             $.each( this.latLngPointMarkerList.list, function(index, latLngPointMarker){
-                latLngPointMarker.addToLayerGroup(_this.interactiveLayerGroup);
+                latLngPointMarker.addToLayerGroup(_this.interactiveLayerGroup, _this.options.markerPane);
             });
 
             this.update();
 
-            //Add a pane just under the pane with the polyline and put the editMarker there
-            var paneName = this.editMarkerPaneName = 'under-overlay';
-            if (!this._map.getPane(paneName)){
-                this._map.createPane(paneName);
-                //Get z-index from the pane where the polylines are in
-                var zIndex = parseInt( $(this._map.getPane('overlayPane')).css('z-index') );
-                $(this._map.getPane(paneName)).css({
-                    'pointer-events': 'none',
-                    'z-index': zIndex-1
-                });
-            }
+            //Add a edit-marker to the edit-pane in its own pane (not edit-marker-pane) just below the polyline
+            if (!L.Browser.mobile && this.options.hasEditMarker && this.options.addInteractive && !this.editMarker){
+                var paneName = this.options.pane + '_editMarker';
+                this.editMarkerPane = map._createSubPane(paneName, this.options.pane, 1);
+                $(this.editMarkerPane).css('pointer-events', 'none');
 
-            if (!L.Browser.mobile && this.options.addInteractive && !this.editMarker){
                 this.editMarker = new L.LatLngEditMarker([0,0], {pane: paneName}, this);
+                this.editMarker.$icon
+                    .css('z-index', this.zIndex-1)
+                    .addClass('hide-for-leaflet-dragging');
 
-                this.editMarker.$icon.addClass('hide-for-leaflet-dragging');
-                this.editMarker.setOpacity(0);
-
-                this.interactiveLayerGroup.addLayer( this.editMarker );
+                this.editMarker.addTo(map);
             }
+
+            this.setZIndex();
 
         },
 
         /*****************************************************
         onRemove
         *****************************************************/
-        onRemove: function(){
+        onRemove: function(map){
             this.setInteractiveOff();
+            delete map.geoPolylines[this.id];
+            map._setCurrentGeoPolyline(null);
             L.Geodesic.prototype.onRemove.apply(this, arguments );
         },
 
@@ -262,20 +567,29 @@ Object representing a polyline or polygon as Geodesic
         beforeSetInteractive
         Freez all other elements
         *****************************************************/
-        beforeSetInteractive: function( beforeSetInteractive ){
+        XX_beforeSetInteractive: function( beforeSetInteractive ){
             return function( on ){
                 if (on){
-                    this._map.freeze({
-                        allowZoomAndPan : true,  //If true zoom and pan is allowed
-                        disableMapEvents: '',    //Names of events on the map to be disabled
-                        hideControls    : false, //If true all leaflet-controls are hidden
-                        hidePopups      : true,  //If true all open popups are closed on freeze
-                        //beforeFreeze    : function(map, options) (optional) to be called before the freezing
-                        //afterThaw       : function(map, options) (optional) to be called after the thawing
-                        //dontFreeze      : this  //leaflet-object, html-element or array of ditto with element or "leaflet-owner" no to be frozen
-                    });
+                    if (!this._map.interactiveGeoPolylines)
+                        //First time
+                        this._map.freeze({
+                            allowZoomAndPan : true,  //If true zoom and pan is allowed
+                            disableMapEvents: '',    //Names of events on the map to be disabled
+                            hideControls    : false, //If true all leaflet-controls are hidden
+                            hidePopups      : true,  //If true all open popups are closed on freeze
+                            //beforeFreeze    : function(map, options) (optional) to be called before the freezing
+                            //afterThaw       : function(map, options) (optional) to be called after the thawing
+                            //dontFreeze      : this  //leaflet-object, html-element or array of ditto with element or "leaflet-owner" no to be frozen
+                        });
 
-                    this._map.on('click', this._map_onClick, this );
+                    this._map.interactiveGeoPolylines++;
+
+                    //Move all panes into map.geoPolylineEdit_Pane/map.geoPolylineEdit_MarkerPane and adjust z-index to have marker above lines
+                    this.$pane.detach().appendTo(this._map.geoPolylineEdit_Pane);
+                    this.$markerPane.detach().appendTo(this._map.geoPolylineEdit_MarkerPane);
+
+                    this._map._setCurrentGeoPolyline(this);
+
                 }
                 beforeSetInteractive.call( this, on );
                 return this;
@@ -286,17 +600,49 @@ Object representing a polyline or polygon as Geodesic
         afterSetInteractive
         Thaw all other elements
         *****************************************************/
-        afterSetInteractive: function( afterSetInteractive ){
+        XX_afterSetInteractive: function( afterSetInteractive ){
             return function( on ){
                 if (!on){
-                    this._map.thaw();
-                    this._map.off('click', this._map_onClick, this );
+                    this._map.interactiveGeoPolylines--;
+
+                    if (!this._map.interactiveGeoPolylines){
+                        this._map.thaw();
+                    }
+
+                    //Move all panes back into map.overlayPane and map.markerPane
+                    this.$pane.detach().appendTo( this._map.getPane('overlayPane') );
+                    this.$markerPane.detach().appendTo( this._map.getPane('markerPane') );
+
+                    this._map._setCurrentGeoPolyline(null);
+
                 }
 
                 afterSetInteractive.call( this, on );
                 return this;
             };
         }( L.Geodesic.prototype.afterSetInteractive ),
+
+
+        /*****************************************************
+        setAsCurrent
+        *****************************************************/
+        setAsCurrent: function(){
+            this._map._setCurrentGeoPolyline(this);
+        },
+
+
+        /*****************************************************
+        onSetAsCurrentOn, onSetAsCurrentOff
+        Called by the map when the geoPolyline is set on/off as
+        current geoPolyline
+        *****************************************************/
+        onSetAsCurrentOn: function(){
+            this.setZIndexOffset(1000);
+        },
+        onSetAsCurrentOff: function(){
+            this.setZIndexOffset(0);
+        },
+
 
         /*****************************************************
         setBorderColor
@@ -332,14 +678,41 @@ Object representing a polyline or polygon as Geodesic
         setPolygon: function(isPolygon){ this._setAny('isPolygon', isPolygon); },
         setRhumb  : function(isRhumb)  { this._setAny('isRhumb'  , isRhumb  ); },
 
+
+        /*****************************************************
+        setZIndex
+        *****************************************************/
+        setZIndex: function(zIndex){
+            return this._setZIndex(zIndex);
+        },
+
+        /*****************************************************
+        setZIndexOffset
+        *****************************************************/
+        setZIndexOffset: function(zIndexOffset = 0){
+            return this._setZIndex(this.zIndex + zIndexOffset);
+        },
+
+        _setZIndex: function(zIndex = this.zIndex){
+            this.$pane.css('z-index', zIndex);
+            this.$markerPane.css('z-index', zIndex);
+            return this;
+        },
+
+
         /*****************************************************
         update
         *****************************************************/
         update: function(){
             if (!this.latLngPointMarkerList || !this.latLngPointMarkerList.list.length) return;
+
             this.updatePolyline();
             if (this.options.onUpdate)
                 this.options.onUpdate(this.latLngPointMarkerList, this.latLngPointMarkerList.currentLatLngPoint);
+
+            if (this._map)
+                this._map._setCurrentGeoPolyline(this);
+
         },
 
         /*****************************************************
@@ -373,7 +746,7 @@ Object representing a polyline or polygon as Geodesic
         *******************************************************/
         insertLatLng: function( latLng, index ){
             var newPoint = this.latLngPointMarkerList.insert( latLng, index );
-            newPoint.addToLayerGroup(this.interactiveLayerGroup);
+            newPoint.addToLayerGroup(this.interactiveLayerGroup, this.options.markerPane);
             newPoint.setBorderColor( this.options.borderColorName );
 
             this.update();
@@ -445,169 +818,6 @@ Object representing a polyline or polygon as Geodesic
             }
         }
     });
-
-
-    /******************************************************************
-    *******************************************************************
-    L.Route - Extend L.GeoPolyline with vessels (L.VesselMarker)
-    *******************************************************************
-    ******************************************************************/
-    L.Route = L.GeoPolyline.extend({
-        /*****************************************************
-        initialize
-        *****************************************************/
-        initialize: function(options){
-            L.GeoPolyline.prototype.initialize.call(this, options );
-            this.vesselList = [];
-        },
-
-        /*****************************************************
-        afterSetInteractive
-        *****************************************************/
-        afterSetInteractive: function( afterSetInteractive ){
-            return function( on ){
-                afterSetInteractive.call( this, on );
-                if (on)
-                    this.backup();
-                var pane = this._map && this.vesselMarkerPaneName ? this._map.getPane(this.vesselMarkerPaneName) : null;
-                if (pane)
-                    $(pane).css('z-index', this.vesselPaneZIndex + (on ? 0 : 2 ));
-            };
-        }( L.GeoPolyline.prototype.afterSetInteractive ),
-
-        /*****************************************************
-        _updateVesselIndex
-        *****************************************************/
-        _updateVesselIndex: function() {
-            $.each( this.vesselList, function(index, vessel){
-                vessel.index = index;
-            });
-        },
-
-        /*****************************************************
-        addVessel
-        *****************************************************/
-        addVessel: function( distance, options ){
-            var vessel = new L.LatLngDistancePointVessel( distance, this.latLngPointMarkerList, options  );
-            vessel.options = options;
-            this.vesselList.push( vessel );
-            this._updateVesselIndex();
-
-            if (this.vesselMarkerLayerGroup && this.vesselMarkerPaneName)
-                vessel.addToLayerGroup(this.vesselMarkerLayerGroup, this.vesselMarkerPaneName);
-            vessel.update();
-            return vessel;
-        },
-
-        /*****************************************************
-        removeVessel
-        *****************************************************/
-        removeVessel: function( indexOrVessel ){
-            var index = typeof indexOrVessel == 'number' ? indexOrVessel : indexOrVessel.index,
-                vessel = this.vesselList[index];
-
-            this.vesselList.splice(index, 1);
-            this.updateVesselList();
-            vessel.remove();
-        },
-
-        /*****************************************************
-        onAdd
-        *****************************************************/
-        onAdd: function(){
-            L.GeoPolyline.prototype.onAdd.apply(this, arguments );
-
-            var _this = this;
-
-            //Create pane and layerGroup for vessels TODO MANGLER
-            //Add a pane just under the pane with the edit-marker and put the vessel-markers there
-            var paneName = this.vesselMarkerPaneName = 'route-vessel';
-
-            if (!this._map.getPane(paneName)){
-                this._map.createPane(paneName);
-                this.vesselPaneZIndex = parseInt( $(this._map.getPane(this.editMarkerPaneName)).css('z-index') ) - 1;
-
-                $(this._map.getPane(paneName)).css({
-                    'pointer-events': 'none',
-                    'z-index': this.vesselPaneZIndex
-                });
-            }
-
-            if (!this.vesselMarkerLayerGroup)
-                this.vesselMarkerLayerGroup = L.layerGroup();
-            this.vesselMarkerLayerGroup.addTo(this._map);
-
-            $.each( this.vesselList, function(index, vessel){
-                vessel.addToLayerGroup(_this.vesselMarkerLayerGroup, paneName);
-            });
-
-
-        },
-
-        /*****************************************************
-        onRemove
-        *****************************************************/
-        onRemove: function(){
-            L.GeoPolyline.prototype.onRemove.apply(this, arguments );
-
-            //Remove vessels
-            this.vesselMarkerLayerGroup.remove();
-        },
-
-        /*****************************************************
-        updateVesselList
-        *****************************************************/
-        updateVesselList: function(){
-            $.each( this.vesselList, function(index, vessel){
-                vessel.update();
-            });
-        },
-
-
-        /*****************************************************
-        onBackup
-        *****************************************************/
-        onBackup: function( backupObj ){
-            backupObj.vesselList = this.vesselList.slice();
-        },
-
-        /*****************************************************
-        onRestore
-        *****************************************************/
-        onRestore: function( backupObj ){
-            //Remove current vessels
-            $.each( this.vesselList, function( index, vessel ){
-                vessel.remove();
-            });
-            this.vesselList = [];
-
-            //Restore vesselList
-            var _this = this;
-            $.each( backupObj.vesselList, function( dummy, vessel ){
-                _this.addVessel( vessel.distance, vessel.marker.options );
-            });
-            this.updateVesselList();
-        },
-
-        /*****************************************************
-        updatePolyline
-        *****************************************************/
-        updatePolyline: function(){
-            L.GeoPolyline.prototype.updatePolyline.apply(this, arguments );
-
-            //Set colors of first and last marker
-            this.latLngPointMarkerList.lastPoint.setColor(this.options.isPolygon ? 'white' : 'danger');
-
-            if (this.latLngPointMarkerList.lastPoint.prevPoint)
-                this.latLngPointMarkerList.lastPoint.prevPoint.setColor('white');
-            this.latLngPointMarkerList.firstPoint.setColor('success');
-
-            //Update vessels
-            this.updateVesselList();
-
-        }
-    });
-
 
 }(jQuery, L, this, document));
 ;

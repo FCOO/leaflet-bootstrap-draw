@@ -14606,6 +14606,18 @@ Overwrite style for bootstrap-slider
   display: none !important; }
 
 /***********************************************
+leaflet-bootstrap-control-legend.scss
+************************************************/
+.modal-header.bsl-working .hide-for-bsl-working {
+  display: none !important; }
+
+.modal-header.no-bsl-working .show-for-bsl-working {
+  display: none !important; }
+
+.no-margin-left {
+  margin-left: 0 !important; }
+
+/***********************************************
 leaflet-bootstrap-contextmenu.scss
 ************************************************/
 .leaflet-popup-contextmenu .modal-content {
