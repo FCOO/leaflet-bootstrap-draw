@@ -227,7 +227,7 @@ L.Route - Extend L.GeoPolyline with vessels (L.VesselMarker)
 
     //Default options
         options: {
-            VERSION: "2.1.0"
+            VERSION: "3.0.0"
 
         },
 
@@ -303,7 +303,9 @@ Object representing a polyline or polygon as Geodesic
 
     //Create a pane and markerPane above 'normal' markerPane to be used when a L.GeoPolyline is been edited
     L.Map.addInitHook(function () {
-        this.interactiveGeoPolylines = 0;
+        this.editingGeoPolylines = 0;       //Nr of GeoPolylines that is being edited
+        this.editingGeoPolylinesFreeze = 0; //Nr of GeoPolylines that have 'frozen' the map while being edited
+
         this.geoPolylines = {};
 
         var markerPane_zIndex = parseInt( $(this.getPane('markerPane')).css('z-index') );
@@ -320,7 +322,6 @@ Object representing a polyline or polygon as Geodesic
         });
 
         this.on('click', this._onClick_geoPolyline, this);
-
     });
 
     L.Map.include({
@@ -366,7 +367,7 @@ Object representing a polyline or polygon as Geodesic
             if (this._currentGeoPolyline)
                 this._currentGeoPolyline._map_onClick(mouseEvent);
             else {
-//MANGLER - find nærmeste geoPolyline (if any)
+//MANGLER - find nærmeste geoPolyline (if any) med editNrOfPoints = true
             }
         }
 
@@ -382,7 +383,6 @@ Object representing a polyline or polygon as Geodesic
     L.GeoPolyline = L.Geodesic.extend({
         options: {
             //options for leaflet-bootstrap
-            tooltip: {da:'Klik for at tilføje', en:'Click to add'},
             tooltipHideWhenDragging : true,
             tooltipHideWhenPopupOpen: true,
 
@@ -393,33 +393,40 @@ Object representing a polyline or polygon as Geodesic
             //options for L.Polyline
             addInteractive          : true,
             interactive             : false,
-            addInteractiveLayerGroup: true,
+            addInteractiveLayerGroup: false,
             weight                  : 2,
             lineColorName           : "black",
-            shadowWhenInteractive   : true,
+            shadowWhenInteractive   : false,
 
             border          : true,
             shadow          : false,
-            hover           : false,
+            hover           : true,
             width           : 2,
 
             //options for GeoPolyline
             isPolygon       : false,
             isRhumb         : true,
 
-            //options for edit-marker = marker on line when mouse is oer to mark "Add new point"
-            hasEditMarker : true
+
+            editable      : true,   //If true the polygon can be edited
+            editNrOfPoints: true,   //If true new points can be added and old points can be deleted
+
+            freezeOnEdit  : false   //If true the map is "frozen" when the polygon is beeing edited.
         },
 
         /*****************************************************
         initialize
         *****************************************************/
         initialize: function(options){
+            options = L.setOptions(this, options );
+
+
             this.index = geoPolylineCount++;
             this.id = 'geopolyline' + this.index;
             this.zIndex = this.options.zIndex || window.L_GEOPOLYLINE_ZINDEX + 10*this.index;
 
-            options = L.setOptions(this, options );
+            if (!this.options.editable)
+                this.options.editNrOfPoints = false;
 
             options.addInteractive = true;
             options.events = options.events || {};
@@ -437,18 +444,19 @@ Object representing a polyline or polygon as Geodesic
                 onUpdate        : $.proxy(this.update, this)
             }, this);
 
-            if (!L.Browser.mobile)
+            if (!L.Browser.mobile && this.options.tooltip)
                 this.bindTooltip(this.options.tooltip);
 
             this.editMarker = null; //Created on add to map
 
-            this.on('mouseover', this.onMouseover, this );
-            this.on('mousemove', this.onMousemove, this );
-            this.on('mouseout',  this.onMouseout,  this );
-            this.on('click',     this.onClick,     this );
-
-            this.on('dragstart', this.onDragstart, this );
-
+            if (this.options.editable){
+                this.on('mouseover',    this.onMouseover,   this );
+                this.on('mousemove',    this.onMousemove,   this );
+                this.on('mouseout',     this.onMouseout,    this );
+                this.on('click',        this.onClick,       this );
+                this.on('contextmenu',  this.onContextmenu, this );
+                this.on('dragstart',    this.onDragstart,   this );
+            }
             return this;
 
         },
@@ -485,26 +493,29 @@ Object representing a polyline or polygon as Geodesic
 
             L.Geodesic.prototype.onAdd.apply(this, arguments );
 
-            $.each( this.latLngPointMarkerList.list, function(index, latLngPointMarker){
-                latLngPointMarker.addToLayerGroup(_this.interactiveLayerGroup, _this.options.markerPane);
-            });
+            //Create layerGroup to hold all points and add them
+            if (this.options.editable){
+                this.pointMarkerLayerGroup = L.layerGroup();
+                $.each( this.latLngPointMarkerList.list, function(index, latLngPointMarker){
+                    latLngPointMarker.addToLayerGroup(_this.pointMarkerLayerGroup, _this.options.markerPane);
+                });
 
-            this.update();
+                //Add a edit-marker to the edit-pane in its own pane (not edit-marker-pane) just below the polyline
+                if (!L.Browser.mobile && this.options.editNrOfPoints && !this.editMarker){
+                    var paneName = this.options.pane + '_editMarker';
+                    this.editMarkerPane = map._createSubPane(paneName, this.options.pane, 1);
+                    $(this.editMarkerPane).css('pointer-events', 'none');
 
-            //Add a edit-marker to the edit-pane in its own pane (not edit-marker-pane) just below the polyline
-            if (!L.Browser.mobile && this.options.hasEditMarker && this.options.addInteractive && !this.editMarker){
-                var paneName = this.options.pane + '_editMarker';
-                this.editMarkerPane = map._createSubPane(paneName, this.options.pane, 1);
-                $(this.editMarkerPane).css('pointer-events', 'none');
+                    this.editMarker = new L.LatLngEditMarker([0,0], {pane: paneName}, this);
+                    this.editMarker.$icon
+                        .css('z-index', this.zIndex-1)
+                        .addClass('hide-for-leaflet-dragging');
 
-                this.editMarker = new L.LatLngEditMarker([0,0], {pane: paneName}, this);
-                this.editMarker.$icon
-                    .css('z-index', this.zIndex-1)
-                    .addClass('hide-for-leaflet-dragging');
-
-                this.editMarker.addTo(map);
+                    this.editMarker.addTo(map);
+                }
             }
 
+            this.update();
             this.setZIndex();
 
         },
@@ -564,64 +575,142 @@ Object representing a polyline or polygon as Geodesic
 
 
         /*****************************************************
-        beforeSetInteractive
+        startEdit
         Freez all other elements
+        setInteractiveOff
         *****************************************************/
-        XX_beforeSetInteractive: function( beforeSetInteractive ){
-            return function( on ){
-                if (on){
-                    if (!this._map.interactiveGeoPolylines)
-                        //First time
-                        this._map.freeze({
-                            allowZoomAndPan : true,  //If true zoom and pan is allowed
-                            disableMapEvents: '',    //Names of events on the map to be disabled
-                            hideControls    : false, //If true all leaflet-controls are hidden
-                            hidePopups      : true,  //If true all open popups are closed on freeze
-                            //beforeFreeze    : function(map, options) (optional) to be called before the freezing
-                            //afterThaw       : function(map, options) (optional) to be called after the thawing
-                            //dontFreeze      : this  //leaflet-object, html-element or array of ditto with element or "leaflet-owner" no to be frozen
-                        });
+        startEdit: function(){
+            if (!this.options.editable || this.isEditing) return;
 
-                    this._map.interactiveGeoPolylines++;
 
-                    //Move all panes into map.geoPolylineEdit_Pane/map.geoPolylineEdit_MarkerPane and adjust z-index to have marker above lines
-                    this.$pane.detach().appendTo(this._map.geoPolylineEdit_Pane);
-                    this.$markerPane.detach().appendTo(this._map.geoPolylineEdit_MarkerPane);
+            //Freeze the map if it is the first time
+            if (this.options.freezeOnEdit){
+                if (!this._map.editingGeoPolylinesFreeze)
+                    //First time
+                    this._map.freeze({
+                        allowZoomAndPan : true,  //If true zoom and pan is allowed
+                        disableMapEvents: '',    //Names of events on the map to be disabled
+                        hideControls    : false, //If true all leaflet-controls are hidden
+                        hidePopups      : true,  //If true all open popups are closed on freeze
+                        //beforeFreeze    : function(map, options) (optional) to be called before the freezing
+                        //afterThaw       : function(map, options) (optional) to be called after the thawing
+                        //dontFreeze      : this  //leaflet-object, html-element or array of ditto with element or "leaflet-owner" no to be frozen
+                    });
+                this._map.editingGeoPolylinesFreeze++;
+            }
 
-                    this._map._setCurrentGeoPolyline(this);
 
-                }
-                beforeSetInteractive.call( this, on );
-                return this;
-            };
-        }( L.Geodesic.prototype.beforeSetInteractive ),
+            this._map.editingGeoPolylines++;
+
+            //Move all panes into map.geoPolylineEdit_Pane/map.geoPolylineEdit_MarkerPane and adjust z-index to have marker above lines
+            this.$pane.detach().appendTo(this._map.geoPolylineEdit_Pane);
+            this.$markerPane.detach().appendTo(this._map.geoPolylineEdit_MarkerPane);
+
+            if (this.pointMarkerLayerGroup)
+                this._map.addLayer(this.pointMarkerLayerGroup);
+
+
+            this._map._setCurrentGeoPolyline(this);
+
+
+            //Save tooltip, popup and unteractice-state and set dito for edit-mode
+            this.saveOptions = {};
+
+            //Tooltip
+            if (this.options.editNrOfPoints)
+                this.bindTooltip({da:'Klik for at tilføje', en:'Click to add'});
+
+
+            //Popup
+            this.saveOptions.popup_content = this.getPopup() ? this.getPopup()._content : null;
+            this.closePopup();
+            this.unbindPopup();
+
+/* TODO: Add edit-popup
+this.bindPopup({
+    trigger: window.bsIsTouch ? 'click' : 'contextmenu',
+    content: 'Skide godt'
+});
+and/or
+$(this.editMarker._path).bsMenuPopover({
+    trigger     : 'contextmenu',
+//    delay       : popupTrigger == 'hover' ? 1000 : 0,
+    closeOnClick: true,
+    small       : true,
+    placement   : 'top',
+    list        : [{text:'Item#1'}, {text:'Item#2'}]
+});
+*/
+
+            //Style and interactive
+            this.saveOptions.shadow = this.options.shadow;
+            this.setStyle({shadow: true});
+
+            this.saveOptions.isInteractive = this.isInteractive;
+            if (!this.isInteractive)
+                this.setInteractiveOn();
+
+            this.isEditing = true;
+            return this;
+        },
 
         /*****************************************************
-        afterSetInteractive
-        Thaw all other elements
+        endEdit
         *****************************************************/
-        XX_afterSetInteractive: function( afterSetInteractive ){
-            return function( on ){
-                if (!on){
-                    this._map.interactiveGeoPolylines--;
+        endEdit: function(restore){
+            if (!this.options.editable || !this.isEditing) return;
+            if (restore === true)
+                this.restore();
 
-                    if (!this._map.interactiveGeoPolylines){
-                        this._map.thaw();
-                    }
 
-                    //Move all panes back into map.overlayPane and map.markerPane
-                    this.$pane.detach().appendTo( this._map.getPane('overlayPane') );
-                    this.$markerPane.detach().appendTo( this._map.getPane('markerPane') );
+            //Thaw the map if it is the last time
+            if (this.options.freezeOnEdit){
+                this._map.editingGeoPolylinesFreeze--;
 
-                    this._map._setCurrentGeoPolyline(null);
+                if (!this._map.editingGeoPolylinesFreeze)
+                    this._map.thaw();
+            }
 
-                }
+            this._map.editingGeoPolylines--;
 
-                afterSetInteractive.call( this, on );
-                return this;
-            };
-        }( L.Geodesic.prototype.afterSetInteractive ),
+            //Move all panes back into map.overlayPane and map.markerPane
+            this.$pane.detach().appendTo( this._map.getPane('overlayPane') );
+            this.$markerPane.detach().appendTo( this._map.getPane('markerPane') );
 
+            this._map._setCurrentGeoPolyline(null);
+
+            if (this.pointMarkerLayerGroup)
+                this._map.removeLayer(this.pointMarkerLayerGroup);
+
+
+            //Restore tooltip, popu and interactive-status
+            //Tooltip
+            this.bindTooltip(this.options.tooltip);
+
+            //Popup
+            this.closePopup();
+            this.unbindPopup();
+            if (this.saveOptions.popup_content)
+                this.bindPopup(this.saveOptions.popup_content);
+
+            //Style and interactive
+            this.setStyle({
+                shadow: this.saveOptions.shadow
+            });
+
+            if (!this.saveOptions.isInteractive)
+                this.setInteractiveOff();
+
+            this.isEditing = false;
+            return this;
+        },
+
+        /*****************************************************
+        cancelEdit
+        *****************************************************/
+        cancelEdit: function(){
+            return this.endEdit(true);
+        },
 
         /*****************************************************
         setAsCurrent
@@ -629,7 +718,6 @@ Object representing a polyline or polygon as Geodesic
         setAsCurrent: function(){
             this._map._setCurrentGeoPolyline(this);
         },
-
 
         /*****************************************************
         onSetAsCurrentOn, onSetAsCurrentOff
@@ -746,7 +834,7 @@ Object representing a polyline or polygon as Geodesic
         *******************************************************/
         insertLatLng: function( latLng, index ){
             var newPoint = this.latLngPointMarkerList.insert( latLng, index );
-            newPoint.addToLayerGroup(this.interactiveLayerGroup, this.options.markerPane);
+            newPoint.addToLayerGroup(this.pointMarkerLayerGroup, this.options.markerPane);
             newPoint.setBorderColor( this.options.borderColorName );
 
             this.update();
@@ -771,15 +859,18 @@ Object representing a polyline or polygon as Geodesic
         Events on interactive layer
         ******************************************************/
         onMouseover: function( mouseEvent ){
+            if (!this.isEditing) return;
             this.onMousemove( mouseEvent );
             if (this.editMarker)
                 this.editMarker.setOpacity(1);
         },
         onMousemove: function( mouseEvent ){
+            if (!this.isEditing) return;
             if (this.editMarker)
                 this.editMarker.setLatLng( mouseEvent.latlng );
         },
         onMouseout: function( /*mouseEvent*/ ){
+            if (!this.isEditing) return;
             if (this.editMarker)
                 this.editMarker.setOpacity(0);
         },
@@ -788,31 +879,41 @@ Object representing a polyline or polygon as Geodesic
         onClick: Find segment-index and add new point after segment first point
         ******************************************************/
         onClick: function( mouseEvent ){
-            var insertAfterIndex = -1,
-                latLng = mouseEvent.latlng,
-                latLngs = this.getLatLngs(),
-                closestLayer = L.GeometryUtil.closestLayer(this._map, latLngs, latLng),
-                firstLagLngOfClosestLayer = closestLayer.layer ? closestLayer.layer[0] : null;
+            if (this.isEditing && this.options.editNrOfPoints){
+                var insertAfterIndex = -1,
+                    latLng = mouseEvent.latlng,
+                    latLngs = this.getLatLngs(),
+                    closestLayer = L.GeometryUtil.closestLayer(this._map, latLngs, latLng),
+                    firstLagLngOfClosestLayer = closestLayer.layer ? closestLayer.layer[0] : null;
 
-            if (firstLagLngOfClosestLayer)
-                $.each(latLngs, function(index, latLngList ){
-                if (latLngList[0].equals(firstLagLngOfClosestLayer)){
-                    insertAfterIndex = index;
-                    return false;
-                }
-            });
+                if (firstLagLngOfClosestLayer)
+                    $.each(latLngs, function(index, latLngList ){
+                    if (latLngList[0].equals(firstLagLngOfClosestLayer)){
+                        insertAfterIndex = index;
+                        return false;
+                    }
+                });
 
-            if (insertAfterIndex != -1)
-                this.insertLatLng( latLng, insertAfterIndex );
-
+                if (insertAfterIndex != -1)
+                    this.insertLatLng( latLng, insertAfterIndex );
+            }
             L.DomEvent.stop( mouseEvent );
+            return false;
         },
+
+        /******************************************************
+        onContextmenu
+        ******************************************************/
+        onContextmenu: function(/* mouseEvent */){
+            //MANGLER
+        },
+
 
         /******************************************************
         Events on map
         ******************************************************/
         _map_onClick: function( mouseEvent ){
-            if (this.isInteractive){
+            if (this.isEditing && this.options.editNrOfPoints){
                 this.appendLatLng( mouseEvent.latlng );
                 L.DomEvent.stop( mouseEvent );
             }

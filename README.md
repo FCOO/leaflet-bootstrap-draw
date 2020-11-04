@@ -5,6 +5,8 @@
 ## Description
 Create and edit polylines, polygons, circles etc. 
 
+**>>SEE SOURCE-FILES FOR DOCUMENTATION<<**
+
 ## Installation
 ### bower
 `bower install https://github.com/FCOO/leaflet-bootstrap-draw.git --save`

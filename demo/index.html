@@ -84,6 +84,8 @@ polygon.bringToFront();
         list: latlngs,
         isPolygon: false,
         lineColorName: 'blue',
+        freezeOnEdit: true,
+//editable: false,
 
         onUpdate: function( list, currentPoint ){
             //console.log(list.getDistance());
@@ -109,6 +111,14 @@ polygon.bringToFront();
         list: latlngs2,
         isPolygon: false,
         lineColorName: 'red',
+        interactive: false,
+        tooltip: 'Davs med dig', 
+        freezeOnEdit: true,
+
+    });
+    route2.bindPopup({
+        header: 'davs',
+        content: {da:'DANSK', en:'Eng'}
     });
     route2.addTo(map);
     
@@ -120,20 +130,19 @@ polygon.bringToFront();
 
     
     L.control.bsButton({text:'Rediger v. 1', square: false, onClick: function(){
-        route.setInteractiveOn();
-        route2.setInteractiveOn();
+        route.startEdit();
+        route2.startEdit();
     }}).addTo(map);
 
     L.control.bsButton({text:'OK (Stop redigering #1)', square: false, onClick: function(){
-        route.setInteractiveOff();
+        route.endEdit();
     }}).addTo(map);
     L.control.bsButton({text:'OK (Stop redigering #2)', square: false, onClick: function(){
-        route2.setInteractiveOff();
+        route2.endEdit();
     }}).addTo(map);
 
     L.control.bsButton({text:'Cancel (Afbryd redigering)', square: false, onClick: function(){
-        route.setInteractiveOff();
-        route.restore();
+        route.cancelEdit();
     }}).addTo(map);
 
     L.control.bsButton({text:'Skift polygon', square: false, onClick: function(){
