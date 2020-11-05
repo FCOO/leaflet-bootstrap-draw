@@ -19,18 +19,18 @@ Object representing a polyline or polygon as Geodesic
 
         this.geoPolylines = {};
 
-        var markerPane_zIndex = parseInt( $(this.getPane('markerPane')).css('z-index') );
-
+        //Create the two pane to hold geopolyline lines and markers when editing
         this.geoPolylineEdit_Pane = this.createPane(geoPolylineEdit_Pane);
-        $(this.geoPolylineEdit_Pane).css({
-            'pointer-events': 'none',
-            'z-index'       : parseInt(markerPane_zIndex) + 1
-        });
+        $(this.geoPolylineEdit_Pane).css('pointer-events', 'none');
         this.geoPolylineEdit_MarkerPane = this.createPane(geoPolylineEdit_MarkerPane);
-        $(this.geoPolylineEdit_MarkerPane).css({
-            'pointer-events': 'none',
-            'z-index'       : parseInt(markerPane_zIndex) + 1 + 20
-        });
+        $(this.geoPolylineEdit_MarkerPane).css('pointer-events', 'none');
+
+        //Set the z-index when the map is loaded
+        this.on('load', function(){
+            var markerPane_zIndex = parseInt( $(this.getPane('markerPane')).css('z-index') );
+            $(this.geoPolylineEdit_Pane).css('z-index', markerPane_zIndex + 1);
+            $(this.geoPolylineEdit_MarkerPane).css('z-index', markerPane_zIndex + 1 + 20);
+        }, this);
 
         this.on('click', this._onClick_geoPolyline, this);
     });
