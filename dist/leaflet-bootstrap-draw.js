@@ -909,7 +909,7 @@ Object representing a marker on a geopolyline
 
     //Default options
         options: {
-            VERSION: "3.0.2"
+            VERSION: "4.0.0"
 
         },
 
@@ -990,7 +990,7 @@ leaflet-bootstrap-draw-figure.js
 
     //Default options
         options: {
-            VERSION: "3.0.2"
+            VERSION: "4.0.0"
 
         },
 

@@ -14674,17 +14674,17 @@ L.geodesic = function(latlngs, options) {
 
 ;
 /*!
- * jQuery JavaScript Library v3.4.1
+ * jQuery JavaScript Library v3.6.0
  * https://jquery.com/
  *
  * Includes Sizzle.js
  * https://sizzlejs.com/
  *
- * Copyright JS Foundation and other contributors
+ * Copyright OpenJS Foundation and other contributors
  * Released under the MIT license
  * https://jquery.org/license
  *
- * Date: 2019-05-01T21:04Z
+ * Date: 2021-03-02T17:08Z
  */
 ( function( global, factory ) {
 
@@ -14722,13 +14722,16 @@ L.geodesic = function(latlngs, options) {
 
 var arr = [];
 
-var document = window.document;
-
 var getProto = Object.getPrototypeOf;
 
 var slice = arr.slice;
 
-var concat = arr.concat;
+var flat = arr.flat ? function( array ) {
+	return arr.flat.call( array );
+} : function( array ) {
+	return arr.concat.apply( [], array );
+};
+
 
 var push = arr.push;
 
@@ -14748,18 +14751,24 @@ var support = {};
 
 var isFunction = function isFunction( obj ) {
 
-      // Support: Chrome <=57, Firefox <=52
-      // In some browsers, typeof returns "function" for HTML <object> elements
-      // (i.e., `typeof document.createElement( "object" ) === "function"`).
-      // We don't want to classify *any* DOM node as a function.
-      return typeof obj === "function" && typeof obj.nodeType !== "number";
-  };
+		// Support: Chrome <=57, Firefox <=52
+		// In some browsers, typeof returns "function" for HTML <object> elements
+		// (i.e., `typeof document.createElement( "object" ) === "function"`).
+		// We don't want to classify *any* DOM node as a function.
+		// Support: QtWeb <=3.8.5, WebKit <=534.34, wkhtmltopdf tool <=0.12.5
+		// Plus for old WebKit, typeof returns "function" for HTML collections
+		// (e.g., `typeof document.getElementsByTagName("div") === "function"`). (gh-4756)
+		return typeof obj === "function" && typeof obj.nodeType !== "number" &&
+			typeof obj.item !== "function";
+	};
 
 
 var isWindow = function isWindow( obj ) {
 		return obj != null && obj === obj.window;
 	};
 
+
+var document = window.document;
 
 
 
@@ -14817,7 +14826,7 @@ function toType( obj ) {
 
 
 var
-	version = "3.4.1",
+	version = "3.6.0",
 
 	// Define a local copy of jQuery
 	jQuery = function( selector, context ) {
@@ -14825,11 +14834,7 @@ var
 		// The jQuery object is actually just the init constructor 'enhanced'
 		// Need init if jQuery is called (just allow error to be thrown if not included)
 		return new jQuery.fn.init( selector, context );
-	},
-
-	// Support: Android <=4.0 only
-	// Make sure we trim BOM and NBSP
-	rtrim = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g;
+	};
 
 jQuery.fn = jQuery.prototype = {
 
@@ -14893,6 +14898,18 @@ jQuery.fn = jQuery.prototype = {
 
 	last: function() {
 		return this.eq( -1 );
+	},
+
+	even: function() {
+		return this.pushStack( jQuery.grep( this, function( _elem, i ) {
+			return ( i + 1 ) % 2;
+		} ) );
+	},
+
+	odd: function() {
+		return this.pushStack( jQuery.grep( this, function( _elem, i ) {
+			return i % 2;
+		} ) );
 	},
 
 	eq: function( i ) {
@@ -15028,9 +15045,10 @@ jQuery.extend( {
 		return true;
 	},
 
-	// Evaluates a script in a global context
-	globalEval: function( code, options ) {
-		DOMEval( code, { nonce: options && options.nonce } );
+	// Evaluates a script in a provided context; falls back to the global one
+	// if not specified.
+	globalEval: function( code, options, doc ) {
+		DOMEval( code, { nonce: options && options.nonce }, doc );
 	},
 
 	each: function( obj, callback ) {
@@ -15054,13 +15072,6 @@ jQuery.extend( {
 		return obj;
 	},
 
-	// Support: Android <=4.0 only
-	trim: function( text ) {
-		return text == null ?
-			"" :
-			( text + "" ).replace( rtrim, "" );
-	},
-
 	// results is for internal usage only
 	makeArray: function( arr, results ) {
 		var ret = results || [];
@@ -15069,7 +15080,7 @@ jQuery.extend( {
 			if ( isArrayLike( Object( arr ) ) ) {
 				jQuery.merge( ret,
 					typeof arr === "string" ?
-					[ arr ] : arr
+						[ arr ] : arr
 				);
 			} else {
 				push.call( ret, arr );
@@ -15147,7 +15158,7 @@ jQuery.extend( {
 		}
 
 		// Flatten any nested arrays
-		return concat.apply( [], ret );
+		return flat( ret );
 	},
 
 	// A global GUID counter for objects
@@ -15164,9 +15175,9 @@ if ( typeof Symbol === "function" ) {
 
 // Populate the class2type map
 jQuery.each( "Boolean Number String Function Array Date RegExp Object Error Symbol".split( " " ),
-function( i, name ) {
-	class2type[ "[object " + name + "]" ] = name.toLowerCase();
-} );
+	function( _i, name ) {
+		class2type[ "[object " + name + "]" ] = name.toLowerCase();
+	} );
 
 function isArrayLike( obj ) {
 
@@ -15186,17 +15197,16 @@ function isArrayLike( obj ) {
 }
 var Sizzle =
 /*!
- * Sizzle CSS Selector Engine v2.3.4
+ * Sizzle CSS Selector Engine v2.3.6
  * https://sizzlejs.com/
  *
  * Copyright JS Foundation and other contributors
  * Released under the MIT license
  * https://js.foundation/
  *
- * Date: 2019-04-08
+ * Date: 2021-02-16
  */
-(function( window ) {
-
+( function( window ) {
 var i,
 	support,
 	Expr,
@@ -15236,59 +15246,70 @@ var i,
 	},
 
 	// Instance methods
-	hasOwn = ({}).hasOwnProperty,
+	hasOwn = ( {} ).hasOwnProperty,
 	arr = [],
 	pop = arr.pop,
-	push_native = arr.push,
+	pushNative = arr.push,
 	push = arr.push,
 	slice = arr.slice,
+
 	// Use a stripped-down indexOf as it's faster than native
 	// https://jsperf.com/thor-indexof-vs-for/5
 	indexOf = function( list, elem ) {
 		var i = 0,
 			len = list.length;
 		for ( ; i < len; i++ ) {
-			if ( list[i] === elem ) {
+			if ( list[ i ] === elem ) {
 				return i;
 			}
 		}
 		return -1;
 	},
 
-	booleans = "checked|selected|async|autofocus|autoplay|controls|defer|disabled|hidden|ismap|loop|multiple|open|readonly|required|scoped",
+	booleans = "checked|selected|async|autofocus|autoplay|controls|defer|disabled|hidden|" +
+		"ismap|loop|multiple|open|readonly|required|scoped",
 
 	// Regular expressions
 
 	// http://www.w3.org/TR/css3-selectors/#whitespace
 	whitespace = "[\\x20\\t\\r\\n\\f]",
 
-	// http://www.w3.org/TR/CSS21/syndata.html#value-def-identifier
-	identifier = "(?:\\\\.|[\\w-]|[^\0-\\xa0])+",
+	// https://www.w3.org/TR/css-syntax-3/#ident-token-diagram
+	identifier = "(?:\\\\[\\da-fA-F]{1,6}" + whitespace +
+		"?|\\\\[^\\r\\n\\f]|[\\w-]|[^\0-\\x7f])+",
 
 	// Attribute selectors: http://www.w3.org/TR/selectors/#attribute-selectors
 	attributes = "\\[" + whitespace + "*(" + identifier + ")(?:" + whitespace +
+
 		// Operator (capture 2)
 		"*([*^$|!~]?=)" + whitespace +
-		// "Attribute values must be CSS identifiers [capture 5] or strings [capture 3 or capture 4]"
-		"*(?:'((?:\\\\.|[^\\\\'])*)'|\"((?:\\\\.|[^\\\\\"])*)\"|(" + identifier + "))|)" + whitespace +
-		"*\\]",
+
+		// "Attribute values must be CSS identifiers [capture 5]
+		// or strings [capture 3 or capture 4]"
+		"*(?:'((?:\\\\.|[^\\\\'])*)'|\"((?:\\\\.|[^\\\\\"])*)\"|(" + identifier + "))|)" +
+		whitespace + "*\\]",
 
 	pseudos = ":(" + identifier + ")(?:\\((" +
+
 		// To reduce the number of selectors needing tokenize in the preFilter, prefer arguments:
 		// 1. quoted (capture 3; capture 4 or capture 5)
 		"('((?:\\\\.|[^\\\\'])*)'|\"((?:\\\\.|[^\\\\\"])*)\")|" +
+
 		// 2. simple (capture 6)
 		"((?:\\\\.|[^\\\\()[\\]]|" + attributes + ")*)|" +
+
 		// 3. anything else (capture 2)
 		".*" +
 		")\\)|)",
 
 	// Leading and non-escaped trailing whitespace, capturing some non-whitespace characters preceding the latter
 	rwhitespace = new RegExp( whitespace + "+", "g" ),
-	rtrim = new RegExp( "^" + whitespace + "+|((?:^|[^\\\\])(?:\\\\.)*)" + whitespace + "+$", "g" ),
+	rtrim = new RegExp( "^" + whitespace + "+|((?:^|[^\\\\])(?:\\\\.)*)" +
+		whitespace + "+$", "g" ),
 
 	rcomma = new RegExp( "^" + whitespace + "*," + whitespace + "*" ),
-	rcombinators = new RegExp( "^" + whitespace + "*([>+~]|" + whitespace + ")" + whitespace + "*" ),
+	rcombinators = new RegExp( "^" + whitespace + "*([>+~]|" + whitespace + ")" + whitespace +
+		"*" ),
 	rdescend = new RegExp( whitespace + "|>" ),
 
 	rpseudo = new RegExp( pseudos ),
@@ -15300,14 +15321,16 @@ var i,
 		"TAG": new RegExp( "^(" + identifier + "|[*])" ),
 		"ATTR": new RegExp( "^" + attributes ),
 		"PSEUDO": new RegExp( "^" + pseudos ),
-		"CHILD": new RegExp( "^:(only|first|last|nth|nth-last)-(child|of-type)(?:\\(" + whitespace +
-			"*(even|odd|(([+-]|)(\\d*)n|)" + whitespace + "*(?:([+-]|)" + whitespace +
-			"*(\\d+)|))" + whitespace + "*\\)|)", "i" ),
+		"CHILD": new RegExp( "^:(only|first|last|nth|nth-last)-(child|of-type)(?:\\(" +
+			whitespace + "*(even|odd|(([+-]|)(\\d*)n|)" + whitespace + "*(?:([+-]|)" +
+			whitespace + "*(\\d+)|))" + whitespace + "*\\)|)", "i" ),
 		"bool": new RegExp( "^(?:" + booleans + ")$", "i" ),
+
 		// For use in libraries implementing .is()
 		// We use this for POS matching in `select`
-		"needsContext": new RegExp( "^" + whitespace + "*[>+~]|:(even|odd|eq|gt|lt|nth|first|last)(?:\\(" +
-			whitespace + "*((?:-\\d)?\\d*)" + whitespace + "*\\)|)(?=[^-]|$)", "i" )
+		"needsContext": new RegExp( "^" + whitespace +
+			"*[>+~]|:(even|odd|eq|gt|lt|nth|first|last)(?:\\(" + whitespace +
+			"*((?:-\\d)?\\d*)" + whitespace + "*\\)|)(?=[^-]|$)", "i" )
 	},
 
 	rhtml = /HTML$/i,
@@ -15323,18 +15346,21 @@ var i,
 
 	// CSS escapes
 	// http://www.w3.org/TR/CSS21/syndata.html#escaped-characters
-	runescape = new RegExp( "\\\\([\\da-f]{1,6}" + whitespace + "?|(" + whitespace + ")|.)", "ig" ),
-	funescape = function( _, escaped, escapedWhitespace ) {
-		var high = "0x" + escaped - 0x10000;
-		// NaN means non-codepoint
-		// Support: Firefox<24
-		// Workaround erroneous numeric interpretation of +"0x"
-		return high !== high || escapedWhitespace ?
-			escaped :
+	runescape = new RegExp( "\\\\[\\da-fA-F]{1,6}" + whitespace + "?|\\\\([^\\r\\n\\f])", "g" ),
+	funescape = function( escape, nonHex ) {
+		var high = "0x" + escape.slice( 1 ) - 0x10000;
+
+		return nonHex ?
+
+			// Strip the backslash prefix from a non-hex escape sequence
+			nonHex :
+
+			// Replace a hexadecimal escape sequence with the encoded Unicode code point
+			// Support: IE <=11+
+			// For values outside the Basic Multilingual Plane (BMP), manually construct a
+			// surrogate pair
 			high < 0 ?
-				// BMP codepoint
 				String.fromCharCode( high + 0x10000 ) :
-				// Supplemental Plane codepoint (surrogate pair)
 				String.fromCharCode( high >> 10 | 0xD800, high & 0x3FF | 0xDC00 );
 	},
 
@@ -15350,7 +15376,8 @@ var i,
 			}
 
 			// Control characters and (dependent upon position) numbers get escaped as code points
-			return ch.slice( 0, -1 ) + "\\" + ch.charCodeAt( ch.length - 1 ).toString( 16 ) + " ";
+			return ch.slice( 0, -1 ) + "\\" +
+				ch.charCodeAt( ch.length - 1 ).toString( 16 ) + " ";
 		}
 
 		// Other potentially-special ASCII characters get backslash-escaped
@@ -15375,18 +15402,20 @@ var i,
 // Optimize for push.apply( _, NodeList )
 try {
 	push.apply(
-		(arr = slice.call( preferredDoc.childNodes )),
+		( arr = slice.call( preferredDoc.childNodes ) ),
 		preferredDoc.childNodes
 	);
+
 	// Support: Android<4.0
 	// Detect silently failing push.apply
+	// eslint-disable-next-line no-unused-expressions
 	arr[ preferredDoc.childNodes.length ].nodeType;
 } catch ( e ) {
 	push = { apply: arr.length ?
 
 		// Leverage slice if possible
 		function( target, els ) {
-			push_native.apply( target, slice.call(els) );
+			pushNative.apply( target, slice.call( els ) );
 		} :
 
 		// Support: IE<9
@@ -15394,8 +15423,9 @@ try {
 		function( target, els ) {
 			var j = target.length,
 				i = 0;
+
 			// Can't trust NodeList.length
-			while ( (target[j++] = els[i++]) ) {}
+			while ( ( target[ j++ ] = els[ i++ ] ) ) {}
 			target.length = j - 1;
 		}
 	};
@@ -15419,24 +15449,21 @@ function Sizzle( selector, context, results, seed ) {
 
 	// Try to shortcut find operations (as opposed to filters) in HTML documents
 	if ( !seed ) {
-
-		if ( ( context ? context.ownerDocument || context : preferredDoc ) !== document ) {
-			setDocument( context );
-		}
+		setDocument( context );
 		context = context || document;
 
 		if ( documentIsHTML ) {
 
 			// If the selector is sufficiently simple, try using a "get*By*" DOM method
 			// (excepting DocumentFragment context, where the methods don't exist)
-			if ( nodeType !== 11 && (match = rquickExpr.exec( selector )) ) {
+			if ( nodeType !== 11 && ( match = rquickExpr.exec( selector ) ) ) {
 
 				// ID selector
-				if ( (m = match[1]) ) {
+				if ( ( m = match[ 1 ] ) ) {
 
 					// Document context
 					if ( nodeType === 9 ) {
-						if ( (elem = context.getElementById( m )) ) {
+						if ( ( elem = context.getElementById( m ) ) ) {
 
 							// Support: IE, Opera, Webkit
 							// TODO: identify versions
@@ -15455,7 +15482,7 @@ function Sizzle( selector, context, results, seed ) {
 						// Support: IE, Opera, Webkit
 						// TODO: identify versions
 						// getElementById can match elements by name instead of ID
-						if ( newContext && (elem = newContext.getElementById( m )) &&
+						if ( newContext && ( elem = newContext.getElementById( m ) ) &&
 							contains( context, elem ) &&
 							elem.id === m ) {
 
@@ -15465,12 +15492,12 @@ function Sizzle( selector, context, results, seed ) {
 					}
 
 				// Type selector
-				} else if ( match[2] ) {
+				} else if ( match[ 2 ] ) {
 					push.apply( results, context.getElementsByTagName( selector ) );
 					return results;
 
 				// Class selector
-				} else if ( (m = match[3]) && support.getElementsByClassName &&
+				} else if ( ( m = match[ 3 ] ) && support.getElementsByClassName &&
 					context.getElementsByClassName ) {
 
 					push.apply( results, context.getElementsByClassName( m ) );
@@ -15481,11 +15508,11 @@ function Sizzle( selector, context, results, seed ) {
 			// Take advantage of querySelectorAll
 			if ( support.qsa &&
 				!nonnativeSelectorCache[ selector + " " ] &&
-				(!rbuggyQSA || !rbuggyQSA.test( selector )) &&
+				( !rbuggyQSA || !rbuggyQSA.test( selector ) ) &&
 
 				// Support: IE 8 only
 				// Exclude object elements
-				(nodeType !== 1 || context.nodeName.toLowerCase() !== "object") ) {
+				( nodeType !== 1 || context.nodeName.toLowerCase() !== "object" ) ) {
 
 				newSelector = selector;
 				newContext = context;
@@ -15494,27 +15521,36 @@ function Sizzle( selector, context, results, seed ) {
 				// descendant combinators, which is not what we want.
 				// In such cases, we work around the behavior by prefixing every selector in the
 				// list with an ID selector referencing the scope context.
+				// The technique has to be used as well when a leading combinator is used
+				// as such selectors are not recognized by querySelectorAll.
 				// Thanks to Andrew Dupont for this technique.
-				if ( nodeType === 1 && rdescend.test( selector ) ) {
+				if ( nodeType === 1 &&
+					( rdescend.test( selector ) || rcombinators.test( selector ) ) ) {
 
-					// Capture the context ID, setting it first if necessary
-					if ( (nid = context.getAttribute( "id" )) ) {
-						nid = nid.replace( rcssescape, fcssescape );
-					} else {
-						context.setAttribute( "id", (nid = expando) );
+					// Expand context for sibling selectors
+					newContext = rsibling.test( selector ) && testContext( context.parentNode ) ||
+						context;
+
+					// We can use :scope instead of the ID hack if the browser
+					// supports it & if we're not changing the context.
+					if ( newContext !== context || !support.scope ) {
+
+						// Capture the context ID, setting it first if necessary
+						if ( ( nid = context.getAttribute( "id" ) ) ) {
+							nid = nid.replace( rcssescape, fcssescape );
+						} else {
+							context.setAttribute( "id", ( nid = expando ) );
+						}
 					}
 
 					// Prefix every selector in the list
 					groups = tokenize( selector );
 					i = groups.length;
 					while ( i-- ) {
-						groups[i] = "#" + nid + " " + toSelector( groups[i] );
+						groups[ i ] = ( nid ? "#" + nid : ":scope" ) + " " +
+							toSelector( groups[ i ] );
 					}
 					newSelector = groups.join( "," );
-
-					// Expand context for sibling selectors
-					newContext = rsibling.test( selector ) && testContext( context.parentNode ) ||
-						context;
 				}
 
 				try {
@@ -15547,12 +15583,14 @@ function createCache() {
 	var keys = [];
 
 	function cache( key, value ) {
+
 		// Use (key + " ") to avoid collision with native prototype properties (see Issue #157)
 		if ( keys.push( key + " " ) > Expr.cacheLength ) {
+
 			// Only keep the most recent entries
 			delete cache[ keys.shift() ];
 		}
-		return (cache[ key + " " ] = value);
+		return ( cache[ key + " " ] = value );
 	}
 	return cache;
 }
@@ -15571,17 +15609,19 @@ function markFunction( fn ) {
  * @param {Function} fn Passed the created element and returns a boolean result
  */
 function assert( fn ) {
-	var el = document.createElement("fieldset");
+	var el = document.createElement( "fieldset" );
 
 	try {
 		return !!fn( el );
-	} catch (e) {
+	} catch ( e ) {
 		return false;
 	} finally {
+
 		// Remove from its parent by default
 		if ( el.parentNode ) {
 			el.parentNode.removeChild( el );
 		}
+
 		// release memory in IE
 		el = null;
 	}
@@ -15593,11 +15633,11 @@ function assert( fn ) {
  * @param {Function} handler The method that will be applied
  */
 function addHandle( attrs, handler ) {
-	var arr = attrs.split("|"),
+	var arr = attrs.split( "|" ),
 		i = arr.length;
 
 	while ( i-- ) {
-		Expr.attrHandle[ arr[i] ] = handler;
+		Expr.attrHandle[ arr[ i ] ] = handler;
 	}
 }
 
@@ -15619,7 +15659,7 @@ function siblingCheck( a, b ) {
 
 	// Check if b follows a
 	if ( cur ) {
-		while ( (cur = cur.nextSibling) ) {
+		while ( ( cur = cur.nextSibling ) ) {
 			if ( cur === b ) {
 				return -1;
 			}
@@ -15647,7 +15687,7 @@ function createInputPseudo( type ) {
 function createButtonPseudo( type ) {
 	return function( elem ) {
 		var name = elem.nodeName.toLowerCase();
-		return (name === "input" || name === "button") && elem.type === type;
+		return ( name === "input" || name === "button" ) && elem.type === type;
 	};
 }
 
@@ -15690,7 +15730,7 @@ function createDisabledPseudo( disabled ) {
 					// Where there is no isDisabled, check manually
 					/* jshint -W018 */
 					elem.isDisabled !== !disabled &&
-						inDisabledFieldset( elem ) === disabled;
+					inDisabledFieldset( elem ) === disabled;
 			}
 
 			return elem.disabled === disabled;
@@ -15712,21 +15752,21 @@ function createDisabledPseudo( disabled ) {
  * @param {Function} fn
  */
 function createPositionalPseudo( fn ) {
-	return markFunction(function( argument ) {
+	return markFunction( function( argument ) {
 		argument = +argument;
-		return markFunction(function( seed, matches ) {
+		return markFunction( function( seed, matches ) {
 			var j,
 				matchIndexes = fn( [], seed.length, argument ),
 				i = matchIndexes.length;
 
 			// Match elements found at the specified indexes
 			while ( i-- ) {
-				if ( seed[ (j = matchIndexes[i]) ] ) {
-					seed[j] = !(matches[j] = seed[j]);
+				if ( seed[ ( j = matchIndexes[ i ] ) ] ) {
+					seed[ j ] = !( matches[ j ] = seed[ j ] );
 				}
 			}
-		});
-	});
+		} );
+	} );
 }
 
 /**
@@ -15747,8 +15787,8 @@ support = Sizzle.support = {};
  * @returns {Boolean} True iff elem is a non-HTML XML node
  */
 isXML = Sizzle.isXML = function( elem ) {
-	var namespace = elem.namespaceURI,
-		docElem = (elem.ownerDocument || elem).documentElement;
+	var namespace = elem && elem.namespaceURI,
+		docElem = elem && ( elem.ownerDocument || elem ).documentElement;
 
 	// Support: IE <=8
 	// Assume HTML when documentElement doesn't yet exist, such as inside loading iframes
@@ -15766,7 +15806,11 @@ setDocument = Sizzle.setDocument = function( node ) {
 		doc = node ? node.ownerDocument || node : preferredDoc;
 
 	// Return early if doc is invalid or already selected
-	if ( doc === document || doc.nodeType !== 9 || !doc.documentElement ) {
+	// Support: IE 11+, Edge 17 - 18+
+	// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+	// two documents; shallow comparisons work.
+	// eslint-disable-next-line eqeqeq
+	if ( doc == document || doc.nodeType !== 9 || !doc.documentElement ) {
 		return document;
 	}
 
@@ -15775,10 +15819,14 @@ setDocument = Sizzle.setDocument = function( node ) {
 	docElem = document.documentElement;
 	documentIsHTML = !isXML( document );
 
-	// Support: IE 9-11, Edge
+	// Support: IE 9 - 11+, Edge 12 - 18+
 	// Accessing iframe documents after unload throws "permission denied" errors (jQuery #13936)
-	if ( preferredDoc !== document &&
-		(subWindow = document.defaultView) && subWindow.top !== subWindow ) {
+	// Support: IE 11+, Edge 17 - 18+
+	// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+	// two documents; shallow comparisons work.
+	// eslint-disable-next-line eqeqeq
+	if ( preferredDoc != document &&
+		( subWindow = document.defaultView ) && subWindow.top !== subWindow ) {
 
 		// Support: IE 11, Edge
 		if ( subWindow.addEventListener ) {
@@ -15790,25 +15838,36 @@ setDocument = Sizzle.setDocument = function( node ) {
 		}
 	}
 
+	// Support: IE 8 - 11+, Edge 12 - 18+, Chrome <=16 - 25 only, Firefox <=3.6 - 31 only,
+	// Safari 4 - 5 only, Opera <=11.6 - 12.x only
+	// IE/Edge & older browsers don't support the :scope pseudo-class.
+	// Support: Safari 6.0 only
+	// Safari 6.0 supports :scope but it's an alias of :root there.
+	support.scope = assert( function( el ) {
+		docElem.appendChild( el ).appendChild( document.createElement( "div" ) );
+		return typeof el.querySelectorAll !== "undefined" &&
+			!el.querySelectorAll( ":scope fieldset div" ).length;
+	} );
+
 	/* Attributes
 	---------------------------------------------------------------------- */
 
 	// Support: IE<8
 	// Verify that getAttribute really returns attributes and not properties
 	// (excepting IE8 booleans)
-	support.attributes = assert(function( el ) {
+	support.attributes = assert( function( el ) {
 		el.className = "i";
-		return !el.getAttribute("className");
-	});
+		return !el.getAttribute( "className" );
+	} );
 
 	/* getElement(s)By*
 	---------------------------------------------------------------------- */
 
 	// Check if getElementsByTagName("*") returns only elements
-	support.getElementsByTagName = assert(function( el ) {
-		el.appendChild( document.createComment("") );
-		return !el.getElementsByTagName("*").length;
-	});
+	support.getElementsByTagName = assert( function( el ) {
+		el.appendChild( document.createComment( "" ) );
+		return !el.getElementsByTagName( "*" ).length;
+	} );
 
 	// Support: IE<9
 	support.getElementsByClassName = rnative.test( document.getElementsByClassName );
@@ -15817,38 +15876,38 @@ setDocument = Sizzle.setDocument = function( node ) {
 	// Check if getElementById returns elements by name
 	// The broken getElementById methods don't pick up programmatically-set names,
 	// so use a roundabout getElementsByName test
-	support.getById = assert(function( el ) {
+	support.getById = assert( function( el ) {
 		docElem.appendChild( el ).id = expando;
 		return !document.getElementsByName || !document.getElementsByName( expando ).length;
-	});
+	} );
 
 	// ID filter and find
 	if ( support.getById ) {
-		Expr.filter["ID"] = function( id ) {
+		Expr.filter[ "ID" ] = function( id ) {
 			var attrId = id.replace( runescape, funescape );
 			return function( elem ) {
-				return elem.getAttribute("id") === attrId;
+				return elem.getAttribute( "id" ) === attrId;
 			};
 		};
-		Expr.find["ID"] = function( id, context ) {
+		Expr.find[ "ID" ] = function( id, context ) {
 			if ( typeof context.getElementById !== "undefined" && documentIsHTML ) {
 				var elem = context.getElementById( id );
 				return elem ? [ elem ] : [];
 			}
 		};
 	} else {
-		Expr.filter["ID"] =  function( id ) {
+		Expr.filter[ "ID" ] =  function( id ) {
 			var attrId = id.replace( runescape, funescape );
 			return function( elem ) {
 				var node = typeof elem.getAttributeNode !== "undefined" &&
-					elem.getAttributeNode("id");
+					elem.getAttributeNode( "id" );
 				return node && node.value === attrId;
 			};
 		};
 
 		// Support: IE 6 - 7 only
 		// getElementById is not reliable as a find shortcut
-		Expr.find["ID"] = function( id, context ) {
+		Expr.find[ "ID" ] = function( id, context ) {
 			if ( typeof context.getElementById !== "undefined" && documentIsHTML ) {
 				var node, i, elems,
 					elem = context.getElementById( id );
@@ -15856,7 +15915,7 @@ setDocument = Sizzle.setDocument = function( node ) {
 				if ( elem ) {
 
 					// Verify the id attribute
-					node = elem.getAttributeNode("id");
+					node = elem.getAttributeNode( "id" );
 					if ( node && node.value === id ) {
 						return [ elem ];
 					}
@@ -15864,8 +15923,8 @@ setDocument = Sizzle.setDocument = function( node ) {
 					// Fall back on getElementsByName
 					elems = context.getElementsByName( id );
 					i = 0;
-					while ( (elem = elems[i++]) ) {
-						node = elem.getAttributeNode("id");
+					while ( ( elem = elems[ i++ ] ) ) {
+						node = elem.getAttributeNode( "id" );
 						if ( node && node.value === id ) {
 							return [ elem ];
 						}
@@ -15878,7 +15937,7 @@ setDocument = Sizzle.setDocument = function( node ) {
 	}
 
 	// Tag
-	Expr.find["TAG"] = support.getElementsByTagName ?
+	Expr.find[ "TAG" ] = support.getElementsByTagName ?
 		function( tag, context ) {
 			if ( typeof context.getElementsByTagName !== "undefined" ) {
 				return context.getElementsByTagName( tag );
@@ -15893,12 +15952,13 @@ setDocument = Sizzle.setDocument = function( node ) {
 			var elem,
 				tmp = [],
 				i = 0,
+
 				// By happy coincidence, a (broken) gEBTN appears on DocumentFragment nodes too
 				results = context.getElementsByTagName( tag );
 
 			// Filter out possible comments
 			if ( tag === "*" ) {
-				while ( (elem = results[i++]) ) {
+				while ( ( elem = results[ i++ ] ) ) {
 					if ( elem.nodeType === 1 ) {
 						tmp.push( elem );
 					}
@@ -15910,7 +15970,7 @@ setDocument = Sizzle.setDocument = function( node ) {
 		};
 
 	// Class
-	Expr.find["CLASS"] = support.getElementsByClassName && function( className, context ) {
+	Expr.find[ "CLASS" ] = support.getElementsByClassName && function( className, context ) {
 		if ( typeof context.getElementsByClassName !== "undefined" && documentIsHTML ) {
 			return context.getElementsByClassName( className );
 		}
@@ -15931,10 +15991,14 @@ setDocument = Sizzle.setDocument = function( node ) {
 	// See https://bugs.jquery.com/ticket/13378
 	rbuggyQSA = [];
 
-	if ( (support.qsa = rnative.test( document.querySelectorAll )) ) {
+	if ( ( support.qsa = rnative.test( document.querySelectorAll ) ) ) {
+
 		// Build QSA regex
 		// Regex strategy adopted from Diego Perini
-		assert(function( el ) {
+		assert( function( el ) {
+
+			var input;
+
 			// Select is set to empty string on purpose
 			// This is to test IE's treatment of not explicitly
 			// setting a boolean content attribute,
@@ -15948,78 +16012,98 @@ setDocument = Sizzle.setDocument = function( node ) {
 			// Nothing should be selected when empty strings follow ^= or $= or *=
 			// The test attribute must be unknown in Opera but "safe" for WinRT
 			// https://msdn.microsoft.com/en-us/library/ie/hh465388.aspx#attribute_section
-			if ( el.querySelectorAll("[msallowcapture^='']").length ) {
+			if ( el.querySelectorAll( "[msallowcapture^='']" ).length ) {
 				rbuggyQSA.push( "[*^$]=" + whitespace + "*(?:''|\"\")" );
 			}
 
 			// Support: IE8
 			// Boolean attributes and "value" are not treated correctly
-			if ( !el.querySelectorAll("[selected]").length ) {
+			if ( !el.querySelectorAll( "[selected]" ).length ) {
 				rbuggyQSA.push( "\\[" + whitespace + "*(?:value|" + booleans + ")" );
 			}
 
 			// Support: Chrome<29, Android<4.4, Safari<7.0+, iOS<7.0+, PhantomJS<1.9.8+
 			if ( !el.querySelectorAll( "[id~=" + expando + "-]" ).length ) {
-				rbuggyQSA.push("~=");
+				rbuggyQSA.push( "~=" );
+			}
+
+			// Support: IE 11+, Edge 15 - 18+
+			// IE 11/Edge don't find elements on a `[name='']` query in some cases.
+			// Adding a temporary attribute to the document before the selection works
+			// around the issue.
+			// Interestingly, IE 10 & older don't seem to have the issue.
+			input = document.createElement( "input" );
+			input.setAttribute( "name", "" );
+			el.appendChild( input );
+			if ( !el.querySelectorAll( "[name='']" ).length ) {
+				rbuggyQSA.push( "\\[" + whitespace + "*name" + whitespace + "*=" +
+					whitespace + "*(?:''|\"\")" );
 			}
 
 			// Webkit/Opera - :checked should return selected option elements
 			// http://www.w3.org/TR/2011/REC-css3-selectors-20110929/#checked
 			// IE8 throws error here and will not see later tests
-			if ( !el.querySelectorAll(":checked").length ) {
-				rbuggyQSA.push(":checked");
+			if ( !el.querySelectorAll( ":checked" ).length ) {
+				rbuggyQSA.push( ":checked" );
 			}
 
 			// Support: Safari 8+, iOS 8+
 			// https://bugs.webkit.org/show_bug.cgi?id=136851
 			// In-page `selector#id sibling-combinator selector` fails
 			if ( !el.querySelectorAll( "a#" + expando + "+*" ).length ) {
-				rbuggyQSA.push(".#.+[+~]");
+				rbuggyQSA.push( ".#.+[+~]" );
 			}
-		});
 
-		assert(function( el ) {
+			// Support: Firefox <=3.6 - 5 only
+			// Old Firefox doesn't throw on a badly-escaped identifier.
+			el.querySelectorAll( "\\\f" );
+			rbuggyQSA.push( "[\\r\\n\\f]" );
+		} );
+
+		assert( function( el ) {
 			el.innerHTML = "<a href='' disabled='disabled'></a>" +
 				"<select disabled='disabled'><option/></select>";
 
 			// Support: Windows 8 Native Apps
 			// The type and name attributes are restricted during .innerHTML assignment
-			var input = document.createElement("input");
+			var input = document.createElement( "input" );
 			input.setAttribute( "type", "hidden" );
 			el.appendChild( input ).setAttribute( "name", "D" );
 
 			// Support: IE8
 			// Enforce case-sensitivity of name attribute
-			if ( el.querySelectorAll("[name=d]").length ) {
+			if ( el.querySelectorAll( "[name=d]" ).length ) {
 				rbuggyQSA.push( "name" + whitespace + "*[*^$|!~]?=" );
 			}
 
 			// FF 3.5 - :enabled/:disabled and hidden elements (hidden elements are still enabled)
 			// IE8 throws error here and will not see later tests
-			if ( el.querySelectorAll(":enabled").length !== 2 ) {
+			if ( el.querySelectorAll( ":enabled" ).length !== 2 ) {
 				rbuggyQSA.push( ":enabled", ":disabled" );
 			}
 
 			// Support: IE9-11+
 			// IE's :disabled selector does not pick up the children of disabled fieldsets
 			docElem.appendChild( el ).disabled = true;
-			if ( el.querySelectorAll(":disabled").length !== 2 ) {
+			if ( el.querySelectorAll( ":disabled" ).length !== 2 ) {
 				rbuggyQSA.push( ":enabled", ":disabled" );
 			}
 
+			// Support: Opera 10 - 11 only
 			// Opera 10-11 does not throw on post-comma invalid pseudos
-			el.querySelectorAll("*,:x");
-			rbuggyQSA.push(",.*:");
-		});
+			el.querySelectorAll( "*,:x" );
+			rbuggyQSA.push( ",.*:" );
+		} );
 	}
 
-	if ( (support.matchesSelector = rnative.test( (matches = docElem.matches ||
+	if ( ( support.matchesSelector = rnative.test( ( matches = docElem.matches ||
 		docElem.webkitMatchesSelector ||
 		docElem.mozMatchesSelector ||
 		docElem.oMatchesSelector ||
-		docElem.msMatchesSelector) )) ) {
+		docElem.msMatchesSelector ) ) ) ) {
 
-		assert(function( el ) {
+		assert( function( el ) {
+
 			// Check to see if it's possible to do matchesSelector
 			// on a disconnected node (IE 9)
 			support.disconnectedMatch = matches.call( el, "*" );
@@ -16028,11 +16112,11 @@ setDocument = Sizzle.setDocument = function( node ) {
 			// Gecko does not error, returns false instead
 			matches.call( el, "[s!='']:x" );
 			rbuggyMatches.push( "!=", pseudos );
-		});
+		} );
 	}
 
-	rbuggyQSA = rbuggyQSA.length && new RegExp( rbuggyQSA.join("|") );
-	rbuggyMatches = rbuggyMatches.length && new RegExp( rbuggyMatches.join("|") );
+	rbuggyQSA = rbuggyQSA.length && new RegExp( rbuggyQSA.join( "|" ) );
+	rbuggyMatches = rbuggyMatches.length && new RegExp( rbuggyMatches.join( "|" ) );
 
 	/* Contains
 	---------------------------------------------------------------------- */
@@ -16049,11 +16133,11 @@ setDocument = Sizzle.setDocument = function( node ) {
 				adown.contains ?
 					adown.contains( bup ) :
 					a.compareDocumentPosition && a.compareDocumentPosition( bup ) & 16
-			));
+			) );
 		} :
 		function( a, b ) {
 			if ( b ) {
-				while ( (b = b.parentNode) ) {
+				while ( ( b = b.parentNode ) ) {
 					if ( b === a ) {
 						return true;
 					}
@@ -16082,7 +16166,11 @@ setDocument = Sizzle.setDocument = function( node ) {
 		}
 
 		// Calculate position if both inputs belong to the same document
-		compare = ( a.ownerDocument || a ) === ( b.ownerDocument || b ) ?
+		// Support: IE 11+, Edge 17 - 18+
+		// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+		// two documents; shallow comparisons work.
+		// eslint-disable-next-line eqeqeq
+		compare = ( a.ownerDocument || a ) == ( b.ownerDocument || b ) ?
 			a.compareDocumentPosition( b ) :
 
 			// Otherwise we know they are disconnected
@@ -16090,13 +16178,24 @@ setDocument = Sizzle.setDocument = function( node ) {
 
 		// Disconnected nodes
 		if ( compare & 1 ||
-			(!support.sortDetached && b.compareDocumentPosition( a ) === compare) ) {
+			( !support.sortDetached && b.compareDocumentPosition( a ) === compare ) ) {
 
 			// Choose the first element that is related to our preferred document
-			if ( a === document || a.ownerDocument === preferredDoc && contains(preferredDoc, a) ) {
+			// Support: IE 11+, Edge 17 - 18+
+			// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+			// two documents; shallow comparisons work.
+			// eslint-disable-next-line eqeqeq
+			if ( a == document || a.ownerDocument == preferredDoc &&
+				contains( preferredDoc, a ) ) {
 				return -1;
 			}
-			if ( b === document || b.ownerDocument === preferredDoc && contains(preferredDoc, b) ) {
+
+			// Support: IE 11+, Edge 17 - 18+
+			// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+			// two documents; shallow comparisons work.
+			// eslint-disable-next-line eqeqeq
+			if ( b == document || b.ownerDocument == preferredDoc &&
+				contains( preferredDoc, b ) ) {
 				return 1;
 			}
 
@@ -16109,6 +16208,7 @@ setDocument = Sizzle.setDocument = function( node ) {
 		return compare & 4 ? -1 : 1;
 	} :
 	function( a, b ) {
+
 		// Exit early if the nodes are identical
 		if ( a === b ) {
 			hasDuplicate = true;
@@ -16124,8 +16224,14 @@ setDocument = Sizzle.setDocument = function( node ) {
 
 		// Parentless nodes are either documents or disconnected
 		if ( !aup || !bup ) {
-			return a === document ? -1 :
-				b === document ? 1 :
+
+			// Support: IE 11+, Edge 17 - 18+
+			// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+			// two documents; shallow comparisons work.
+			/* eslint-disable eqeqeq */
+			return a == document ? -1 :
+				b == document ? 1 :
+				/* eslint-enable eqeqeq */
 				aup ? -1 :
 				bup ? 1 :
 				sortInput ?
@@ -16139,26 +16245,32 @@ setDocument = Sizzle.setDocument = function( node ) {
 
 		// Otherwise we need full lists of their ancestors for comparison
 		cur = a;
-		while ( (cur = cur.parentNode) ) {
+		while ( ( cur = cur.parentNode ) ) {
 			ap.unshift( cur );
 		}
 		cur = b;
-		while ( (cur = cur.parentNode) ) {
+		while ( ( cur = cur.parentNode ) ) {
 			bp.unshift( cur );
 		}
 
 		// Walk down the tree looking for a discrepancy
-		while ( ap[i] === bp[i] ) {
+		while ( ap[ i ] === bp[ i ] ) {
 			i++;
 		}
 
 		return i ?
+
 			// Do a sibling check if the nodes have a common ancestor
-			siblingCheck( ap[i], bp[i] ) :
+			siblingCheck( ap[ i ], bp[ i ] ) :
 
 			// Otherwise nodes in our document sort first
-			ap[i] === preferredDoc ? -1 :
-			bp[i] === preferredDoc ? 1 :
+			// Support: IE 11+, Edge 17 - 18+
+			// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+			// two documents; shallow comparisons work.
+			/* eslint-disable eqeqeq */
+			ap[ i ] == preferredDoc ? -1 :
+			bp[ i ] == preferredDoc ? 1 :
+			/* eslint-enable eqeqeq */
 			0;
 	};
 
@@ -16170,10 +16282,7 @@ Sizzle.matches = function( expr, elements ) {
 };
 
 Sizzle.matchesSelector = function( elem, expr ) {
-	// Set document vars if needed
-	if ( ( elem.ownerDocument || elem ) !== document ) {
-		setDocument( elem );
-	}
+	setDocument( elem );
 
 	if ( support.matchesSelector && documentIsHTML &&
 		!nonnativeSelectorCache[ expr + " " ] &&
@@ -16185,12 +16294,13 @@ Sizzle.matchesSelector = function( elem, expr ) {
 
 			// IE 9's matchesSelector returns false on disconnected nodes
 			if ( ret || support.disconnectedMatch ||
-					// As well, disconnected nodes are said to be in a document
-					// fragment in IE 9
-					elem.document && elem.document.nodeType !== 11 ) {
+
+				// As well, disconnected nodes are said to be in a document
+				// fragment in IE 9
+				elem.document && elem.document.nodeType !== 11 ) {
 				return ret;
 			}
-		} catch (e) {
+		} catch ( e ) {
 			nonnativeSelectorCache( expr, true );
 		}
 	}
@@ -16199,20 +16309,31 @@ Sizzle.matchesSelector = function( elem, expr ) {
 };
 
 Sizzle.contains = function( context, elem ) {
+
 	// Set document vars if needed
-	if ( ( context.ownerDocument || context ) !== document ) {
+	// Support: IE 11+, Edge 17 - 18+
+	// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+	// two documents; shallow comparisons work.
+	// eslint-disable-next-line eqeqeq
+	if ( ( context.ownerDocument || context ) != document ) {
 		setDocument( context );
 	}
 	return contains( context, elem );
 };
 
 Sizzle.attr = function( elem, name ) {
+
 	// Set document vars if needed
-	if ( ( elem.ownerDocument || elem ) !== document ) {
+	// Support: IE 11+, Edge 17 - 18+
+	// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+	// two documents; shallow comparisons work.
+	// eslint-disable-next-line eqeqeq
+	if ( ( elem.ownerDocument || elem ) != document ) {
 		setDocument( elem );
 	}
 
 	var fn = Expr.attrHandle[ name.toLowerCase() ],
+
 		// Don't get fooled by Object.prototype properties (jQuery #13807)
 		val = fn && hasOwn.call( Expr.attrHandle, name.toLowerCase() ) ?
 			fn( elem, name, !documentIsHTML ) :
@@ -16222,13 +16343,13 @@ Sizzle.attr = function( elem, name ) {
 		val :
 		support.attributes || !documentIsHTML ?
 			elem.getAttribute( name ) :
-			(val = elem.getAttributeNode(name)) && val.specified ?
+			( val = elem.getAttributeNode( name ) ) && val.specified ?
 				val.value :
 				null;
 };
 
 Sizzle.escape = function( sel ) {
-	return (sel + "").replace( rcssescape, fcssescape );
+	return ( sel + "" ).replace( rcssescape, fcssescape );
 };
 
 Sizzle.error = function( msg ) {
@@ -16251,7 +16372,7 @@ Sizzle.uniqueSort = function( results ) {
 	results.sort( sortOrder );
 
 	if ( hasDuplicate ) {
-		while ( (elem = results[i++]) ) {
+		while ( ( elem = results[ i++ ] ) ) {
 			if ( elem === results[ i ] ) {
 				j = duplicates.push( i );
 			}
@@ -16279,17 +16400,21 @@ getText = Sizzle.getText = function( elem ) {
 		nodeType = elem.nodeType;
 
 	if ( !nodeType ) {
+
 		// If no nodeType, this is expected to be an array
-		while ( (node = elem[i++]) ) {
+		while ( ( node = elem[ i++ ] ) ) {
+
 			// Do not traverse comment nodes
 			ret += getText( node );
 		}
 	} else if ( nodeType === 1 || nodeType === 9 || nodeType === 11 ) {
+
 		// Use textContent for elements
 		// innerText usage removed for consistency of new lines (jQuery #11153)
 		if ( typeof elem.textContent === "string" ) {
 			return elem.textContent;
 		} else {
+
 			// Traverse its children
 			for ( elem = elem.firstChild; elem; elem = elem.nextSibling ) {
 				ret += getText( elem );
@@ -16298,6 +16423,7 @@ getText = Sizzle.getText = function( elem ) {
 	} else if ( nodeType === 3 || nodeType === 4 ) {
 		return elem.nodeValue;
 	}
+
 	// Do not include comment or processing instruction nodes
 
 	return ret;
@@ -16325,19 +16451,21 @@ Expr = Sizzle.selectors = {
 
 	preFilter: {
 		"ATTR": function( match ) {
-			match[1] = match[1].replace( runescape, funescape );
+			match[ 1 ] = match[ 1 ].replace( runescape, funescape );
 
 			// Move the given value to match[3] whether quoted or unquoted
-			match[3] = ( match[3] || match[4] || match[5] || "" ).replace( runescape, funescape );
+			match[ 3 ] = ( match[ 3 ] || match[ 4 ] ||
+				match[ 5 ] || "" ).replace( runescape, funescape );
 
-			if ( match[2] === "~=" ) {
-				match[3] = " " + match[3] + " ";
+			if ( match[ 2 ] === "~=" ) {
+				match[ 3 ] = " " + match[ 3 ] + " ";
 			}
 
 			return match.slice( 0, 4 );
 		},
 
 		"CHILD": function( match ) {
+
 			/* matches from matchExpr["CHILD"]
 				1 type (only|nth|...)
 				2 what (child|of-type)
@@ -16348,22 +16476,25 @@ Expr = Sizzle.selectors = {
 				7 sign of y-component
 				8 y of y-component
 			*/
-			match[1] = match[1].toLowerCase();
+			match[ 1 ] = match[ 1 ].toLowerCase();
 
-			if ( match[1].slice( 0, 3 ) === "nth" ) {
+			if ( match[ 1 ].slice( 0, 3 ) === "nth" ) {
+
 				// nth-* requires argument
-				if ( !match[3] ) {
-					Sizzle.error( match[0] );
+				if ( !match[ 3 ] ) {
+					Sizzle.error( match[ 0 ] );
 				}
 
 				// numeric x and y parameters for Expr.filter.CHILD
 				// remember that false/true cast respectively to 0/1
-				match[4] = +( match[4] ? match[5] + (match[6] || 1) : 2 * ( match[3] === "even" || match[3] === "odd" ) );
-				match[5] = +( ( match[7] + match[8] ) || match[3] === "odd" );
+				match[ 4 ] = +( match[ 4 ] ?
+					match[ 5 ] + ( match[ 6 ] || 1 ) :
+					2 * ( match[ 3 ] === "even" || match[ 3 ] === "odd" ) );
+				match[ 5 ] = +( ( match[ 7 ] + match[ 8 ] ) || match[ 3 ] === "odd" );
 
-			// other types prohibit arguments
-			} else if ( match[3] ) {
-				Sizzle.error( match[0] );
+				// other types prohibit arguments
+			} else if ( match[ 3 ] ) {
+				Sizzle.error( match[ 0 ] );
 			}
 
 			return match;
@@ -16371,26 +16502,28 @@ Expr = Sizzle.selectors = {
 
 		"PSEUDO": function( match ) {
 			var excess,
-				unquoted = !match[6] && match[2];
+				unquoted = !match[ 6 ] && match[ 2 ];
 
-			if ( matchExpr["CHILD"].test( match[0] ) ) {
+			if ( matchExpr[ "CHILD" ].test( match[ 0 ] ) ) {
 				return null;
 			}
 
 			// Accept quoted arguments as-is
-			if ( match[3] ) {
-				match[2] = match[4] || match[5] || "";
+			if ( match[ 3 ] ) {
+				match[ 2 ] = match[ 4 ] || match[ 5 ] || "";
 
 			// Strip excess characters from unquoted arguments
 			} else if ( unquoted && rpseudo.test( unquoted ) &&
+
 				// Get excess from tokenize (recursively)
-				(excess = tokenize( unquoted, true )) &&
+				( excess = tokenize( unquoted, true ) ) &&
+
 				// advance to the next closing parenthesis
-				(excess = unquoted.indexOf( ")", unquoted.length - excess ) - unquoted.length) ) {
+				( excess = unquoted.indexOf( ")", unquoted.length - excess ) - unquoted.length ) ) {
 
 				// excess is a negative index
-				match[0] = match[0].slice( 0, excess );
-				match[2] = unquoted.slice( 0, excess );
+				match[ 0 ] = match[ 0 ].slice( 0, excess );
+				match[ 2 ] = unquoted.slice( 0, excess );
 			}
 
 			// Return only captures needed by the pseudo filter method (type and argument)
@@ -16403,7 +16536,9 @@ Expr = Sizzle.selectors = {
 		"TAG": function( nodeNameSelector ) {
 			var nodeName = nodeNameSelector.replace( runescape, funescape ).toLowerCase();
 			return nodeNameSelector === "*" ?
-				function() { return true; } :
+				function() {
+					return true;
+				} :
 				function( elem ) {
 					return elem.nodeName && elem.nodeName.toLowerCase() === nodeName;
 				};
@@ -16413,10 +16548,16 @@ Expr = Sizzle.selectors = {
 			var pattern = classCache[ className + " " ];
 
 			return pattern ||
-				(pattern = new RegExp( "(^|" + whitespace + ")" + className + "(" + whitespace + "|$)" )) &&
-				classCache( className, function( elem ) {
-					return pattern.test( typeof elem.className === "string" && elem.className || typeof elem.getAttribute !== "undefined" && elem.getAttribute("class") || "" );
-				});
+				( pattern = new RegExp( "(^|" + whitespace +
+					")" + className + "(" + whitespace + "|$)" ) ) && classCache(
+						className, function( elem ) {
+							return pattern.test(
+								typeof elem.className === "string" && elem.className ||
+								typeof elem.getAttribute !== "undefined" &&
+									elem.getAttribute( "class" ) ||
+								""
+							);
+				} );
 		},
 
 		"ATTR": function( name, operator, check ) {
@@ -16432,6 +16573,8 @@ Expr = Sizzle.selectors = {
 
 				result += "";
 
+				/* eslint-disable max-len */
+
 				return operator === "=" ? result === check :
 					operator === "!=" ? result !== check :
 					operator === "^=" ? check && result.indexOf( check ) === 0 :
@@ -16440,10 +16583,12 @@ Expr = Sizzle.selectors = {
 					operator === "~=" ? ( " " + result.replace( rwhitespace, " " ) + " " ).indexOf( check ) > -1 :
 					operator === "|=" ? result === check || result.slice( 0, check.length + 1 ) === check + "-" :
 					false;
+				/* eslint-enable max-len */
+
 			};
 		},
 
-		"CHILD": function( type, what, argument, first, last ) {
+		"CHILD": function( type, what, _argument, first, last ) {
 			var simple = type.slice( 0, 3 ) !== "nth",
 				forward = type.slice( -4 ) !== "last",
 				ofType = what === "of-type";
@@ -16455,7 +16600,7 @@ Expr = Sizzle.selectors = {
 					return !!elem.parentNode;
 				} :
 
-				function( elem, context, xml ) {
+				function( elem, _context, xml ) {
 					var cache, uniqueCache, outerCache, node, nodeIndex, start,
 						dir = simple !== forward ? "nextSibling" : "previousSibling",
 						parent = elem.parentNode,
@@ -16469,7 +16614,7 @@ Expr = Sizzle.selectors = {
 						if ( simple ) {
 							while ( dir ) {
 								node = elem;
-								while ( (node = node[ dir ]) ) {
+								while ( ( node = node[ dir ] ) ) {
 									if ( ofType ?
 										node.nodeName.toLowerCase() === name :
 										node.nodeType === 1 ) {
@@ -16477,6 +16622,7 @@ Expr = Sizzle.selectors = {
 										return false;
 									}
 								}
+
 								// Reverse direction for :only-* (if we haven't yet done so)
 								start = dir = type === "only" && !start && "nextSibling";
 							}
@@ -16492,22 +16638,22 @@ Expr = Sizzle.selectors = {
 
 							// ...in a gzip-friendly way
 							node = parent;
-							outerCache = node[ expando ] || (node[ expando ] = {});
+							outerCache = node[ expando ] || ( node[ expando ] = {} );
 
 							// Support: IE <9 only
 							// Defend against cloned attroperties (jQuery gh-1709)
 							uniqueCache = outerCache[ node.uniqueID ] ||
-								(outerCache[ node.uniqueID ] = {});
+								( outerCache[ node.uniqueID ] = {} );
 
 							cache = uniqueCache[ type ] || [];
 							nodeIndex = cache[ 0 ] === dirruns && cache[ 1 ];
 							diff = nodeIndex && cache[ 2 ];
 							node = nodeIndex && parent.childNodes[ nodeIndex ];
 
-							while ( (node = ++nodeIndex && node && node[ dir ] ||
+							while ( ( node = ++nodeIndex && node && node[ dir ] ||
 
 								// Fallback to seeking `elem` from the start
-								(diff = nodeIndex = 0) || start.pop()) ) {
+								( diff = nodeIndex = 0 ) || start.pop() ) ) {
 
 								// When found, cache indexes on `parent` and break
 								if ( node.nodeType === 1 && ++diff && node === elem ) {
@@ -16517,16 +16663,18 @@ Expr = Sizzle.selectors = {
 							}
 
 						} else {
+
 							// Use previously-cached element index if available
 							if ( useCache ) {
+
 								// ...in a gzip-friendly way
 								node = elem;
-								outerCache = node[ expando ] || (node[ expando ] = {});
+								outerCache = node[ expando ] || ( node[ expando ] = {} );
 
 								// Support: IE <9 only
 								// Defend against cloned attroperties (jQuery gh-1709)
 								uniqueCache = outerCache[ node.uniqueID ] ||
-									(outerCache[ node.uniqueID ] = {});
+									( outerCache[ node.uniqueID ] = {} );
 
 								cache = uniqueCache[ type ] || [];
 								nodeIndex = cache[ 0 ] === dirruns && cache[ 1 ];
@@ -16536,9 +16684,10 @@ Expr = Sizzle.selectors = {
 							// xml :nth-child(...)
 							// or :nth-last-child(...) or :nth(-last)?-of-type(...)
 							if ( diff === false ) {
+
 								// Use the same loop as above to seek `elem` from the start
-								while ( (node = ++nodeIndex && node && node[ dir ] ||
-									(diff = nodeIndex = 0) || start.pop()) ) {
+								while ( ( node = ++nodeIndex && node && node[ dir ] ||
+									( diff = nodeIndex = 0 ) || start.pop() ) ) {
 
 									if ( ( ofType ?
 										node.nodeName.toLowerCase() === name :
@@ -16547,12 +16696,13 @@ Expr = Sizzle.selectors = {
 
 										// Cache the index of each encountered element
 										if ( useCache ) {
-											outerCache = node[ expando ] || (node[ expando ] = {});
+											outerCache = node[ expando ] ||
+												( node[ expando ] = {} );
 
 											// Support: IE <9 only
 											// Defend against cloned attroperties (jQuery gh-1709)
 											uniqueCache = outerCache[ node.uniqueID ] ||
-												(outerCache[ node.uniqueID ] = {});
+												( outerCache[ node.uniqueID ] = {} );
 
 											uniqueCache[ type ] = [ dirruns, diff ];
 										}
@@ -16573,6 +16723,7 @@ Expr = Sizzle.selectors = {
 		},
 
 		"PSEUDO": function( pseudo, argument ) {
+
 			// pseudo-class names are case-insensitive
 			// http://www.w3.org/TR/selectors/#pseudo-classes
 			// Prioritize by case sensitivity in case custom pseudos are added with uppercase letters
@@ -16592,15 +16743,15 @@ Expr = Sizzle.selectors = {
 			if ( fn.length > 1 ) {
 				args = [ pseudo, pseudo, "", argument ];
 				return Expr.setFilters.hasOwnProperty( pseudo.toLowerCase() ) ?
-					markFunction(function( seed, matches ) {
+					markFunction( function( seed, matches ) {
 						var idx,
 							matched = fn( seed, argument ),
 							i = matched.length;
 						while ( i-- ) {
-							idx = indexOf( seed, matched[i] );
-							seed[ idx ] = !( matches[ idx ] = matched[i] );
+							idx = indexOf( seed, matched[ i ] );
+							seed[ idx ] = !( matches[ idx ] = matched[ i ] );
 						}
-					}) :
+					} ) :
 					function( elem ) {
 						return fn( elem, 0, args );
 					};
@@ -16611,8 +16762,10 @@ Expr = Sizzle.selectors = {
 	},
 
 	pseudos: {
+
 		// Potentially complex pseudos
-		"not": markFunction(function( selector ) {
+		"not": markFunction( function( selector ) {
+
 			// Trim the selector passed to compile
 			// to avoid treating leading and trailing
 			// spaces as combinators
@@ -16621,39 +16774,40 @@ Expr = Sizzle.selectors = {
 				matcher = compile( selector.replace( rtrim, "$1" ) );
 
 			return matcher[ expando ] ?
-				markFunction(function( seed, matches, context, xml ) {
+				markFunction( function( seed, matches, _context, xml ) {
 					var elem,
 						unmatched = matcher( seed, null, xml, [] ),
 						i = seed.length;
 
 					// Match elements unmatched by `matcher`
 					while ( i-- ) {
-						if ( (elem = unmatched[i]) ) {
-							seed[i] = !(matches[i] = elem);
+						if ( ( elem = unmatched[ i ] ) ) {
+							seed[ i ] = !( matches[ i ] = elem );
 						}
 					}
-				}) :
-				function( elem, context, xml ) {
-					input[0] = elem;
+				} ) :
+				function( elem, _context, xml ) {
+					input[ 0 ] = elem;
 					matcher( input, null, xml, results );
+
 					// Don't keep the element (issue #299)
-					input[0] = null;
+					input[ 0 ] = null;
 					return !results.pop();
 				};
-		}),
+		} ),
 
-		"has": markFunction(function( selector ) {
+		"has": markFunction( function( selector ) {
 			return function( elem ) {
 				return Sizzle( selector, elem ).length > 0;
 			};
-		}),
+		} ),
 
-		"contains": markFunction(function( text ) {
+		"contains": markFunction( function( text ) {
 			text = text.replace( runescape, funescape );
 			return function( elem ) {
 				return ( elem.textContent || getText( elem ) ).indexOf( text ) > -1;
 			};
-		}),
+		} ),
 
 		// "Whether an element is represented by a :lang() selector
 		// is based solely on the element's language value
@@ -16663,25 +16817,26 @@ Expr = Sizzle.selectors = {
 		// The identifier C does not have to be a valid language name."
 		// http://www.w3.org/TR/selectors/#lang-pseudo
 		"lang": markFunction( function( lang ) {
+
 			// lang value must be a valid identifier
-			if ( !ridentifier.test(lang || "") ) {
+			if ( !ridentifier.test( lang || "" ) ) {
 				Sizzle.error( "unsupported lang: " + lang );
 			}
 			lang = lang.replace( runescape, funescape ).toLowerCase();
 			return function( elem ) {
 				var elemLang;
 				do {
-					if ( (elemLang = documentIsHTML ?
+					if ( ( elemLang = documentIsHTML ?
 						elem.lang :
-						elem.getAttribute("xml:lang") || elem.getAttribute("lang")) ) {
+						elem.getAttribute( "xml:lang" ) || elem.getAttribute( "lang" ) ) ) {
 
 						elemLang = elemLang.toLowerCase();
 						return elemLang === lang || elemLang.indexOf( lang + "-" ) === 0;
 					}
-				} while ( (elem = elem.parentNode) && elem.nodeType === 1 );
+				} while ( ( elem = elem.parentNode ) && elem.nodeType === 1 );
 				return false;
 			};
-		}),
+		} ),
 
 		// Miscellaneous
 		"target": function( elem ) {
@@ -16694,7 +16849,9 @@ Expr = Sizzle.selectors = {
 		},
 
 		"focus": function( elem ) {
-			return elem === document.activeElement && (!document.hasFocus || document.hasFocus()) && !!(elem.type || elem.href || ~elem.tabIndex);
+			return elem === document.activeElement &&
+				( !document.hasFocus || document.hasFocus() ) &&
+				!!( elem.type || elem.href || ~elem.tabIndex );
 		},
 
 		// Boolean properties
@@ -16702,16 +16859,20 @@ Expr = Sizzle.selectors = {
 		"disabled": createDisabledPseudo( true ),
 
 		"checked": function( elem ) {
+
 			// In CSS3, :checked should return both checked and selected elements
 			// http://www.w3.org/TR/2011/REC-css3-selectors-20110929/#checked
 			var nodeName = elem.nodeName.toLowerCase();
-			return (nodeName === "input" && !!elem.checked) || (nodeName === "option" && !!elem.selected);
+			return ( nodeName === "input" && !!elem.checked ) ||
+				( nodeName === "option" && !!elem.selected );
 		},
 
 		"selected": function( elem ) {
+
 			// Accessing this property makes selected-by-default
 			// options in Safari work properly
 			if ( elem.parentNode ) {
+				// eslint-disable-next-line no-unused-expressions
 				elem.parentNode.selectedIndex;
 			}
 
@@ -16720,6 +16881,7 @@ Expr = Sizzle.selectors = {
 
 		// Contents
 		"empty": function( elem ) {
+
 			// http://www.w3.org/TR/selectors/#empty-pseudo
 			// :empty is negated by element (1) or content nodes (text: 3; cdata: 4; entity ref: 5),
 			//   but not by others (comment: 8; processing instruction: 7; etc.)
@@ -16733,7 +16895,7 @@ Expr = Sizzle.selectors = {
 		},
 
 		"parent": function( elem ) {
-			return !Expr.pseudos["empty"]( elem );
+			return !Expr.pseudos[ "empty" ]( elem );
 		},
 
 		// Element/input types
@@ -16757,39 +16919,40 @@ Expr = Sizzle.selectors = {
 
 				// Support: IE<8
 				// New HTML5 attribute values (e.g., "search") appear with elem.type === "text"
-				( (attr = elem.getAttribute("type")) == null || attr.toLowerCase() === "text" );
+				( ( attr = elem.getAttribute( "type" ) ) == null ||
+					attr.toLowerCase() === "text" );
 		},
 
 		// Position-in-collection
-		"first": createPositionalPseudo(function() {
+		"first": createPositionalPseudo( function() {
 			return [ 0 ];
-		}),
+		} ),
 
-		"last": createPositionalPseudo(function( matchIndexes, length ) {
+		"last": createPositionalPseudo( function( _matchIndexes, length ) {
 			return [ length - 1 ];
-		}),
+		} ),
 
-		"eq": createPositionalPseudo(function( matchIndexes, length, argument ) {
+		"eq": createPositionalPseudo( function( _matchIndexes, length, argument ) {
 			return [ argument < 0 ? argument + length : argument ];
-		}),
+		} ),
 
-		"even": createPositionalPseudo(function( matchIndexes, length ) {
+		"even": createPositionalPseudo( function( matchIndexes, length ) {
 			var i = 0;
 			for ( ; i < length; i += 2 ) {
 				matchIndexes.push( i );
 			}
 			return matchIndexes;
-		}),
+		} ),
 
-		"odd": createPositionalPseudo(function( matchIndexes, length ) {
+		"odd": createPositionalPseudo( function( matchIndexes, length ) {
 			var i = 1;
 			for ( ; i < length; i += 2 ) {
 				matchIndexes.push( i );
 			}
 			return matchIndexes;
-		}),
+		} ),
 
-		"lt": createPositionalPseudo(function( matchIndexes, length, argument ) {
+		"lt": createPositionalPseudo( function( matchIndexes, length, argument ) {
 			var i = argument < 0 ?
 				argument + length :
 				argument > length ?
@@ -16799,19 +16962,19 @@ Expr = Sizzle.selectors = {
 				matchIndexes.push( i );
 			}
 			return matchIndexes;
-		}),
+		} ),
 
-		"gt": createPositionalPseudo(function( matchIndexes, length, argument ) {
+		"gt": createPositionalPseudo( function( matchIndexes, length, argument ) {
 			var i = argument < 0 ? argument + length : argument;
 			for ( ; ++i < length; ) {
 				matchIndexes.push( i );
 			}
 			return matchIndexes;
-		})
+		} )
 	}
 };
 
-Expr.pseudos["nth"] = Expr.pseudos["eq"];
+Expr.pseudos[ "nth" ] = Expr.pseudos[ "eq" ];
 
 // Add button/input type pseudos
 for ( i in { radio: true, checkbox: true, file: true, password: true, image: true } ) {
@@ -16842,37 +17005,39 @@ tokenize = Sizzle.tokenize = function( selector, parseOnly ) {
 	while ( soFar ) {
 
 		// Comma and first run
-		if ( !matched || (match = rcomma.exec( soFar )) ) {
+		if ( !matched || ( match = rcomma.exec( soFar ) ) ) {
 			if ( match ) {
+
 				// Don't consume trailing commas as valid
-				soFar = soFar.slice( match[0].length ) || soFar;
+				soFar = soFar.slice( match[ 0 ].length ) || soFar;
 			}
-			groups.push( (tokens = []) );
+			groups.push( ( tokens = [] ) );
 		}
 
 		matched = false;
 
 		// Combinators
-		if ( (match = rcombinators.exec( soFar )) ) {
+		if ( ( match = rcombinators.exec( soFar ) ) ) {
 			matched = match.shift();
-			tokens.push({
+			tokens.push( {
 				value: matched,
+
 				// Cast descendant combinators to space
-				type: match[0].replace( rtrim, " " )
-			});
+				type: match[ 0 ].replace( rtrim, " " )
+			} );
 			soFar = soFar.slice( matched.length );
 		}
 
 		// Filters
 		for ( type in Expr.filter ) {
-			if ( (match = matchExpr[ type ].exec( soFar )) && (!preFilters[ type ] ||
-				(match = preFilters[ type ]( match ))) ) {
+			if ( ( match = matchExpr[ type ].exec( soFar ) ) && ( !preFilters[ type ] ||
+				( match = preFilters[ type ]( match ) ) ) ) {
 				matched = match.shift();
-				tokens.push({
+				tokens.push( {
 					value: matched,
 					type: type,
 					matches: match
-				});
+				} );
 				soFar = soFar.slice( matched.length );
 			}
 		}
@@ -16889,6 +17054,7 @@ tokenize = Sizzle.tokenize = function( selector, parseOnly ) {
 		soFar.length :
 		soFar ?
 			Sizzle.error( selector ) :
+
 			// Cache the tokens
 			tokenCache( selector, groups ).slice( 0 );
 };
@@ -16898,7 +17064,7 @@ function toSelector( tokens ) {
 		len = tokens.length,
 		selector = "";
 	for ( ; i < len; i++ ) {
-		selector += tokens[i].value;
+		selector += tokens[ i ].value;
 	}
 	return selector;
 }
@@ -16911,9 +17077,10 @@ function addCombinator( matcher, combinator, base ) {
 		doneName = done++;
 
 	return combinator.first ?
+
 		// Check against closest ancestor/preceding element
 		function( elem, context, xml ) {
-			while ( (elem = elem[ dir ]) ) {
+			while ( ( elem = elem[ dir ] ) ) {
 				if ( elem.nodeType === 1 || checkNonElements ) {
 					return matcher( elem, context, xml );
 				}
@@ -16928,7 +17095,7 @@ function addCombinator( matcher, combinator, base ) {
 
 			// We can't set arbitrary data on XML nodes, so they don't benefit from combinator caching
 			if ( xml ) {
-				while ( (elem = elem[ dir ]) ) {
+				while ( ( elem = elem[ dir ] ) ) {
 					if ( elem.nodeType === 1 || checkNonElements ) {
 						if ( matcher( elem, context, xml ) ) {
 							return true;
@@ -16936,27 +17103,29 @@ function addCombinator( matcher, combinator, base ) {
 					}
 				}
 			} else {
-				while ( (elem = elem[ dir ]) ) {
+				while ( ( elem = elem[ dir ] ) ) {
 					if ( elem.nodeType === 1 || checkNonElements ) {
-						outerCache = elem[ expando ] || (elem[ expando ] = {});
+						outerCache = elem[ expando ] || ( elem[ expando ] = {} );
 
 						// Support: IE <9 only
 						// Defend against cloned attroperties (jQuery gh-1709)
-						uniqueCache = outerCache[ elem.uniqueID ] || (outerCache[ elem.uniqueID ] = {});
+						uniqueCache = outerCache[ elem.uniqueID ] ||
+							( outerCache[ elem.uniqueID ] = {} );
 
 						if ( skip && skip === elem.nodeName.toLowerCase() ) {
 							elem = elem[ dir ] || elem;
-						} else if ( (oldCache = uniqueCache[ key ]) &&
+						} else if ( ( oldCache = uniqueCache[ key ] ) &&
 							oldCache[ 0 ] === dirruns && oldCache[ 1 ] === doneName ) {
 
 							// Assign to newCache so results back-propagate to previous elements
-							return (newCache[ 2 ] = oldCache[ 2 ]);
+							return ( newCache[ 2 ] = oldCache[ 2 ] );
 						} else {
+
 							// Reuse newcache so results back-propagate to previous elements
 							uniqueCache[ key ] = newCache;
 
 							// A match means we're done; a fail means we have to keep checking
-							if ( (newCache[ 2 ] = matcher( elem, context, xml )) ) {
+							if ( ( newCache[ 2 ] = matcher( elem, context, xml ) ) ) {
 								return true;
 							}
 						}
@@ -16972,20 +17141,20 @@ function elementMatcher( matchers ) {
 		function( elem, context, xml ) {
 			var i = matchers.length;
 			while ( i-- ) {
-				if ( !matchers[i]( elem, context, xml ) ) {
+				if ( !matchers[ i ]( elem, context, xml ) ) {
 					return false;
 				}
 			}
 			return true;
 		} :
-		matchers[0];
+		matchers[ 0 ];
 }
 
 function multipleContexts( selector, contexts, results ) {
 	var i = 0,
 		len = contexts.length;
 	for ( ; i < len; i++ ) {
-		Sizzle( selector, contexts[i], results );
+		Sizzle( selector, contexts[ i ], results );
 	}
 	return results;
 }
@@ -16998,7 +17167,7 @@ function condense( unmatched, map, filter, context, xml ) {
 		mapped = map != null;
 
 	for ( ; i < len; i++ ) {
-		if ( (elem = unmatched[i]) ) {
+		if ( ( elem = unmatched[ i ] ) ) {
 			if ( !filter || filter( elem, context, xml ) ) {
 				newUnmatched.push( elem );
 				if ( mapped ) {
@@ -17018,14 +17187,18 @@ function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postS
 	if ( postFinder && !postFinder[ expando ] ) {
 		postFinder = setMatcher( postFinder, postSelector );
 	}
-	return markFunction(function( seed, results, context, xml ) {
+	return markFunction( function( seed, results, context, xml ) {
 		var temp, i, elem,
 			preMap = [],
 			postMap = [],
 			preexisting = results.length,
 
 			// Get initial elements from seed or context
-			elems = seed || multipleContexts( selector || "*", context.nodeType ? [ context ] : context, [] ),
+			elems = seed || multipleContexts(
+				selector || "*",
+				context.nodeType ? [ context ] : context,
+				[]
+			),
 
 			// Prefilter to get matcher input, preserving a map for seed-results synchronization
 			matcherIn = preFilter && ( seed || !selector ) ?
@@ -17033,6 +17206,7 @@ function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postS
 				elems,
 
 			matcherOut = matcher ?
+
 				// If we have a postFinder, or filtered seed, or non-seed postFilter or preexisting results,
 				postFinder || ( seed ? preFilter : preexisting || postFilter ) ?
 
@@ -17056,8 +17230,8 @@ function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postS
 			// Un-match failing elements by moving them back to matcherIn
 			i = temp.length;
 			while ( i-- ) {
-				if ( (elem = temp[i]) ) {
-					matcherOut[ postMap[i] ] = !(matcherIn[ postMap[i] ] = elem);
+				if ( ( elem = temp[ i ] ) ) {
+					matcherOut[ postMap[ i ] ] = !( matcherIn[ postMap[ i ] ] = elem );
 				}
 			}
 		}
@@ -17065,25 +17239,27 @@ function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postS
 		if ( seed ) {
 			if ( postFinder || preFilter ) {
 				if ( postFinder ) {
+
 					// Get the final matcherOut by condensing this intermediate into postFinder contexts
 					temp = [];
 					i = matcherOut.length;
 					while ( i-- ) {
-						if ( (elem = matcherOut[i]) ) {
+						if ( ( elem = matcherOut[ i ] ) ) {
+
 							// Restore matcherIn since elem is not yet a final match
-							temp.push( (matcherIn[i] = elem) );
+							temp.push( ( matcherIn[ i ] = elem ) );
 						}
 					}
-					postFinder( null, (matcherOut = []), temp, xml );
+					postFinder( null, ( matcherOut = [] ), temp, xml );
 				}
 
 				// Move matched elements from seed to results to keep them synchronized
 				i = matcherOut.length;
 				while ( i-- ) {
-					if ( (elem = matcherOut[i]) &&
-						(temp = postFinder ? indexOf( seed, elem ) : preMap[i]) > -1 ) {
+					if ( ( elem = matcherOut[ i ] ) &&
+						( temp = postFinder ? indexOf( seed, elem ) : preMap[ i ] ) > -1 ) {
 
-						seed[temp] = !(results[temp] = elem);
+						seed[ temp ] = !( results[ temp ] = elem );
 					}
 				}
 			}
@@ -17101,14 +17277,14 @@ function setMatcher( preFilter, selector, matcher, postFilter, postFinder, postS
 				push.apply( results, matcherOut );
 			}
 		}
-	});
+	} );
 }
 
 function matcherFromTokens( tokens ) {
 	var checkContext, matcher, j,
 		len = tokens.length,
-		leadingRelative = Expr.relative[ tokens[0].type ],
-		implicitRelative = leadingRelative || Expr.relative[" "],
+		leadingRelative = Expr.relative[ tokens[ 0 ].type ],
+		implicitRelative = leadingRelative || Expr.relative[ " " ],
 		i = leadingRelative ? 1 : 0,
 
 		// The foundational matcher ensures that elements are reachable from top-level context(s)
@@ -17120,38 +17296,43 @@ function matcherFromTokens( tokens ) {
 		}, implicitRelative, true ),
 		matchers = [ function( elem, context, xml ) {
 			var ret = ( !leadingRelative && ( xml || context !== outermostContext ) ) || (
-				(checkContext = context).nodeType ?
+				( checkContext = context ).nodeType ?
 					matchContext( elem, context, xml ) :
 					matchAnyContext( elem, context, xml ) );
+
 			// Avoid hanging onto element (issue #299)
 			checkContext = null;
 			return ret;
 		} ];
 
 	for ( ; i < len; i++ ) {
-		if ( (matcher = Expr.relative[ tokens[i].type ]) ) {
-			matchers = [ addCombinator(elementMatcher( matchers ), matcher) ];
+		if ( ( matcher = Expr.relative[ tokens[ i ].type ] ) ) {
+			matchers = [ addCombinator( elementMatcher( matchers ), matcher ) ];
 		} else {
-			matcher = Expr.filter[ tokens[i].type ].apply( null, tokens[i].matches );
+			matcher = Expr.filter[ tokens[ i ].type ].apply( null, tokens[ i ].matches );
 
 			// Return special upon seeing a positional matcher
 			if ( matcher[ expando ] ) {
+
 				// Find the next relative operator (if any) for proper handling
 				j = ++i;
 				for ( ; j < len; j++ ) {
-					if ( Expr.relative[ tokens[j].type ] ) {
+					if ( Expr.relative[ tokens[ j ].type ] ) {
 						break;
 					}
 				}
 				return setMatcher(
 					i > 1 && elementMatcher( matchers ),
 					i > 1 && toSelector(
-						// If the preceding token was a descendant combinator, insert an implicit any-element `*`
-						tokens.slice( 0, i - 1 ).concat({ value: tokens[ i - 2 ].type === " " ? "*" : "" })
+
+					// If the preceding token was a descendant combinator, insert an implicit any-element `*`
+					tokens
+						.slice( 0, i - 1 )
+						.concat( { value: tokens[ i - 2 ].type === " " ? "*" : "" } )
 					).replace( rtrim, "$1" ),
 					matcher,
 					i < j && matcherFromTokens( tokens.slice( i, j ) ),
-					j < len && matcherFromTokens( (tokens = tokens.slice( j )) ),
+					j < len && matcherFromTokens( ( tokens = tokens.slice( j ) ) ),
 					j < len && toSelector( tokens )
 				);
 			}
@@ -17172,28 +17353,40 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 				unmatched = seed && [],
 				setMatched = [],
 				contextBackup = outermostContext,
+
 				// We must always have either seed elements or outermost context
-				elems = seed || byElement && Expr.find["TAG"]( "*", outermost ),
+				elems = seed || byElement && Expr.find[ "TAG" ]( "*", outermost ),
+
 				// Use integer dirruns iff this is the outermost matcher
-				dirrunsUnique = (dirruns += contextBackup == null ? 1 : Math.random() || 0.1),
+				dirrunsUnique = ( dirruns += contextBackup == null ? 1 : Math.random() || 0.1 ),
 				len = elems.length;
 
 			if ( outermost ) {
-				outermostContext = context === document || context || outermost;
+
+				// Support: IE 11+, Edge 17 - 18+
+				// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+				// two documents; shallow comparisons work.
+				// eslint-disable-next-line eqeqeq
+				outermostContext = context == document || context || outermost;
 			}
 
 			// Add elements passing elementMatchers directly to results
 			// Support: IE<9, Safari
 			// Tolerate NodeList properties (IE: "length"; Safari: <number>) matching elements by id
-			for ( ; i !== len && (elem = elems[i]) != null; i++ ) {
+			for ( ; i !== len && ( elem = elems[ i ] ) != null; i++ ) {
 				if ( byElement && elem ) {
 					j = 0;
-					if ( !context && elem.ownerDocument !== document ) {
+
+					// Support: IE 11+, Edge 17 - 18+
+					// IE/Edge sometimes throw a "Permission denied" error when strict-comparing
+					// two documents; shallow comparisons work.
+					// eslint-disable-next-line eqeqeq
+					if ( !context && elem.ownerDocument != document ) {
 						setDocument( elem );
 						xml = !documentIsHTML;
 					}
-					while ( (matcher = elementMatchers[j++]) ) {
-						if ( matcher( elem, context || document, xml) ) {
+					while ( ( matcher = elementMatchers[ j++ ] ) ) {
+						if ( matcher( elem, context || document, xml ) ) {
 							results.push( elem );
 							break;
 						}
@@ -17205,8 +17398,9 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 
 				// Track unmatched elements for set filters
 				if ( bySet ) {
+
 					// They will have gone through all possible matchers
-					if ( (elem = !matcher && elem) ) {
+					if ( ( elem = !matcher && elem ) ) {
 						matchedCount--;
 					}
 
@@ -17230,16 +17424,17 @@ function matcherFromGroupMatchers( elementMatchers, setMatchers ) {
 			// numerically zero.
 			if ( bySet && i !== matchedCount ) {
 				j = 0;
-				while ( (matcher = setMatchers[j++]) ) {
+				while ( ( matcher = setMatchers[ j++ ] ) ) {
 					matcher( unmatched, setMatched, context, xml );
 				}
 
 				if ( seed ) {
+
 					// Reintegrate element matches to eliminate the need for sorting
 					if ( matchedCount > 0 ) {
 						while ( i-- ) {
-							if ( !(unmatched[i] || setMatched[i]) ) {
-								setMatched[i] = pop.call( results );
+							if ( !( unmatched[ i ] || setMatched[ i ] ) ) {
+								setMatched[ i ] = pop.call( results );
 							}
 						}
 					}
@@ -17280,13 +17475,14 @@ compile = Sizzle.compile = function( selector, match /* Internal Use Only */ ) {
 		cached = compilerCache[ selector + " " ];
 
 	if ( !cached ) {
+
 		// Generate a function of recursive functions that can be used to check each element
 		if ( !match ) {
 			match = tokenize( selector );
 		}
 		i = match.length;
 		while ( i-- ) {
-			cached = matcherFromTokens( match[i] );
+			cached = matcherFromTokens( match[ i ] );
 			if ( cached[ expando ] ) {
 				setMatchers.push( cached );
 			} else {
@@ -17295,7 +17491,10 @@ compile = Sizzle.compile = function( selector, match /* Internal Use Only */ ) {
 		}
 
 		// Cache the compiled function
-		cached = compilerCache( selector, matcherFromGroupMatchers( elementMatchers, setMatchers ) );
+		cached = compilerCache(
+			selector,
+			matcherFromGroupMatchers( elementMatchers, setMatchers )
+		);
 
 		// Save selector and tokenization
 		cached.selector = selector;
@@ -17315,7 +17514,7 @@ compile = Sizzle.compile = function( selector, match /* Internal Use Only */ ) {
 select = Sizzle.select = function( selector, context, results, seed ) {
 	var i, tokens, token, type, find,
 		compiled = typeof selector === "function" && selector,
-		match = !seed && tokenize( (selector = compiled.selector || selector) );
+		match = !seed && tokenize( ( selector = compiled.selector || selector ) );
 
 	results = results || [];
 
@@ -17324,11 +17523,12 @@ select = Sizzle.select = function( selector, context, results, seed ) {
 	if ( match.length === 1 ) {
 
 		// Reduce context if the leading compound selector is an ID
-		tokens = match[0] = match[0].slice( 0 );
-		if ( tokens.length > 2 && (token = tokens[0]).type === "ID" &&
-				context.nodeType === 9 && documentIsHTML && Expr.relative[ tokens[1].type ] ) {
+		tokens = match[ 0 ] = match[ 0 ].slice( 0 );
+		if ( tokens.length > 2 && ( token = tokens[ 0 ] ).type === "ID" &&
+			context.nodeType === 9 && documentIsHTML && Expr.relative[ tokens[ 1 ].type ] ) {
 
-			context = ( Expr.find["ID"]( token.matches[0].replace(runescape, funescape), context ) || [] )[0];
+			context = ( Expr.find[ "ID" ]( token.matches[ 0 ]
+				.replace( runescape, funescape ), context ) || [] )[ 0 ];
 			if ( !context ) {
 				return results;
 
@@ -17341,20 +17541,22 @@ select = Sizzle.select = function( selector, context, results, seed ) {
 		}
 
 		// Fetch a seed set for right-to-left matching
-		i = matchExpr["needsContext"].test( selector ) ? 0 : tokens.length;
+		i = matchExpr[ "needsContext" ].test( selector ) ? 0 : tokens.length;
 		while ( i-- ) {
-			token = tokens[i];
+			token = tokens[ i ];
 
 			// Abort if we hit a combinator
-			if ( Expr.relative[ (type = token.type) ] ) {
+			if ( Expr.relative[ ( type = token.type ) ] ) {
 				break;
 			}
-			if ( (find = Expr.find[ type ]) ) {
+			if ( ( find = Expr.find[ type ] ) ) {
+
 				// Search, expanding context for leading sibling combinators
-				if ( (seed = find(
-					token.matches[0].replace( runescape, funescape ),
-					rsibling.test( tokens[0].type ) && testContext( context.parentNode ) || context
-				)) ) {
+				if ( ( seed = find(
+					token.matches[ 0 ].replace( runescape, funescape ),
+					rsibling.test( tokens[ 0 ].type ) && testContext( context.parentNode ) ||
+						context
+				) ) ) {
 
 					// If seed is empty or no tokens remain, we can return early
 					tokens.splice( i, 1 );
@@ -17385,7 +17587,7 @@ select = Sizzle.select = function( selector, context, results, seed ) {
 // One-time assignments
 
 // Sort stability
-support.sortStable = expando.split("").sort( sortOrder ).join("") === expando;
+support.sortStable = expando.split( "" ).sort( sortOrder ).join( "" ) === expando;
 
 // Support: Chrome 14-35+
 // Always assume duplicates if they aren't passed to the comparison function
@@ -17396,58 +17598,59 @@ setDocument();
 
 // Support: Webkit<537.32 - Safari 6.0.3/Chrome 25 (fixed in Chrome 27)
 // Detached nodes confoundingly follow *each other*
-support.sortDetached = assert(function( el ) {
+support.sortDetached = assert( function( el ) {
+
 	// Should return 1, but returns 4 (following)
-	return el.compareDocumentPosition( document.createElement("fieldset") ) & 1;
-});
+	return el.compareDocumentPosition( document.createElement( "fieldset" ) ) & 1;
+} );
 
 // Support: IE<8
 // Prevent attribute/property "interpolation"
 // https://msdn.microsoft.com/en-us/library/ms536429%28VS.85%29.aspx
-if ( !assert(function( el ) {
+if ( !assert( function( el ) {
 	el.innerHTML = "<a href='#'></a>";
-	return el.firstChild.getAttribute("href") === "#" ;
-}) ) {
+	return el.firstChild.getAttribute( "href" ) === "#";
+} ) ) {
 	addHandle( "type|href|height|width", function( elem, name, isXML ) {
 		if ( !isXML ) {
 			return elem.getAttribute( name, name.toLowerCase() === "type" ? 1 : 2 );
 		}
-	});
+	} );
 }
 
 // Support: IE<9
 // Use defaultValue in place of getAttribute("value")
-if ( !support.attributes || !assert(function( el ) {
+if ( !support.attributes || !assert( function( el ) {
 	el.innerHTML = "<input/>";
 	el.firstChild.setAttribute( "value", "" );
 	return el.firstChild.getAttribute( "value" ) === "";
-}) ) {
-	addHandle( "value", function( elem, name, isXML ) {
+} ) ) {
+	addHandle( "value", function( elem, _name, isXML ) {
 		if ( !isXML && elem.nodeName.toLowerCase() === "input" ) {
 			return elem.defaultValue;
 		}
-	});
+	} );
 }
 
 // Support: IE<9
 // Use getAttributeNode to fetch booleans when getAttribute lies
-if ( !assert(function( el ) {
-	return el.getAttribute("disabled") == null;
-}) ) {
+if ( !assert( function( el ) {
+	return el.getAttribute( "disabled" ) == null;
+} ) ) {
 	addHandle( booleans, function( elem, name, isXML ) {
 		var val;
 		if ( !isXML ) {
 			return elem[ name ] === true ? name.toLowerCase() :
-					(val = elem.getAttributeNode( name )) && val.specified ?
+				( val = elem.getAttributeNode( name ) ) && val.specified ?
 					val.value :
-				null;
+					null;
 		}
-	});
+	} );
 }
 
 return Sizzle;
 
-})( window );
+} )( window );
 
 
 
@@ -17500,9 +17703,9 @@ var rneedsContext = jQuery.expr.match.needsContext;
 
 function nodeName( elem, name ) {
 
-  return elem.nodeName && elem.nodeName.toLowerCase() === name.toLowerCase();
+	return elem.nodeName && elem.nodeName.toLowerCase() === name.toLowerCase();
 
-};
+}
 var rsingleTag = ( /^<([a-z][^\/\0>:\x20\t\r\n\f]*)[\x20\t\r\n\f]*\/?>(?:<\/\1>|)$/i );
 
 
@@ -17816,7 +18019,7 @@ jQuery.each( {
 	parents: function( elem ) {
 		return dir( elem, "parentNode" );
 	},
-	parentsUntil: function( elem, i, until ) {
+	parentsUntil: function( elem, _i, until ) {
 		return dir( elem, "parentNode", until );
 	},
 	next: function( elem ) {
@@ -17831,10 +18034,10 @@ jQuery.each( {
 	prevAll: function( elem ) {
 		return dir( elem, "previousSibling" );
 	},
-	nextUntil: function( elem, i, until ) {
+	nextUntil: function( elem, _i, until ) {
 		return dir( elem, "nextSibling", until );
 	},
-	prevUntil: function( elem, i, until ) {
+	prevUntil: function( elem, _i, until ) {
 		return dir( elem, "previousSibling", until );
 	},
 	siblings: function( elem ) {
@@ -17844,7 +18047,13 @@ jQuery.each( {
 		return siblings( elem.firstChild );
 	},
 	contents: function( elem ) {
-		if ( typeof elem.contentDocument !== "undefined" ) {
+		if ( elem.contentDocument != null &&
+
+			// Support: IE 11+
+			// <object> elements with no `data` attribute has an object
+			// `contentDocument` with a `null` prototype.
+			getProto( elem.contentDocument ) ) {
+
 			return elem.contentDocument;
 		}
 
@@ -18187,7 +18396,7 @@ jQuery.extend( {
 					var fns = arguments;
 
 					return jQuery.Deferred( function( newDefer ) {
-						jQuery.each( tuples, function( i, tuple ) {
+						jQuery.each( tuples, function( _i, tuple ) {
 
 							// Map tuples (progress, done, fail) to arguments (done, fail, progress)
 							var fn = isFunction( fns[ tuple[ 4 ] ] ) && fns[ tuple[ 4 ] ];
@@ -18467,8 +18676,8 @@ jQuery.extend( {
 			resolveContexts = Array( i ),
 			resolveValues = slice.call( arguments ),
 
-			// the master Deferred
-			master = jQuery.Deferred(),
+			// the primary Deferred
+			primary = jQuery.Deferred(),
 
 			// subordinate callback factory
 			updateFunc = function( i ) {
@@ -18476,30 +18685,30 @@ jQuery.extend( {
 					resolveContexts[ i ] = this;
 					resolveValues[ i ] = arguments.length > 1 ? slice.call( arguments ) : value;
 					if ( !( --remaining ) ) {
-						master.resolveWith( resolveContexts, resolveValues );
+						primary.resolveWith( resolveContexts, resolveValues );
 					}
 				};
 			};
 
 		// Single- and empty arguments are adopted like Promise.resolve
 		if ( remaining <= 1 ) {
-			adoptValue( singleValue, master.done( updateFunc( i ) ).resolve, master.reject,
+			adoptValue( singleValue, primary.done( updateFunc( i ) ).resolve, primary.reject,
 				!remaining );
 
 			// Use .then() to unwrap secondary thenables (cf. gh-3000)
-			if ( master.state() === "pending" ||
+			if ( primary.state() === "pending" ||
 				isFunction( resolveValues[ i ] && resolveValues[ i ].then ) ) {
 
-				return master.then();
+				return primary.then();
 			}
 		}
 
 		// Multiple arguments are aggregated like Promise.all array elements
 		while ( i-- ) {
-			adoptValue( resolveValues[ i ], updateFunc( i ), master.reject );
+			adoptValue( resolveValues[ i ], updateFunc( i ), primary.reject );
 		}
 
-		return master.promise();
+		return primary.promise();
 	}
 } );
 
@@ -18640,7 +18849,7 @@ var access = function( elems, fn, key, value, chainable, emptyGet, raw ) {
 			// ...except when executing function values
 			} else {
 				bulk = fn;
-				fn = function( elem, key, value ) {
+				fn = function( elem, _key, value ) {
 					return bulk.call( jQuery( elem ), value );
 				};
 			}
@@ -18650,8 +18859,8 @@ var access = function( elems, fn, key, value, chainable, emptyGet, raw ) {
 			for ( ; i < len; i++ ) {
 				fn(
 					elems[ i ], key, raw ?
-					value :
-					value.call( elems[ i ], i, fn( elems[ i ], key ) )
+						value :
+						value.call( elems[ i ], i, fn( elems[ i ], key ) )
 				);
 			}
 		}
@@ -18675,7 +18884,7 @@ var rmsPrefix = /^-ms-/,
 	rdashAlpha = /-([a-z])/g;
 
 // Used by camelCase as callback to replace()
-function fcamelCase( all, letter ) {
+function fcamelCase( _all, letter ) {
 	return letter.toUpperCase();
 }
 
@@ -19203,27 +19412,6 @@ var isHiddenWithinTree = function( elem, el ) {
 			jQuery.css( elem, "display" ) === "none";
 	};
 
-var swap = function( elem, options, callback, args ) {
-	var ret, name,
-		old = {};
-
-	// Remember the old values, and insert the new ones
-	for ( name in options ) {
-		old[ name ] = elem.style[ name ];
-		elem.style[ name ] = options[ name ];
-	}
-
-	ret = callback.apply( elem, args || [] );
-
-	// Revert the old values
-	for ( name in options ) {
-		elem.style[ name ] = old[ name ];
-	}
-
-	return ret;
-};
-
-
 
 
 function adjustCSS( elem, prop, valueParts, tween ) {
@@ -19394,11 +19582,40 @@ var rscriptType = ( /^$|^module$|\/(?:java|ecma)script/i );
 
 
 
-// We have to close these tags to support XHTML (#13200)
-var wrapMap = {
+( function() {
+	var fragment = document.createDocumentFragment(),
+		div = fragment.appendChild( document.createElement( "div" ) ),
+		input = document.createElement( "input" );
+
+	// Support: Android 4.0 - 4.3 only
+	// Check state lost if the name is set (#11217)
+	// Support: Windows Web Apps (WWA)
+	// `name` and `type` must use .setAttribute for WWA (#14901)
+	input.setAttribute( "type", "radio" );
+	input.setAttribute( "checked", "checked" );
+	input.setAttribute( "name", "t" );
+
+	div.appendChild( input );
+
+	// Support: Android <=4.1 only
+	// Older WebKit doesn't clone checked state correctly in fragments
+	support.checkClone = div.cloneNode( true ).cloneNode( true ).lastChild.checked;
+
+	// Support: IE <=11 only
+	// Make sure textarea (and checkbox) defaultValue is properly cloned
+	div.innerHTML = "<textarea>x</textarea>";
+	support.noCloneChecked = !!div.cloneNode( true ).lastChild.defaultValue;
 
 	// Support: IE <=9 only
-	option: [ 1, "<select multiple='multiple'>", "</select>" ],
+	// IE <=9 replaces <option> tags with their contents when inserted outside of
+	// the select element.
+	div.innerHTML = "<option></option>";
+	support.option = !!div.lastChild;
+} )();
+
+
+// We have to close these tags to support XHTML (#13200)
+var wrapMap = {
 
 	// XHTML parsers do not magically insert elements in the
 	// same way that tag soup parsers do. So we cannot shorten
@@ -19411,11 +19628,13 @@ var wrapMap = {
 	_default: [ 0, "", "" ]
 };
 
-// Support: IE <=9 only
-wrapMap.optgroup = wrapMap.option;
-
 wrapMap.tbody = wrapMap.tfoot = wrapMap.colgroup = wrapMap.caption = wrapMap.thead;
 wrapMap.th = wrapMap.td;
+
+// Support: IE <=9 only
+if ( !support.option ) {
+	wrapMap.optgroup = wrapMap.option = [ 1, "<select multiple='multiple'>", "</select>" ];
+}
 
 
 function getAll( context, tag ) {
@@ -19549,36 +19768,7 @@ function buildFragment( elems, context, scripts, selection, ignored ) {
 }
 
 
-( function() {
-	var fragment = document.createDocumentFragment(),
-		div = fragment.appendChild( document.createElement( "div" ) ),
-		input = document.createElement( "input" );
-
-	// Support: Android 4.0 - 4.3 only
-	// Check state lost if the name is set (#11217)
-	// Support: Windows Web Apps (WWA)
-	// `name` and `type` must use .setAttribute for WWA (#14901)
-	input.setAttribute( "type", "radio" );
-	input.setAttribute( "checked", "checked" );
-	input.setAttribute( "name", "t" );
-
-	div.appendChild( input );
-
-	// Support: Android <=4.1 only
-	// Older WebKit doesn't clone checked state correctly in fragments
-	support.checkClone = div.cloneNode( true ).cloneNode( true ).lastChild.checked;
-
-	// Support: IE <=11 only
-	// Make sure textarea (and checkbox) defaultValue is properly cloned
-	div.innerHTML = "<textarea>x</textarea>";
-	support.noCloneChecked = !!div.cloneNode( true ).lastChild.defaultValue;
-} )();
-
-
-var
-	rkeyEvent = /^key/,
-	rmouseEvent = /^(?:mouse|pointer|contextmenu|drag|drop)|click/,
-	rtypenamespace = /^([^.]*)(?:\.(.+)|)/;
+var rtypenamespace = /^([^.]*)(?:\.(.+)|)/;
 
 function returnTrue() {
 	return true;
@@ -19683,8 +19873,8 @@ jQuery.event = {
 			special, handlers, type, namespaces, origType,
 			elemData = dataPriv.get( elem );
 
-		// Don't attach events to noData or text/comment nodes (but allow plain objects)
-		if ( !elemData ) {
+		// Only attach events to objects that accept data
+		if ( !acceptData( elem ) ) {
 			return;
 		}
 
@@ -19708,7 +19898,7 @@ jQuery.event = {
 
 		// Init the element's event structure and main handler, if this is the first
 		if ( !( events = elemData.events ) ) {
-			events = elemData.events = {};
+			events = elemData.events = Object.create( null );
 		}
 		if ( !( eventHandle = elemData.handle ) ) {
 			eventHandle = elemData.handle = function( e ) {
@@ -19866,12 +20056,15 @@ jQuery.event = {
 
 	dispatch: function( nativeEvent ) {
 
-		// Make a writable jQuery.Event from the native event object
-		var event = jQuery.event.fix( nativeEvent );
-
 		var i, j, ret, matched, handleObj, handlerQueue,
 			args = new Array( arguments.length ),
-			handlers = ( dataPriv.get( this, "events" ) || {} )[ event.type ] || [],
+
+			// Make a writable jQuery.Event from the native event object
+			event = jQuery.event.fix( nativeEvent ),
+
+			handlers = (
+				dataPriv.get( this, "events" ) || Object.create( null )
+			)[ event.type ] || [],
 			special = jQuery.event.special[ event.type ] || {};
 
 		// Use the fix-ed jQuery.Event rather than the (read-only) native event
@@ -19995,12 +20188,12 @@ jQuery.event = {
 			get: isFunction( hook ) ?
 				function() {
 					if ( this.originalEvent ) {
-							return hook( this.originalEvent );
+						return hook( this.originalEvent );
 					}
 				} :
 				function() {
 					if ( this.originalEvent ) {
-							return this.originalEvent[ name ];
+						return this.originalEvent[ name ];
 					}
 				},
 
@@ -20139,7 +20332,13 @@ function leverageNative( el, type, expectSync ) {
 						// Cancel the outer synthetic event
 						event.stopImmediatePropagation();
 						event.preventDefault();
-						return result.value;
+
+						// Support: Chrome 86+
+						// In Chrome, if an element having a focusout handler is blurred by
+						// clicking outside of it, it invokes the handler synchronously. If
+						// that handler calls `.remove()` on the element, the data is cleared,
+						// leaving `result` undefined. We need to guard against this.
+						return result && result.value;
 					}
 
 				// If this is an inner synthetic event for an event with a bubbling surrogate
@@ -20304,34 +20503,7 @@ jQuery.each( {
 	targetTouches: true,
 	toElement: true,
 	touches: true,
-
-	which: function( event ) {
-		var button = event.button;
-
-		// Add which for key events
-		if ( event.which == null && rkeyEvent.test( event.type ) ) {
-			return event.charCode != null ? event.charCode : event.keyCode;
-		}
-
-		// Add which for click: 1 === left; 2 === middle; 3 === right
-		if ( !event.which && button !== undefined && rmouseEvent.test( event.type ) ) {
-			if ( button & 1 ) {
-				return 1;
-			}
-
-			if ( button & 2 ) {
-				return 3;
-			}
-
-			if ( button & 4 ) {
-				return 2;
-			}
-
-			return 0;
-		}
-
-		return event.which;
-	}
+	which: true
 }, jQuery.event.addProp );
 
 jQuery.each( { focus: "focusin", blur: "focusout" }, function( type, delegateType ) {
@@ -20354,6 +20526,12 @@ jQuery.each( { focus: "focusin", blur: "focusout" }, function( type, delegateTyp
 			leverageNative( this, type );
 
 			// Return non-false to allow normal event-path propagation
+			return true;
+		},
+
+		// Suppress native focus or blur as it's already being fired
+		// in leverageNative.
+		_default: function() {
 			return true;
 		},
 
@@ -20446,13 +20624,6 @@ jQuery.fn.extend( {
 
 var
 
-	/* eslint-disable max-len */
-
-	// See https://github.com/eslint/eslint/issues/3229
-	rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([a-z][^\/\0>\x20\t\r\n\f]*)[^>]*)\/>/gi,
-
-	/* eslint-enable */
-
 	// Support: IE <=10 - 11, Edge 12 - 13 only
 	// In IE/Edge using regex groups here causes severe slowdowns.
 	// See https://connect.microsoft.com/IE/feedback/details/1736512/
@@ -20489,7 +20660,7 @@ function restoreScript( elem ) {
 }
 
 function cloneCopyEvent( src, dest ) {
-	var i, l, type, pdataOld, pdataCur, udataOld, udataCur, events;
+	var i, l, type, pdataOld, udataOld, udataCur, events;
 
 	if ( dest.nodeType !== 1 ) {
 		return;
@@ -20497,13 +20668,11 @@ function cloneCopyEvent( src, dest ) {
 
 	// 1. Copy private data: events, handlers, etc.
 	if ( dataPriv.hasData( src ) ) {
-		pdataOld = dataPriv.access( src );
-		pdataCur = dataPriv.set( dest, pdataOld );
+		pdataOld = dataPriv.get( src );
 		events = pdataOld.events;
 
 		if ( events ) {
-			delete pdataCur.handle;
-			pdataCur.events = {};
+			dataPriv.remove( dest, "handle events" );
 
 			for ( type in events ) {
 				for ( i = 0, l = events[ type ].length; i < l; i++ ) {
@@ -20539,7 +20708,7 @@ function fixInput( src, dest ) {
 function domManip( collection, args, callback, ignored ) {
 
 	// Flatten any nested arrays
-	args = concat.apply( [], args );
+	args = flat( args );
 
 	var fragment, first, scripts, hasScripts, node, doc,
 		i = 0,
@@ -20614,7 +20783,7 @@ function domManip( collection, args, callback, ignored ) {
 							if ( jQuery._evalUrl && !node.noModule ) {
 								jQuery._evalUrl( node.src, {
 									nonce: node.nonce || node.getAttribute( "nonce" )
-								} );
+								}, doc );
 							}
 						} else {
 							DOMEval( node.textContent.replace( rcleanScript, "" ), node, doc );
@@ -20651,7 +20820,7 @@ function remove( elem, selector, keepData ) {
 
 jQuery.extend( {
 	htmlPrefilter: function( html ) {
-		return html.replace( rxhtmlTag, "<$1></$2>" );
+		return html;
 	},
 
 	clone: function( elem, dataAndEvents, deepDataAndEvents ) {
@@ -20913,6 +21082,27 @@ var getStyles = function( elem ) {
 		return view.getComputedStyle( elem );
 	};
 
+var swap = function( elem, options, callback ) {
+	var ret, name,
+		old = {};
+
+	// Remember the old values, and insert the new ones
+	for ( name in options ) {
+		old[ name ] = elem.style[ name ];
+		elem.style[ name ] = options[ name ];
+	}
+
+	ret = callback.call( elem );
+
+	// Revert the old values
+	for ( name in options ) {
+		elem.style[ name ] = old[ name ];
+	}
+
+	return ret;
+};
+
+
 var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 
 
@@ -20970,7 +21160,7 @@ var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 	}
 
 	var pixelPositionVal, boxSizingReliableVal, scrollboxSizeVal, pixelBoxStylesVal,
-		reliableMarginLeftVal,
+		reliableTrDimensionsVal, reliableMarginLeftVal,
 		container = document.createElement( "div" ),
 		div = document.createElement( "div" );
 
@@ -21005,6 +21195,54 @@ var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 		scrollboxSize: function() {
 			computeStyleTests();
 			return scrollboxSizeVal;
+		},
+
+		// Support: IE 9 - 11+, Edge 15 - 18+
+		// IE/Edge misreport `getComputedStyle` of table rows with width/height
+		// set in CSS while `offset*` properties report correct values.
+		// Behavior in IE 9 is more subtle than in newer versions & it passes
+		// some versions of this test; make sure not to make it pass there!
+		//
+		// Support: Firefox 70+
+		// Only Firefox includes border widths
+		// in computed dimensions. (gh-4529)
+		reliableTrDimensions: function() {
+			var table, tr, trChild, trStyle;
+			if ( reliableTrDimensionsVal == null ) {
+				table = document.createElement( "table" );
+				tr = document.createElement( "tr" );
+				trChild = document.createElement( "div" );
+
+				table.style.cssText = "position:absolute;left:-11111px;border-collapse:separate";
+				tr.style.cssText = "border:1px solid";
+
+				// Support: Chrome 86+
+				// Height set through cssText does not get applied.
+				// Computed height then comes back as 0.
+				tr.style.height = "1px";
+				trChild.style.height = "9px";
+
+				// Support: Android 8 Chrome 86+
+				// In our bodyBackground.html iframe,
+				// display for all div elements is set to "inline",
+				// which causes a problem only in Android 8 Chrome 86.
+				// Ensuring the div is display: block
+				// gets around this issue.
+				trChild.style.display = "block";
+
+				documentElement
+					.appendChild( table )
+					.appendChild( tr )
+					.appendChild( trChild );
+
+				trStyle = window.getComputedStyle( tr );
+				reliableTrDimensionsVal = ( parseInt( trStyle.height, 10 ) +
+					parseInt( trStyle.borderTopWidth, 10 ) +
+					parseInt( trStyle.borderBottomWidth, 10 ) ) === tr.offsetHeight;
+
+				documentElement.removeChild( table );
+			}
+			return reliableTrDimensionsVal;
 		}
 	} );
 } )();
@@ -21129,7 +21367,7 @@ var
 		fontWeight: "400"
 	};
 
-function setPositiveNumber( elem, value, subtract ) {
+function setPositiveNumber( _elem, value, subtract ) {
 
 	// Any relative (+/-) values have already been
 	// normalized at this point
@@ -21234,17 +21472,26 @@ function getWidthOrHeight( elem, dimension, extra ) {
 	}
 
 
-	// Fall back to offsetWidth/offsetHeight when value is "auto"
-	// This happens for inline elements with no explicit setting (gh-3571)
-	// Support: Android <=4.1 - 4.3 only
-	// Also use offsetWidth/offsetHeight for misreported inline dimensions (gh-3602)
-	// Support: IE 9-11 only
-	// Also use offsetWidth/offsetHeight for when box sizing is unreliable
-	// We use getClientRects() to check for hidden/disconnected.
-	// In those cases, the computed value can be trusted to be border-box
+	// Support: IE 9 - 11 only
+	// Use offsetWidth/offsetHeight for when box sizing is unreliable.
+	// In those cases, the computed value can be trusted to be border-box.
 	if ( ( !support.boxSizingReliable() && isBorderBox ||
+
+		// Support: IE 10 - 11+, Edge 15 - 18+
+		// IE/Edge misreport `getComputedStyle` of table rows with width/height
+		// set in CSS while `offset*` properties report correct values.
+		// Interestingly, in some cases IE 9 doesn't suffer from this issue.
+		!support.reliableTrDimensions() && nodeName( elem, "tr" ) ||
+
+		// Fall back to offsetWidth/offsetHeight when value is "auto"
+		// This happens for inline elements with no explicit setting (gh-3571)
 		val === "auto" ||
+
+		// Support: Android <=4.1 - 4.3 only
+		// Also use offsetWidth/offsetHeight for misreported inline dimensions (gh-3602)
 		!parseFloat( val ) && jQuery.css( elem, "display", false, styles ) === "inline" ) &&
+
+		// Make sure the element is visible & connected
 		elem.getClientRects().length ) {
 
 		isBorderBox = jQuery.css( elem, "boxSizing", false, styles ) === "border-box";
@@ -21439,7 +21686,7 @@ jQuery.extend( {
 	}
 } );
 
-jQuery.each( [ "height", "width" ], function( i, dimension ) {
+jQuery.each( [ "height", "width" ], function( _i, dimension ) {
 	jQuery.cssHooks[ dimension ] = {
 		get: function( elem, computed, extra ) {
 			if ( computed ) {
@@ -21455,10 +21702,10 @@ jQuery.each( [ "height", "width" ], function( i, dimension ) {
 					// Running getBoundingClientRect on a disconnected node
 					// in IE throws an error.
 					( !elem.getClientRects().length || !elem.getBoundingClientRect().width ) ?
-						swap( elem, cssShow, function() {
-							return getWidthOrHeight( elem, dimension, extra );
-						} ) :
-						getWidthOrHeight( elem, dimension, extra );
+					swap( elem, cssShow, function() {
+						return getWidthOrHeight( elem, dimension, extra );
+					} ) :
+					getWidthOrHeight( elem, dimension, extra );
 			}
 		},
 
@@ -21517,7 +21764,7 @@ jQuery.cssHooks.marginLeft = addGetHookIf( support.reliableMarginLeft,
 					swap( elem, { marginLeft: 0 }, function() {
 						return elem.getBoundingClientRect().left;
 					} )
-				) + "px";
+			) + "px";
 		}
 	}
 );
@@ -21656,7 +21903,7 @@ Tween.propHooks = {
 			if ( jQuery.fx.step[ tween.prop ] ) {
 				jQuery.fx.step[ tween.prop ]( tween );
 			} else if ( tween.elem.nodeType === 1 && (
-					jQuery.cssHooks[ tween.prop ] ||
+				jQuery.cssHooks[ tween.prop ] ||
 					tween.elem.style[ finalPropName( tween.prop ) ] != null ) ) {
 				jQuery.style( tween.elem, tween.prop, tween.now + tween.unit );
 			} else {
@@ -21901,7 +22148,7 @@ function defaultPrefilter( elem, props, opts ) {
 
 			anim.done( function() {
 
-			/* eslint-enable no-loop-func */
+				/* eslint-enable no-loop-func */
 
 				// The final step of a "hide" animation is actually hiding the element
 				if ( !hidden ) {
@@ -22021,7 +22268,7 @@ function Animation( elem, properties, options ) {
 			tweens: [],
 			createTween: function( prop, end ) {
 				var tween = jQuery.Tween( elem, animation.opts, prop, end,
-						animation.opts.specialEasing[ prop ] || animation.opts.easing );
+					animation.opts.specialEasing[ prop ] || animation.opts.easing );
 				animation.tweens.push( tween );
 				return tween;
 			},
@@ -22194,7 +22441,8 @@ jQuery.fn.extend( {
 					anim.stop( true );
 				}
 			};
-			doAnimation.finish = doAnimation;
+
+		doAnimation.finish = doAnimation;
 
 		return empty || optall.queue === false ?
 			this.each( doAnimation ) :
@@ -22212,7 +22460,7 @@ jQuery.fn.extend( {
 			clearQueue = type;
 			type = undefined;
 		}
-		if ( clearQueue && type !== false ) {
+		if ( clearQueue ) {
 			this.queue( type || "fx", [] );
 		}
 
@@ -22295,7 +22543,7 @@ jQuery.fn.extend( {
 	}
 } );
 
-jQuery.each( [ "toggle", "show", "hide" ], function( i, name ) {
+jQuery.each( [ "toggle", "show", "hide" ], function( _i, name ) {
 	var cssFn = jQuery.fn[ name ];
 	jQuery.fn[ name ] = function( speed, easing, callback ) {
 		return speed == null || typeof speed === "boolean" ?
@@ -22516,7 +22764,7 @@ boolHook = {
 	}
 };
 
-jQuery.each( jQuery.expr.match.bool.source.match( /\w+/g ), function( i, name ) {
+jQuery.each( jQuery.expr.match.bool.source.match( /\w+/g ), function( _i, name ) {
 	var getter = attrHandle[ name ] || jQuery.find.attr;
 
 	attrHandle[ name ] = function( elem, name, isXML ) {
@@ -22834,8 +23082,8 @@ jQuery.fn.extend( {
 				if ( this.setAttribute ) {
 					this.setAttribute( "class",
 						className || value === false ?
-						"" :
-						dataPriv.get( this, "__className__" ) || ""
+							"" :
+							dataPriv.get( this, "__className__" ) || ""
 					);
 				}
 			}
@@ -22850,7 +23098,7 @@ jQuery.fn.extend( {
 		while ( ( elem = this[ i++ ] ) ) {
 			if ( elem.nodeType === 1 &&
 				( " " + stripAndCollapse( getClass( elem ) ) + " " ).indexOf( className ) > -1 ) {
-					return true;
+				return true;
 			}
 		}
 
@@ -23140,7 +23388,7 @@ jQuery.extend( jQuery.event, {
 				special.bindType || type;
 
 			// jQuery handler
-			handle = ( dataPriv.get( cur, "events" ) || {} )[ event.type ] &&
+			handle = ( dataPriv.get( cur, "events" ) || Object.create( null ) )[ event.type ] &&
 				dataPriv.get( cur, "handle" );
 			if ( handle ) {
 				handle.apply( cur, data );
@@ -23251,7 +23499,10 @@ if ( !support.focusin ) {
 
 		jQuery.event.special[ fix ] = {
 			setup: function() {
-				var doc = this.ownerDocument || this,
+
+				// Handle: regular nodes (via `this.ownerDocument`), window
+				// (via `this.document`) & document (via `this`).
+				var doc = this.ownerDocument || this.document || this,
 					attaches = dataPriv.access( doc, fix );
 
 				if ( !attaches ) {
@@ -23260,7 +23511,7 @@ if ( !support.focusin ) {
 				dataPriv.access( doc, fix, ( attaches || 0 ) + 1 );
 			},
 			teardown: function() {
-				var doc = this.ownerDocument || this,
+				var doc = this.ownerDocument || this.document || this,
 					attaches = dataPriv.access( doc, fix ) - 1;
 
 				if ( !attaches ) {
@@ -23276,7 +23527,7 @@ if ( !support.focusin ) {
 }
 var location = window.location;
 
-var nonce = Date.now();
+var nonce = { guid: Date.now() };
 
 var rquery = ( /\?/ );
 
@@ -23284,7 +23535,7 @@ var rquery = ( /\?/ );
 
 // Cross-browser xml parsing
 jQuery.parseXML = function( data ) {
-	var xml;
+	var xml, parserErrorElem;
 	if ( !data || typeof data !== "string" ) {
 		return null;
 	}
@@ -23293,12 +23544,17 @@ jQuery.parseXML = function( data ) {
 	// IE throws on parseFromString with invalid input.
 	try {
 		xml = ( new window.DOMParser() ).parseFromString( data, "text/xml" );
-	} catch ( e ) {
-		xml = undefined;
-	}
+	} catch ( e ) {}
 
-	if ( !xml || xml.getElementsByTagName( "parsererror" ).length ) {
-		jQuery.error( "Invalid XML: " + data );
+	parserErrorElem = xml && xml.getElementsByTagName( "parsererror" )[ 0 ];
+	if ( !xml || parserErrorElem ) {
+		jQuery.error( "Invalid XML: " + (
+			parserErrorElem ?
+				jQuery.map( parserErrorElem.childNodes, function( el ) {
+					return el.textContent;
+				} ).join( "\n" ) :
+				data
+		) );
 	}
 	return xml;
 };
@@ -23399,16 +23655,14 @@ jQuery.fn.extend( {
 			// Can add propHook for "elements" to filter or add form elements
 			var elements = jQuery.prop( this, "elements" );
 			return elements ? jQuery.makeArray( elements ) : this;
-		} )
-		.filter( function() {
+		} ).filter( function() {
 			var type = this.type;
 
 			// Use .is( ":disabled" ) so that fieldset[disabled] works
 			return this.name && !jQuery( this ).is( ":disabled" ) &&
 				rsubmittable.test( this.nodeName ) && !rsubmitterTypes.test( type ) &&
 				( this.checked || !rcheckableType.test( type ) );
-		} )
-		.map( function( i, elem ) {
+		} ).map( function( _i, elem ) {
 			var val = jQuery( this ).val();
 
 			if ( val == null ) {
@@ -23461,7 +23715,8 @@ var
 
 	// Anchor tag for parsing the document origin
 	originAnchor = document.createElement( "a" );
-	originAnchor.href = location.href;
+
+originAnchor.href = location.href;
 
 // Base "constructor" for jQuery.ajaxPrefilter and jQuery.ajaxTransport
 function addToPrefiltersOrTransports( structure ) {
@@ -23842,8 +24097,8 @@ jQuery.extend( {
 			// Context for global events is callbackContext if it is a DOM node or jQuery collection
 			globalEventContext = s.context &&
 				( callbackContext.nodeType || callbackContext.jquery ) ?
-					jQuery( callbackContext ) :
-					jQuery.event,
+				jQuery( callbackContext ) :
+				jQuery.event,
 
 			// Deferreds
 			deferred = jQuery.Deferred(),
@@ -24021,7 +24276,8 @@ jQuery.extend( {
 			// Add or update anti-cache param if needed
 			if ( s.cache === false ) {
 				cacheURL = cacheURL.replace( rantiCache, "$1" );
-				uncached = ( rquery.test( cacheURL ) ? "&" : "?" ) + "_=" + ( nonce++ ) + uncached;
+				uncached = ( rquery.test( cacheURL ) ? "&" : "?" ) + "_=" + ( nonce.guid++ ) +
+					uncached;
 			}
 
 			// Put hash and anti-cache on the URL that will be requested (gh-1732)
@@ -24154,6 +24410,13 @@ jQuery.extend( {
 				response = ajaxHandleResponses( s, jqXHR, responses );
 			}
 
+			// Use a noop converter for missing script but not if jsonp
+			if ( !isSuccess &&
+				jQuery.inArray( "script", s.dataTypes ) > -1 &&
+				jQuery.inArray( "json", s.dataTypes ) < 0 ) {
+				s.converters[ "text script" ] = function() {};
+			}
+
 			// Convert no matter what (that way responseXXX fields are always set)
 			response = ajaxConvert( s, response, jqXHR, isSuccess );
 
@@ -24244,7 +24507,7 @@ jQuery.extend( {
 	}
 } );
 
-jQuery.each( [ "get", "post" ], function( i, method ) {
+jQuery.each( [ "get", "post" ], function( _i, method ) {
 	jQuery[ method ] = function( url, data, callback, type ) {
 
 		// Shift arguments if data argument was omitted
@@ -24265,8 +24528,17 @@ jQuery.each( [ "get", "post" ], function( i, method ) {
 	};
 } );
 
+jQuery.ajaxPrefilter( function( s ) {
+	var i;
+	for ( i in s.headers ) {
+		if ( i.toLowerCase() === "content-type" ) {
+			s.contentType = s.headers[ i ] || "";
+		}
+	}
+} );
 
-jQuery._evalUrl = function( url, options ) {
+
+jQuery._evalUrl = function( url, options, doc ) {
 	return jQuery.ajax( {
 		url: url,
 
@@ -24284,7 +24556,7 @@ jQuery._evalUrl = function( url, options ) {
 			"text script": function() {}
 		},
 		dataFilter: function( response ) {
-			jQuery.globalEval( response, options );
+			jQuery.globalEval( response, options, doc );
 		}
 	} );
 };
@@ -24606,7 +24878,7 @@ var oldCallbacks = [],
 jQuery.ajaxSetup( {
 	jsonp: "callback",
 	jsonpCallback: function() {
-		var callback = oldCallbacks.pop() || ( jQuery.expando + "_" + ( nonce++ ) );
+		var callback = oldCallbacks.pop() || ( jQuery.expando + "_" + ( nonce.guid++ ) );
 		this[ callback ] = true;
 		return callback;
 	}
@@ -24823,23 +25095,6 @@ jQuery.fn.load = function( url, params, callback ) {
 
 
 
-// Attach a bunch of functions for handling common AJAX events
-jQuery.each( [
-	"ajaxStart",
-	"ajaxStop",
-	"ajaxComplete",
-	"ajaxError",
-	"ajaxSuccess",
-	"ajaxSend"
-], function( i, type ) {
-	jQuery.fn[ type ] = function( fn ) {
-		return this.on( type, fn );
-	};
-} );
-
-
-
-
 jQuery.expr.pseudos.animated = function( elem ) {
 	return jQuery.grep( jQuery.timers, function( fn ) {
 		return elem === fn.elem;
@@ -25046,7 +25301,7 @@ jQuery.each( { scrollLeft: "pageXOffset", scrollTop: "pageYOffset" }, function( 
 // Blink bug: https://bugs.chromium.org/p/chromium/issues/detail?id=589347
 // getComputedStyle returns percent when specified for top/left/bottom/right;
 // rather than make the css module depend on the offset module, just check for it here
-jQuery.each( [ "top", "left" ], function( i, prop ) {
+jQuery.each( [ "top", "left" ], function( _i, prop ) {
 	jQuery.cssHooks[ prop ] = addGetHookIf( support.pixelPosition,
 		function( elem, computed ) {
 			if ( computed ) {
@@ -25064,8 +25319,11 @@ jQuery.each( [ "top", "left" ], function( i, prop ) {
 
 // Create innerHeight, innerWidth, height, width, outerHeight and outerWidth methods
 jQuery.each( { Height: "height", Width: "width" }, function( name, type ) {
-	jQuery.each( { padding: "inner" + name, content: type, "": "outer" + name },
-		function( defaultExtra, funcName ) {
+	jQuery.each( {
+		padding: "inner" + name,
+		content: type,
+		"": "outer" + name
+	}, function( defaultExtra, funcName ) {
 
 		// Margin is only for outerHeight, outerWidth
 		jQuery.fn[ funcName ] = function( margin, value ) {
@@ -25109,23 +25367,17 @@ jQuery.each( { Height: "height", Width: "width" }, function( name, type ) {
 } );
 
 
-jQuery.each( ( "blur focus focusin focusout resize scroll click dblclick " +
-	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
-	"change select submit keydown keypress keyup contextmenu" ).split( " " ),
-	function( i, name ) {
-
-	// Handle event binding
-	jQuery.fn[ name ] = function( data, fn ) {
-		return arguments.length > 0 ?
-			this.on( name, null, data, fn ) :
-			this.trigger( name );
+jQuery.each( [
+	"ajaxStart",
+	"ajaxStop",
+	"ajaxComplete",
+	"ajaxError",
+	"ajaxSuccess",
+	"ajaxSend"
+], function( _i, type ) {
+	jQuery.fn[ type ] = function( fn ) {
+		return this.on( type, fn );
 	};
-} );
-
-jQuery.fn.extend( {
-	hover: function( fnOver, fnOut ) {
-		return this.mouseenter( fnOver ).mouseleave( fnOut || fnOver );
-	}
 } );
 
 
@@ -25149,8 +25401,34 @@ jQuery.fn.extend( {
 		return arguments.length === 1 ?
 			this.off( selector, "**" ) :
 			this.off( types, selector || "**", fn );
+	},
+
+	hover: function( fnOver, fnOut ) {
+		return this.mouseenter( fnOver ).mouseleave( fnOut || fnOver );
 	}
 } );
+
+jQuery.each(
+	( "blur focus focusin focusout resize scroll click dblclick " +
+	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
+	"change select submit keydown keypress keyup contextmenu" ).split( " " ),
+	function( _i, name ) {
+
+		// Handle event binding
+		jQuery.fn[ name ] = function( data, fn ) {
+			return arguments.length > 0 ?
+				this.on( name, null, data, fn ) :
+				this.trigger( name );
+		};
+	}
+);
+
+
+
+
+// Support: Android <=4.0 only
+// Make sure we trim BOM and NBSP
+var rtrim = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g;
 
 // Bind a function to a context, optionally partially applying any
 // arguments.
@@ -25214,6 +25492,11 @@ jQuery.isNumeric = function( obj ) {
 		!isNaN( obj - parseFloat( obj ) );
 };
 
+jQuery.trim = function( text ) {
+	return text == null ?
+		"" :
+		( text + "" ).replace( rtrim, "" );
+};
 
 
 
@@ -25262,7 +25545,7 @@ jQuery.noConflict = function( deep ) {
 // Expose jQuery and $ identifiers, even in AMD
 // (#7102#comment:10, https://github.com/jquery/jquery/pull/557)
 // and CommonJS for browser emulators (#13566)
-if ( !noGlobal ) {
+if ( typeof noGlobal === "undefined" ) {
 	window.jQuery = window.$ = jQuery;
 }
 
@@ -25274,8 +25557,8 @@ return jQuery;
 
 ;
 /*!
-  * Bootstrap v4.5.3 (https://getbootstrap.com/)
-  * Copyright 2011-2020 The Bootstrap Authors (https://github.com/twbs/bootstrap/graphs/contributors)
+  * Bootstrap v4.6.0 (https://getbootstrap.com/)
+  * Copyright 2011-2021 The Bootstrap Authors (https://github.com/twbs/bootstrap/graphs/contributors)
   * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
   */
 (function (global, factory) {
@@ -25330,7 +25613,7 @@ return jQuery;
 
   /**
    * --------------------------------------------------------------------------
-   * Bootstrap (v4.5.3): util.js
+   * Bootstrap (v4.6.0): util.js
    * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
    * --------------------------------------------------------------------------
    */
@@ -25509,7 +25792,7 @@ return jQuery;
    */
 
   var NAME = 'alert';
-  var VERSION = '4.5.3';
+  var VERSION = '4.6.0';
   var DATA_KEY = 'bs.alert';
   var EVENT_KEY = "." + DATA_KEY;
   var DATA_API_KEY = '.data-api';
@@ -25665,7 +25948,7 @@ return jQuery;
    */
 
   var NAME$1 = 'button';
-  var VERSION$1 = '4.5.3';
+  var VERSION$1 = '4.6.0';
   var DATA_KEY$1 = 'bs.button';
   var EVENT_KEY$1 = "." + DATA_KEY$1;
   var DATA_API_KEY$1 = '.data-api';
@@ -25864,7 +26147,7 @@ return jQuery;
    */
 
   var NAME$2 = 'carousel';
-  var VERSION$2 = '4.5.3';
+  var VERSION$2 = '4.6.0';
   var DATA_KEY$2 = 'bs.carousel';
   var EVENT_KEY$2 = "." + DATA_KEY$2;
   var DATA_API_KEY$2 = '.data-api';
@@ -26004,6 +26287,8 @@ return jQuery;
       }
 
       if (this._config.interval && !this._isPaused) {
+        this._updateInterval();
+
         this._interval = setInterval((document.visibilityState ? this.nextWhenVisible : this.next).bind(this), this._config.interval);
       }
     };
@@ -26245,6 +26530,23 @@ return jQuery;
       }
     };
 
+    _proto._updateInterval = function _updateInterval() {
+      var element = this._activeElement || this._element.querySelector(SELECTOR_ACTIVE_ITEM);
+
+      if (!element) {
+        return;
+      }
+
+      var elementInterval = parseInt(element.getAttribute('data-interval'), 10);
+
+      if (elementInterval) {
+        this._config.defaultInterval = this._config.defaultInterval || this._config.interval;
+        this._config.interval = elementInterval;
+      } else {
+        this._config.interval = this._config.defaultInterval || this._config.interval;
+      }
+    };
+
     _proto._slide = function _slide(direction, element) {
       var _this4 = this;
 
@@ -26295,6 +26597,7 @@ return jQuery;
 
       this._setActiveIndicatorElement(nextElement);
 
+      this._activeElement = nextElement;
       var slidEvent = $__default['default'].Event(EVENT_SLID, {
         relatedTarget: nextElement,
         direction: eventDirectionName,
@@ -26307,15 +26610,6 @@ return jQuery;
         Util.reflow(nextElement);
         $__default['default'](activeElement).addClass(directionalClassName);
         $__default['default'](nextElement).addClass(directionalClassName);
-        var nextElementInterval = parseInt(nextElement.getAttribute('data-interval'), 10);
-
-        if (nextElementInterval) {
-          this._config.defaultInterval = this._config.defaultInterval || this._config.interval;
-          this._config.interval = nextElementInterval;
-        } else {
-          this._config.interval = this._config.defaultInterval || this._config.interval;
-        }
-
         var transitionDuration = Util.getTransitionDurationFromElement(activeElement);
         $__default['default'](activeElement).one(Util.TRANSITION_END, function () {
           $__default['default'](nextElement).removeClass(directionalClassName + " " + orderClassName).addClass(CLASS_NAME_ACTIVE$1);
@@ -26452,7 +26746,7 @@ return jQuery;
    */
 
   var NAME$3 = 'collapse';
-  var VERSION$3 = '4.5.3';
+  var VERSION$3 = '4.6.0';
   var DATA_KEY$3 = 'bs.collapse';
   var EVENT_KEY$3 = "." + DATA_KEY$3;
   var DATA_API_KEY$3 = '.data-api';
@@ -29415,7 +29709,7 @@ return jQuery;
    */
 
   var NAME$4 = 'dropdown';
-  var VERSION$4 = '4.5.3';
+  var VERSION$4 = '4.6.0';
   var DATA_KEY$4 = 'bs.dropdown';
   var EVENT_KEY$4 = "." + DATA_KEY$4;
   var DATA_API_KEY$4 = '.data-api';
@@ -29532,7 +29826,7 @@ return jQuery;
 
       if (showEvent.isDefaultPrevented()) {
         return;
-      } // Disable totally Popper.js for Dropdown in Navbar
+      } // Totally disable Popper for Dropdowns in Navbar
 
 
       if (!this._inNavbar && usePopper) {
@@ -29541,7 +29835,7 @@ return jQuery;
          * Popper - https://popper.js.org
          */
         if (typeof Popper === 'undefined') {
-          throw new TypeError('Bootstrap\'s dropdowns require Popper.js (https://popper.js.org/)');
+          throw new TypeError('Bootstrap\'s dropdowns require Popper (https://popper.js.org)');
         }
 
         var referenceElement = this._element;
@@ -29709,7 +30003,7 @@ return jQuery;
             boundariesElement: this._config.boundary
           }
         }
-      }; // Disable Popper.js if we have a static display
+      }; // Disable Popper if we have a static display
 
       if (this._config.display === 'static') {
         popperConfig.modifiers.applyStyle = {
@@ -29929,7 +30223,7 @@ return jQuery;
    */
 
   var NAME$5 = 'modal';
-  var VERSION$5 = '4.5.3';
+  var VERSION$5 = '4.6.0';
   var DATA_KEY$5 = 'bs.modal';
   var EVENT_KEY$5 = "." + DATA_KEY$5;
   var DATA_API_KEY$5 = '.data-api';
@@ -30129,38 +30423,34 @@ return jQuery;
     _proto._triggerBackdropTransition = function _triggerBackdropTransition() {
       var _this3 = this;
 
-      if (this._config.backdrop === 'static') {
-        var hideEventPrevented = $__default['default'].Event(EVENT_HIDE_PREVENTED);
-        $__default['default'](this._element).trigger(hideEventPrevented);
+      var hideEventPrevented = $__default['default'].Event(EVENT_HIDE_PREVENTED);
+      $__default['default'](this._element).trigger(hideEventPrevented);
 
-        if (hideEventPrevented.isDefaultPrevented()) {
-          return;
-        }
+      if (hideEventPrevented.isDefaultPrevented()) {
+        return;
+      }
 
-        var isModalOverflowing = this._element.scrollHeight > document.documentElement.clientHeight;
+      var isModalOverflowing = this._element.scrollHeight > document.documentElement.clientHeight;
+
+      if (!isModalOverflowing) {
+        this._element.style.overflowY = 'hidden';
+      }
+
+      this._element.classList.add(CLASS_NAME_STATIC);
+
+      var modalTransitionDuration = Util.getTransitionDurationFromElement(this._dialog);
+      $__default['default'](this._element).off(Util.TRANSITION_END);
+      $__default['default'](this._element).one(Util.TRANSITION_END, function () {
+        _this3._element.classList.remove(CLASS_NAME_STATIC);
 
         if (!isModalOverflowing) {
-          this._element.style.overflowY = 'hidden';
+          $__default['default'](_this3._element).one(Util.TRANSITION_END, function () {
+            _this3._element.style.overflowY = '';
+          }).emulateTransitionEnd(_this3._element, modalTransitionDuration);
         }
+      }).emulateTransitionEnd(modalTransitionDuration);
 
-        this._element.classList.add(CLASS_NAME_STATIC);
-
-        var modalTransitionDuration = Util.getTransitionDurationFromElement(this._dialog);
-        $__default['default'](this._element).off(Util.TRANSITION_END);
-        $__default['default'](this._element).one(Util.TRANSITION_END, function () {
-          _this3._element.classList.remove(CLASS_NAME_STATIC);
-
-          if (!isModalOverflowing) {
-            $__default['default'](_this3._element).one(Util.TRANSITION_END, function () {
-              _this3._element.style.overflowY = '';
-            }).emulateTransitionEnd(_this3._element, modalTransitionDuration);
-          }
-        }).emulateTransitionEnd(modalTransitionDuration);
-
-        this._element.focus();
-      } else {
-        this.hide();
-      }
+      this._element.focus();
     };
 
     _proto._showElement = function _showElement(relatedTarget) {
@@ -30315,7 +30605,11 @@ return jQuery;
             return;
           }
 
-          _this9._triggerBackdropTransition();
+          if (_this9._config.backdrop === 'static') {
+            _this9._triggerBackdropTransition();
+          } else {
+            _this9.hide();
+          }
         });
 
         if (animate) {
@@ -30539,7 +30833,7 @@ return jQuery;
 
   /**
    * --------------------------------------------------------------------------
-   * Bootstrap (v4.5.3): tools/sanitizer.js
+   * Bootstrap (v4.6.0): tools/sanitizer.js
    * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
    * --------------------------------------------------------------------------
    */
@@ -30665,7 +30959,7 @@ return jQuery;
    */
 
   var NAME$6 = 'tooltip';
-  var VERSION$6 = '4.5.3';
+  var VERSION$6 = '4.6.0';
   var DATA_KEY$6 = 'bs.tooltip';
   var EVENT_KEY$6 = "." + DATA_KEY$6;
   var JQUERY_NO_CONFLICT$6 = $__default['default'].fn[NAME$6];
@@ -30685,6 +30979,7 @@ return jQuery;
     container: '(string|element|boolean)',
     fallbackPlacement: '(string|array)',
     boundary: '(string|element)',
+    customClass: '(string|function)',
     sanitize: 'boolean',
     sanitizeFn: '(null|function)',
     whiteList: 'object',
@@ -30710,6 +31005,7 @@ return jQuery;
     container: false,
     fallbackPlacement: 'flip',
     boundary: 'scrollParent',
+    customClass: '',
     sanitize: true,
     sanitizeFn: null,
     whiteList: DefaultWhitelist,
@@ -30746,7 +31042,7 @@ return jQuery;
   var Tooltip = /*#__PURE__*/function () {
     function Tooltip(element, config) {
       if (typeof Popper === 'undefined') {
-        throw new TypeError('Bootstrap\'s tooltips require Popper.js (https://popper.js.org/)');
+        throw new TypeError('Bootstrap\'s tooltips require Popper (https://popper.js.org)');
       } // private
 
 
@@ -30880,7 +31176,8 @@ return jQuery;
 
         $__default['default'](this.element).trigger(this.constructor.Event.INSERTED);
         this._popper = new Popper(this.element, tip, this._getPopperConfig(attachment));
-        $__default['default'](tip).addClass(CLASS_NAME_SHOW$4); // If this is a touch-enabled device we add extra
+        $__default['default'](tip).addClass(CLASS_NAME_SHOW$4);
+        $__default['default'](tip).addClass(this.config.customClass); // If this is a touch-enabled device we add extra
         // empty mouseover listeners to the body's immediate children;
         // only needed because of broken event delegation on iOS
         // https://www.quirksmode.org/blog/archives/2014/02/mouse_event_bub.html
@@ -31378,7 +31675,7 @@ return jQuery;
    */
 
   var NAME$7 = 'popover';
-  var VERSION$7 = '4.5.3';
+  var VERSION$7 = '4.6.0';
   var DATA_KEY$7 = 'bs.popover';
   var EVENT_KEY$7 = "." + DATA_KEY$7;
   var JQUERY_NO_CONFLICT$7 = $__default['default'].fn[NAME$7];
@@ -31558,7 +31855,7 @@ return jQuery;
    */
 
   var NAME$8 = 'scrollspy';
-  var VERSION$8 = '4.5.3';
+  var VERSION$8 = '4.6.0';
   var DATA_KEY$8 = 'bs.scrollspy';
   var EVENT_KEY$8 = "." + DATA_KEY$8;
   var DATA_API_KEY$6 = '.data-api';
@@ -31850,7 +32147,7 @@ return jQuery;
    */
 
   var NAME$9 = 'tab';
-  var VERSION$9 = '4.5.3';
+  var VERSION$9 = '4.6.0';
   var DATA_KEY$9 = 'bs.tab';
   var EVENT_KEY$9 = "." + DATA_KEY$9;
   var DATA_API_KEY$7 = '.data-api';
@@ -32076,7 +32373,7 @@ return jQuery;
    */
 
   var NAME$a = 'toast';
-  var VERSION$a = '4.5.3';
+  var VERSION$a = '4.6.0';
   var DATA_KEY$a = 'bs.toast';
   var EVENT_KEY$a = "." + DATA_KEY$a;
   var JQUERY_NO_CONFLICT$a = $__default['default'].fn[NAME$a];
@@ -32809,7 +33106,7 @@ L.GeometryUtil = L.extend(L.GeometryUtil || {}, {
 			cumulativeDistanceToA = cumulativeDistanceToB;
 			cumulativeDistanceToB += pointA.distanceTo(pointB);
 		}
-
+		
 		if (pointA == undefined && pointB == undefined) { // Happens when line has no length
 			var pointA = pts[0], pointB = pts[1], i = 1;
 		}
@@ -33500,11 +33797,11 @@ return L.GeometryUtil;
 	var minor = parseInt(splitVersion[1]);
 
 	var JQ_LT_17 = (major < 1) || (major == 1 && minor < 7);
-
+	
 	function eventsData($el) {
 		return JQ_LT_17 ? $el.data('events') : $._data($el[0]).events;
 	}
-
+	
 	function moveHandlerToTop($el, eventName, isDelegated) {
 		var data = eventsData($el);
 		var events = data[eventName];
@@ -33522,7 +33819,7 @@ return L.GeometryUtil;
 			events.unshift(events.pop());
 		}
 	}
-
+	
 	function moveEventHandlers($elems, eventsString, isDelegate) {
 		var events = eventsString.split(/\s+/);
 		$elems.each(function() {
@@ -33532,7 +33829,7 @@ return L.GeometryUtil;
 			}
 		});
 	}
-
+	
 	function makeMethod(methodName) {
 		$.fn[methodName + 'First'] = function() {
 			var args = $.makeArray(arguments);
@@ -33557,7 +33854,7 @@ return L.GeometryUtil;
 	$.fn.delegateFirst = function() {
 		var args = $.makeArray(arguments);
 		var eventsString = args[1];
-
+		
 		if (eventsString) {
 			args.splice(0, 2);
 			$.fn.delegate.apply(this, arguments);
@@ -33577,7 +33874,7 @@ return L.GeometryUtil;
 
 		return this;
 	};
-
+	
 	// on (jquery >= 1.7)
 	if (!JQ_LT_17) {
 		$.fn.onFirst = function(types, selector) {
@@ -39571,8 +39868,8 @@ if (typeof define === 'function' && define.amd) {
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
-  (global = global || self, global.i18next = factory());
-}(this, function () { 'use strict';
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.i18next = factory());
+}(this, (function () { 'use strict';
 
   function _typeof(obj) {
     "@babel/helpers - typeof";
@@ -39885,7 +40182,12 @@ if (typeof define === 'function' && define.amd) {
       if (canNotTraverseDeeper()) return {};
       var key = cleanKey(stack.shift());
       if (!object[key] && Empty) object[key] = new Empty();
-      object = object[key];
+
+      if (Object.prototype.hasOwnProperty.call(object, key)) {
+        object = object[key];
+      } else {
+        object = {};
+      }
     }
 
     if (canNotTraverseDeeper()) return {};
@@ -39930,7 +40232,7 @@ if (typeof define === 'function' && define.amd) {
   }
   function deepExtend(target, source, overwrite) {
     for (var prop in source) {
-      if (prop !== '__proto__') {
+      if (prop !== '__proto__' && prop !== 'constructor') {
         if (prop in target) {
           if (typeof target[prop] === 'string' || target[prop] instanceof String || typeof source[prop] === 'string' || source[prop] instanceof String) {
             if (overwrite) target[prop] = source[prop];
@@ -39967,6 +40269,43 @@ if (typeof define === 'function' && define.amd) {
   }
   var isIE10 = typeof window !== 'undefined' && window.navigator && window.navigator.userAgent && window.navigator.userAgent.indexOf('MSIE') > -1;
 
+  function deepFind(obj, path) {
+    var keySeparator = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '.';
+    if (!obj) return undefined;
+    if (obj[path]) return obj[path];
+    var paths = path.split(keySeparator);
+    var current = obj;
+
+    for (var i = 0; i < paths.length; ++i) {
+      if (typeof current[paths[i]] === 'string' && i + 1 < paths.length) {
+        return undefined;
+      }
+
+      if (current[paths[i]] === undefined) {
+        var j = 2;
+        var p = paths.slice(i, i + j).join(keySeparator);
+        var mix = current[p];
+
+        while (mix === undefined && paths.length > i + j) {
+          j++;
+          p = paths.slice(i, i + j).join(keySeparator);
+          mix = current[p];
+        }
+
+        if (mix === undefined) return undefined;
+        if (typeof mix === 'string') return mix;
+        if (p && typeof mix[p] === 'string') return mix[p];
+        var joinedPath = paths.slice(i + j).join(keySeparator);
+        if (joinedPath) return deepFind(mix, joinedPath, keySeparator);
+        return undefined;
+      }
+
+      current = current[paths[i]];
+    }
+
+    return current;
+  }
+
   var ResourceStore = function (_EventEmitter) {
     _inherits(ResourceStore, _EventEmitter);
 
@@ -39993,6 +40332,10 @@ if (typeof define === 'function' && define.amd) {
         _this.options.keySeparator = '.';
       }
 
+      if (_this.options.ignoreJSONStructure === undefined) {
+        _this.options.ignoreJSONStructure = true;
+      }
+
       return _this;
     }
 
@@ -40017,6 +40360,7 @@ if (typeof define === 'function' && define.amd) {
       value: function getResource(lng, ns, key) {
         var options = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};
         var keySeparator = options.keySeparator !== undefined ? options.keySeparator : this.options.keySeparator;
+        var ignoreJSONStructure = options.ignoreJSONStructure !== undefined ? options.ignoreJSONStructure : this.options.ignoreJSONStructure;
         var path = [lng, ns];
         if (key && typeof key !== 'string') path = path.concat(key);
         if (key && typeof key === 'string') path = path.concat(keySeparator ? key.split(keySeparator) : key);
@@ -40025,7 +40369,9 @@ if (typeof define === 'function' && define.amd) {
           path = lng.split('.');
         }
 
-        return getPath(this.data, path);
+        var result = getPath(this.data, path);
+        if (result || !ignoreJSONStructure || typeof key !== 'string') return result;
+        return deepFind(this.data && this.data[lng] && this.data[lng][ns], key, keySeparator);
       }
     }, {
       key: "addResource",
@@ -40257,27 +40603,32 @@ if (typeof define === 'function' && define.amd) {
 
         if (handleAsObjectInI18nFormat && res && handleAsObject && noObject.indexOf(resType) < 0 && !(typeof joinArrays === 'string' && resType === '[object Array]')) {
           if (!options.returnObjects && !this.options.returnObjects) {
-            this.logger.warn('accessing an object - but returnObjects options is not enabled!');
-            return this.options.returnedObjectHandler ? this.options.returnedObjectHandler(resUsedKey, res, options) : "key '".concat(key, " (").concat(this.language, ")' returned an object instead of string.");
+            if (!this.options.returnedObjectHandler) {
+              this.logger.warn('accessing an object - but returnObjects options is not enabled!');
+            }
+
+            return this.options.returnedObjectHandler ? this.options.returnedObjectHandler(resUsedKey, res, _objectSpread({}, options, {
+              ns: namespaces
+            })) : "key '".concat(key, " (").concat(this.language, ")' returned an object instead of string.");
           }
 
           if (keySeparator) {
             var resTypeIsArray = resType === '[object Array]';
-            var copy$$1 = resTypeIsArray ? [] : {};
+            var copy = resTypeIsArray ? [] : {};
             var newKeyToUse = resTypeIsArray ? resExactUsedKey : resUsedKey;
 
             for (var m in res) {
               if (Object.prototype.hasOwnProperty.call(res, m)) {
                 var deepKey = "".concat(newKeyToUse).concat(keySeparator).concat(m);
-                copy$$1[m] = this.translate(deepKey, _objectSpread({}, options, {
+                copy[m] = this.translate(deepKey, _objectSpread({}, options, {
                   joinArrays: false,
                   ns: namespaces
                 }));
-                if (copy$$1[m] === deepKey) copy$$1[m] = res[m];
+                if (copy[m] === deepKey) copy[m] = res[m];
               }
             }
 
-            res = copy$$1;
+            res = copy;
           }
         } else if (handleAsObjectInI18nFormat && typeof joinArrays === 'string' && resType === '[object Array]') {
           res = res.join(joinArrays);
@@ -40285,16 +40636,14 @@ if (typeof define === 'function' && define.amd) {
         } else {
           var usedDefault = false;
           var usedKey = false;
+          var needsPluralHandling = options.count !== undefined && typeof options.count !== 'string';
+          var hasDefaultValue = Translator.hasDefaultValue(options);
+          var defaultValueSuffix = needsPluralHandling ? this.pluralResolver.getSuffix(lng, options.count) : '';
+          var defaultValue = options["defaultValue".concat(defaultValueSuffix)] || options.defaultValue;
 
-          if (!this.isValidLookup(res) && options.defaultValue !== undefined) {
+          if (!this.isValidLookup(res) && hasDefaultValue) {
             usedDefault = true;
-
-            if (options.count !== undefined) {
-              var suffix = this.pluralResolver.getSuffix(lng, options.count);
-              res = options["defaultValue".concat(suffix)];
-            }
-
-            if (!res) res = options.defaultValue;
+            res = defaultValue;
           }
 
           if (!this.isValidLookup(res)) {
@@ -40302,10 +40651,10 @@ if (typeof define === 'function' && define.amd) {
             res = key;
           }
 
-          var updateMissing = options.defaultValue && options.defaultValue !== res && this.options.updateMissing;
+          var updateMissing = hasDefaultValue && defaultValue !== res && this.options.updateMissing;
 
           if (usedKey || usedDefault || updateMissing) {
-            this.logger.log(updateMissing ? 'updateKey' : 'missingKey', lng, namespace, key, updateMissing ? options.defaultValue : res);
+            this.logger.log(updateMissing ? 'updateKey' : 'missingKey', lng, namespace, key, updateMissing ? defaultValue : res);
 
             if (keySeparator) {
               var fk = this.resolve(key, _objectSpread({}, options, {
@@ -40327,29 +40676,25 @@ if (typeof define === 'function' && define.amd) {
               lngs.push(options.lng || this.language);
             }
 
-            var send = function send(l, k) {
+            var send = function send(l, k, fallbackValue) {
               if (_this2.options.missingKeyHandler) {
-                _this2.options.missingKeyHandler(l, namespace, k, updateMissing ? options.defaultValue : res, updateMissing, options);
+                _this2.options.missingKeyHandler(l, namespace, k, updateMissing ? fallbackValue : res, updateMissing, options);
               } else if (_this2.backendConnector && _this2.backendConnector.saveMissing) {
-                _this2.backendConnector.saveMissing(l, namespace, k, updateMissing ? options.defaultValue : res, updateMissing, options);
+                _this2.backendConnector.saveMissing(l, namespace, k, updateMissing ? fallbackValue : res, updateMissing, options);
               }
 
               _this2.emit('missingKey', l, namespace, k, res);
             };
 
             if (this.options.saveMissing) {
-              var needsPluralHandling = options.count !== undefined && typeof options.count !== 'string';
-
               if (this.options.saveMissingPlurals && needsPluralHandling) {
-                lngs.forEach(function (l) {
-                  var plurals = _this2.pluralResolver.getPluralFormsOfKey(l, key);
-
-                  plurals.forEach(function (p) {
-                    return send([l], p);
+                lngs.forEach(function (language) {
+                  _this2.pluralResolver.getSuffixes(language).forEach(function (suffix) {
+                    send([language], key + suffix, options["defaultValue".concat(suffix)] || defaultValue);
                   });
                 });
               } else {
-                send(lngs, key);
+                send(lngs, key, defaultValue);
               }
             }
           }
@@ -40441,7 +40786,7 @@ if (typeof define === 'function' && define.amd) {
           var namespaces = extracted.namespaces;
           if (_this4.options.fallbackNS) namespaces = namespaces.concat(_this4.options.fallbackNS);
           var needsPluralHandling = options.count !== undefined && typeof options.count !== 'string';
-          var needsContextHandling = options.context !== undefined && typeof options.context === 'string' && options.context !== '';
+          var needsContextHandling = options.context !== undefined && (typeof options.context === 'string' || typeof options.context === 'number') && options.context !== '';
           var codes = options.lngs ? options.lngs : _this4.languageUtils.toResolveHierarchy(options.lng || _this4.language, options.fallbackLng);
           namespaces.forEach(function (ns) {
             if (_this4.isValidLookup(found)) return;
@@ -40499,6 +40844,19 @@ if (typeof define === 'function' && define.amd) {
         var options = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};
         if (this.i18nFormat && this.i18nFormat.getResource) return this.i18nFormat.getResource(code, ns, key, options);
         return this.resourceStore.getResource(code, ns, key, options);
+      }
+    }], [{
+      key: "hasDefaultValue",
+      value: function hasDefaultValue(options) {
+        var prefix = 'defaultValue';
+
+        for (var option in options) {
+          if (Object.prototype.hasOwnProperty.call(options, option) && prefix === option.substring(0, prefix.length) && undefined !== options[option]) {
+            return true;
+          }
+        }
+
+        return false;
       }
     }]);
 
@@ -40662,15 +41020,15 @@ if (typeof define === 'function' && define.amd) {
   }();
 
   var sets = [{
-    lngs: ['ach', 'ak', 'am', 'arn', 'br', 'fil', 'gun', 'ln', 'mfe', 'mg', 'mi', 'oc', 'pt', 'pt-BR', 'tg', 'ti', 'tr', 'uz', 'wa'],
+    lngs: ['ach', 'ak', 'am', 'arn', 'br', 'fil', 'gun', 'ln', 'mfe', 'mg', 'mi', 'oc', 'pt', 'pt-BR', 'tg', 'tl', 'ti', 'tr', 'uz', 'wa'],
     nr: [1, 2],
     fc: 1
   }, {
-    lngs: ['af', 'an', 'ast', 'az', 'bg', 'bn', 'ca', 'da', 'de', 'dev', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fi', 'fo', 'fur', 'fy', 'gl', 'gu', 'ha', 'hi', 'hu', 'hy', 'ia', 'it', 'kn', 'ku', 'lb', 'mai', 'ml', 'mn', 'mr', 'nah', 'nap', 'nb', 'ne', 'nl', 'nn', 'no', 'nso', 'pa', 'pap', 'pms', 'ps', 'pt-PT', 'rm', 'sco', 'se', 'si', 'so', 'son', 'sq', 'sv', 'sw', 'ta', 'te', 'tk', 'ur', 'yo'],
+    lngs: ['af', 'an', 'ast', 'az', 'bg', 'bn', 'ca', 'da', 'de', 'dev', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fi', 'fo', 'fur', 'fy', 'gl', 'gu', 'ha', 'hi', 'hu', 'hy', 'ia', 'it', 'kk', 'kn', 'ku', 'lb', 'mai', 'ml', 'mn', 'mr', 'nah', 'nap', 'nb', 'ne', 'nl', 'nn', 'no', 'nso', 'pa', 'pap', 'pms', 'ps', 'pt-PT', 'rm', 'sco', 'se', 'si', 'so', 'son', 'sq', 'sv', 'sw', 'ta', 'te', 'tk', 'ur', 'yo'],
     nr: [1, 2],
     fc: 2
   }, {
-    lngs: ['ay', 'bo', 'cgg', 'fa', 'ht', 'id', 'ja', 'jbo', 'ka', 'kk', 'km', 'ko', 'ky', 'lo', 'ms', 'sah', 'su', 'th', 'tt', 'ug', 'vi', 'wo', 'zh'],
+    lngs: ['ay', 'bo', 'cgg', 'fa', 'ht', 'id', 'ja', 'jbo', 'ka', 'km', 'ko', 'ky', 'lo', 'ms', 'sah', 'su', 'th', 'tt', 'ug', 'vi', 'wo', 'zh'],
     nr: [1],
     fc: 3
   }, {
@@ -40867,17 +41225,24 @@ if (typeof define === 'function' && define.amd) {
     }, {
       key: "getPluralFormsOfKey",
       value: function getPluralFormsOfKey(code, key) {
+        return this.getSuffixes(code).map(function (suffix) {
+          return key + suffix;
+        });
+      }
+    }, {
+      key: "getSuffixes",
+      value: function getSuffixes(code) {
         var _this = this;
 
-        var ret = [];
         var rule = this.getRule(code);
-        if (!rule) return ret;
-        rule.numbers.forEach(function (n) {
-          var suffix = _this.getSuffix(code, n);
 
-          ret.push("".concat(key).concat(suffix));
+        if (!rule) {
+          return [];
+        }
+
+        return rule.numbers.map(function (number) {
+          return _this.getSuffix(code, number);
         });
-        return ret;
       }
     }, {
       key: "getSuffix",
@@ -40994,13 +41359,17 @@ if (typeof define === 'function' && define.amd) {
         var handleFormat = function handleFormat(key) {
           if (key.indexOf(_this.formatSeparator) < 0) {
             var path = getPathWithDefaults(data, defaultData, key);
-            return _this.alwaysFormat ? _this.format(path, undefined, lng) : path;
+            return _this.alwaysFormat ? _this.format(path, undefined, lng, _objectSpread({}, options, data, {
+              interpolationkey: key
+            })) : path;
           }
 
           var p = key.split(_this.formatSeparator);
           var k = p.shift().trim();
           var f = p.join(_this.formatSeparator).trim();
-          return _this.format(getPathWithDefaults(data, defaultData, k), f, lng, options);
+          return _this.format(getPathWithDefaults(data, defaultData, k), f, lng, _objectSpread({}, options, data, {
+            interpolationkey: k
+          }));
         };
 
         this.resetRegExp();
@@ -41039,8 +41408,16 @@ if (typeof define === 'function' && define.amd) {
               value = makeString(value);
             }
 
-            str = str.replace(match[0], todo.safeValue(value));
-            todo.regex.lastIndex = 0;
+            var safeValue = todo.safeValue(value);
+            str = str.replace(match[0], safeValue);
+
+            if (skipOnVariables) {
+              todo.regex.lastIndex += safeValue.length;
+              todo.regex.lastIndex -= match[0].length;
+            } else {
+              todo.regex.lastIndex = 0;
+            }
+
             replaces++;
 
             if (replaces >= _this.maxReplaces) {
@@ -41089,7 +41466,7 @@ if (typeof define === 'function' && define.amd) {
           var formatters = [];
           var doReduce = false;
 
-          if (match[0].includes(this.formatSeparator) && !/{.*}/.test(match[1])) {
+          if (match[0].indexOf(this.formatSeparator) !== -1 && !/{.*}/.test(match[1])) {
             var r = match[1].split(this.formatSeparator).map(function (elem) {
               return elem.trim();
             });
@@ -41109,7 +41486,9 @@ if (typeof define === 'function' && define.amd) {
 
           if (doReduce) {
             value = formatters.reduce(function (v, f) {
-              return _this2.format(v, f, options.lng, options);
+              return _this2.format(v, f, options.lng, _objectSpread({}, options, {
+                interpolationkey: match[1].trim()
+              }));
             }, value.trim());
           }
 
@@ -41571,6 +41950,11 @@ if (typeof define === 'function' && define.amd) {
           });
         }
 
+        if (this.options.fallbackLng && !this.services.languageDetector && !this.options.lng) {
+          var codes = this.services.languageUtils.getFallbackCodes(this.options.fallbackLng);
+          if (codes.length > 0 && codes[0] !== 'dev') this.options.lng = codes[0];
+        }
+
         if (!this.services.languageDetector && !this.options.lng) {
           this.logger.warn('init: no languageDetector is used and no lng is defined');
         }
@@ -41596,7 +41980,8 @@ if (typeof define === 'function' && define.amd) {
         var deferred = defer();
 
         var load = function load() {
-          _this2.changeLanguage(_this2.options.lng, function (err, t) {
+          var finish = function finish(err, t) {
+            if (_this2.isInitialized) _this2.logger.warn('init: i18next is already initialized. You should call init just once!');
             _this2.isInitialized = true;
             if (!_this2.options.isClone) _this2.logger.log('initialized', _this2.options);
 
@@ -41604,7 +41989,11 @@ if (typeof define === 'function' && define.amd) {
 
             deferred.resolve(t);
             callback(err, t);
-          });
+          };
+
+          if (_this2.languages && _this2.options.compatibilityAPI !== 'v1' && !_this2.isInitialized) return finish(null, _this2.t.bind(_this2));
+
+          _this2.changeLanguage(_this2.options.lng, finish);
         };
 
         if (this.options.resources || !this.options.initImmediate) {
@@ -41738,6 +42127,7 @@ if (typeof define === 'function' && define.amd) {
         };
 
         var setLng = function setLng(lngs) {
+          if (!lng && !lngs && _this4.services.languageDetector) lngs = [];
           var l = typeof lngs === 'string' ? lngs : _this4.services.languageUtils.getBestMatchFromCodes(lngs);
 
           if (l) {
@@ -41950,6 +42340,16 @@ if (typeof define === 'function' && define.amd) {
         };
         return clone;
       }
+    }, {
+      key: "toJSON",
+      value: function toJSON() {
+        return {
+          options: this.options,
+          store: this.store,
+          language: this.language,
+          languages: this.languages
+        };
+      }
     }]);
 
     return I18n;
@@ -41959,7 +42359,7 @@ if (typeof define === 'function' && define.amd) {
 
   return i18next;
 
-}));
+})));
 
 ;
 /*!
@@ -42064,8 +42464,8 @@ if (typeof define === 'function' && define.amd) {
     };
     (function(factory) {
         if (true) {
-            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(2) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory,
-            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__,
+            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(2) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory, 
+            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__, 
             __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
         } else {}
     })(function(Inputmask) {
@@ -42159,8 +42559,8 @@ if (typeof define === 'function' && define.amd) {
     };
     (function(factory) {
         if (true) {
-            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(3), __webpack_require__(5) ],
-            __WEBPACK_AMD_DEFINE_FACTORY__ = factory, __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__,
+            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(3), __webpack_require__(5) ], 
+            __WEBPACK_AMD_DEFINE_FACTORY__ = factory, __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__, 
             __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
         } else {}
     })(function($, window, undefined) {
@@ -43673,7 +44073,7 @@ if (typeof define === 'function' && define.amd) {
             function seekPrevious(pos, newBlock) {
                 var position = pos, tests;
                 if (position <= 0) return 0;
-                while (--position > 0 && (newBlock === true && getTest(position).match.newBlockMarker !== true || newBlock !== true && !isMask(position) && (tests = getTests(position),
+                while (--position > 0 && (newBlock === true && getTest(position).match.newBlockMarker !== true || newBlock !== true && !isMask(position) && (tests = getTests(position), 
                 tests.length < 2 || tests.length === 2 && tests[1].match.def === ""))) {}
                 return position;
             }
@@ -44910,8 +45310,8 @@ if (typeof define === 'function' && define.amd) {
     };
     (function(factory) {
         if (true) {
-            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(4) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory,
-            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__,
+            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(4) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory, 
+            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__, 
             __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
         } else {}
     })(function($) {
@@ -44940,8 +45340,8 @@ if (typeof define === 'function' && define.amd) {
     };
     (function(factory) {
         if (true) {
-            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(2) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory,
-            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__,
+            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(2) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory, 
+            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__, 
             __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
         } else {}
     })(function(Inputmask) {
@@ -45192,8 +45592,8 @@ if (typeof define === 'function' && define.amd) {
     };
     (function(factory) {
         if (true) {
-            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(2) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory,
-            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__,
+            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(2) ], __WEBPACK_AMD_DEFINE_FACTORY__ = factory, 
+            __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__, 
             __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
         } else {}
     })(function(Inputmask) {
@@ -45743,8 +46143,8 @@ if (typeof define === 'function' && define.amd) {
     };
     (function(factory) {
         if (true) {
-            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(4), __webpack_require__(2) ],
-            __WEBPACK_AMD_DEFINE_FACTORY__ = factory, __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__,
+            !(__WEBPACK_AMD_DEFINE_ARRAY__ = [ __webpack_require__(4), __webpack_require__(2) ], 
+            __WEBPACK_AMD_DEFINE_FACTORY__ = factory, __WEBPACK_AMD_DEFINE_RESULT__ = typeof __WEBPACK_AMD_DEFINE_FACTORY__ === "function" ? __WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__) : __WEBPACK_AMD_DEFINE_FACTORY__, 
             __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
         } else {}
     })(function($, Inputmask) {
@@ -46398,7 +46798,7 @@ if (typeof define === 'function' && define.amd) {
 
 ;
 /****************************************************************************
-	modernizr-javascript.js,
+	modernizr-javascript.js, 
 
 	(c) 2016, FCOO
 
@@ -46409,20 +46809,20 @@ if (typeof define === 'function' && define.amd) {
 
 (function ($, window, document, undefined) {
 	"use strict";
-
+	
 	var ns = window;
 
     //Extend the jQuery prototype
     $.fn.extend({
-        modernizrOn : function( test ){
-            return this.modernizrToggle( test, true );
+        modernizrOn : function( test ){ 
+            return this.modernizrToggle( test, true ); 
         },
 
-        modernizrOff: function( test ){
-            return this.modernizrToggle( test, false );
+        modernizrOff: function( test ){ 
+            return this.modernizrToggle( test, false ); 
         },
-
-        modernizrToggle: function( test, on ){
+        
+        modernizrToggle: function( test, on ){ 
 		if ( on === undefined )
             return this.modernizrToggle( test, !this.hasClass( test ) );
 
@@ -48954,13 +49354,15 @@ if (typeof define === 'function' && define.amd) {
         /***********************************************************
         $.fn.checkbox( options )
         options:
-            id         (default: id of element or auto-created)
-            prop       (default '')     Property set when the eleemnt is selected
-            className  (default: '')    Class-name set when the eleemnt is selected
-            selector   (default: null)  Selector for child-element to be updated with prop and/or className
-            modernizr  (default; false) If true the element get "no-"+className when unselected
-            selected   (default: false)
-            onChange = function( id, selected, $checkbox )
+            id              (default: id of element or auto-created)
+            prop            (default '')     Property set when the element is selected
+            className       (default: '')    Class-name set when the element is selected
+            className_semi  (default: '')    Class-name set when the element is semi-selected
+            selector        (default: null)  Selector for child-element to be updated with prop and/or className
+            modernizr       (default; false) If true the element get "no-"+className when unselected
+            selected        (default: false)
+            semiSelected    (default: false) If true the checkbox appear with className_semi and selected. Will be removed the first time the input is clicked
+            onChange        = function( id, selected, $checkbox )
         ***********************************************************/
         checkbox: function( options ){
             return this.each(function() {
@@ -48975,7 +49377,15 @@ if (typeof define === 'function' && define.amd) {
                         onChange : function(){}
                     }, options);
                 $this.data('cbx_options', _options );
+
+
+                if (options.className_semi && options.semiSelected){
+                    _options.selected = true;
+                    $this.addClass(options.className_semi);
+                }
+
                 $this._cbxSet( _options.selected, true );
+
                 $this.on('click', $.proxy( $this._cbxOnClick, $this ));
                 if (options.onDblClick)
                     $this.on('dblclick', $.proxy($this._cbxCallDblClick, $this));
@@ -49007,8 +49417,10 @@ if (typeof define === 'function' && define.amd) {
 
             });
 
-            if (!dontCallOnChange)
+            if (!dontCallOnChange){
+                this.removeClass(options.className_semi);
                 this._cbxCallOnChange();
+            }
             return this;
         },
 
@@ -49304,19 +49716,19 @@ if (typeof define === 'function' && define.amd) {
 ;
 /* @preserve
  * The MIT License (MIT)
- *
+ * 
  * Copyright (c) 2013-2018 Petka Antonov
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
@@ -49324,7 +49736,7 @@ if (typeof define === 'function' && define.amd) {
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- *
+ * 
  */
 /**
  * bluebird build version 3.7.2
@@ -52916,28 +53328,28 @@ _dereq_('./using.js')(Promise, apiRejection, tryConvertToPromise, createContext,
 _dereq_('./any.js')(Promise);
 _dereq_('./each.js')(Promise, INTERNAL);
 _dereq_('./filter.js')(Promise, INTERNAL);
-
-    util.toFastProperties(Promise);
-    util.toFastProperties(Promise.prototype);
-    function fillTypes(value) {
-        var p = new Promise(INTERNAL);
-        p._fulfillmentHandler0 = value;
-        p._rejectionHandler0 = value;
-        p._promise0 = value;
-        p._receiver0 = value;
-    }
-    // Complete slack tracking, opt out of field-type tracking and
-    // stabilize map
-    fillTypes({a: 1});
-    fillTypes({b: 2});
-    fillTypes({c: 3});
-    fillTypes(1);
-    fillTypes(function(){});
-    fillTypes(undefined);
-    fillTypes(false);
-    fillTypes(new Promise(INTERNAL));
-    debug.setBounds(Async.firstLineError, util.lastLineError);
-    return Promise;
+                                                         
+    util.toFastProperties(Promise);                                          
+    util.toFastProperties(Promise.prototype);                                
+    function fillTypes(value) {                                              
+        var p = new Promise(INTERNAL);                                       
+        p._fulfillmentHandler0 = value;                                      
+        p._rejectionHandler0 = value;                                        
+        p._promise0 = value;                                                 
+        p._receiver0 = value;                                                
+    }                                                                        
+    // Complete slack tracking, opt out of field-type tracking and           
+    // stabilize map                                                         
+    fillTypes({a: 1});                                                       
+    fillTypes({b: 2});                                                       
+    fillTypes({c: 3});                                                       
+    fillTypes(1);                                                            
+    fillTypes(function(){});                                                 
+    fillTypes(undefined);                                                    
+    fillTypes(false);                                                        
+    fillTypes(new Promise(INTERNAL));                                        
+    debug.setBounds(Async.firstLineError, util.lastLineError);               
+    return Promise;                                                          
 
 };
 
@@ -65712,7 +66124,7 @@ return index;
 
     var keys = ['Hours', 'Minutes', 'Seconds', 'Milliseconds'];
     var maxValues = [24, 60, 60, 1000];
-
+    
     // Capitalize first letter
     key = key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
 
@@ -65758,7 +66170,7 @@ return index;
 }).call(this);
 ;
 //! moment-timezone.js
-//! version : 0.5.31
+//! version : 0.5.33
 //! Copyright (c) JS Foundation and other contributors
 //! license : MIT
 //! github.com/moment/moment-timezone
@@ -65788,7 +66200,7 @@ return index;
 	// 	return moment;
 	// }
 
-	var VERSION = "0.5.31",
+	var VERSION = "0.5.33",
 		zones = {},
 		links = {},
 		countries = {},
@@ -66450,7 +66862,7 @@ return index;
 	}
 
 	loadData({
-		"version": "2020a",
+		"version": "2021a",
 		"zones": [
 			"Africa/Abidjan|GMT|0|0||48e5",
 			"Africa/Nairobi|EAT|-30|0||47e5",
@@ -66458,105 +66870,102 @@ return index;
 			"Africa/Lagos|WAT|-10|0||17e6",
 			"Africa/Maputo|CAT|-20|0||26e5",
 			"Africa/Cairo|EET|-20|0||15e6",
-			"Africa/Casablanca|+00 +01|0 -10|010101010101010101010101010101|1O9e0 uM0 e00 Dc0 11A0 s00 e00 IM0 WM0 mo0 gM0 LA0 WM0 jA0 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 e00 28M0 e00 2600 gM0|32e5",
-			"Europe/Paris|CET CEST|-10 -20|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|11e6",
+			"Africa/Casablanca|+00 +01|0 -10|0101010101010101010101010101|1QyO0 s00 e00 IM0 WM0 mo0 gM0 LA0 WM0 jA0 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 gM0 2600 e00 2600 gM0 2600 e00|32e5",
+			"Europe/Paris|CET CEST|-10 -20|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|11e6",
 			"Africa/Johannesburg|SAST|-20|0||84e5",
+			"Africa/Juba|EAT CAT|-30 -20|01|24nx0|",
 			"Africa/Khartoum|EAT CAT|-30 -20|01|1Usl0|51e5",
 			"Africa/Sao_Tome|GMT WAT|0 -10|010|1UQN0 2q00|",
-			"Africa/Windhoek|CAT WAT|-20 -10|0101010|1Oc00 11B0 1nX0 11B0 1nX0 11B0|32e4",
-			"America/Adak|HST HDT|a0 90|01010101010101010101010|1O100 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|326",
-			"America/Anchorage|AKST AKDT|90 80|01010101010101010101010|1O0X0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|30e4",
+			"Africa/Windhoek|CAT WAT|-20 -10|01010|1QBA0 11B0 1nX0 11B0|32e4",
+			"America/Adak|HST HDT|a0 90|01010101010101010101010|1Qto0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|326",
+			"America/Anchorage|AKST AKDT|90 80|01010101010101010101010|1Qtn0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|30e4",
 			"America/Santo_Domingo|AST|40|0||29e5",
 			"America/Fortaleza|-03|30|0||34e5",
-			"America/Asuncion|-03 -04|30 40|01010101010101010101010|1O6r0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0|28e5",
+			"America/Asuncion|-03 -04|30 40|01010101010101010101010|1QyP0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0 17b0 1ip0|28e5",
 			"America/Panama|EST|50|0||15e5",
-			"America/Mexico_City|CST CDT|60 50|01010101010101010101010|1Oc80 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|20e6",
+			"America/Mexico_City|CST CDT|60 50|01010101010101010101010|1QBI0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0|20e6",
 			"America/Managua|CST|60|0||22e5",
 			"America/La_Paz|-04|40|0||19e5",
 			"America/Lima|-05|50|0||11e6",
-			"America/Denver|MST MDT|70 60|01010101010101010101010|1O0V0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|26e5",
-			"America/Campo_Grande|-03 -04|30 40|0101010101|1NTf0 1zd0 On0 1zd0 On0 1zd0 On0 1HB0 FX0|77e4",
-			"America/Cancun|CST EST|60 50|01|1NKU0|63e4",
+			"America/Denver|MST MDT|70 60|01010101010101010101010|1Qtl0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|26e5",
+			"America/Campo_Grande|-03 -04|30 40|01010101|1QkP0 1zd0 On0 1zd0 On0 1HB0 FX0|77e4",
 			"America/Caracas|-0430 -04|4u 40|01|1QMT0|29e5",
-			"America/Chicago|CST CDT|60 50|01010101010101010101010|1O0U0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|92e5",
-			"America/Chihuahua|MST MDT|70 60|01010101010101010101010|1Oc90 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|81e4",
+			"America/Chicago|CST CDT|60 50|01010101010101010101010|1Qtk0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|92e5",
+			"America/Chihuahua|MST MDT|70 60|01010101010101010101010|1QBJ0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0|81e4",
 			"America/Phoenix|MST|70|0||42e5",
-			"America/Whitehorse|PST PDT MST|80 70 70|010101010102|1O0W0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0|23e3",
-			"America/New_York|EST EDT|50 40|01010101010101010101010|1O0T0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|21e6",
-			"America/Los_Angeles|PST PDT|80 70|01010101010101010101010|1O0W0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|15e6",
-			"America/Fort_Nelson|PST MST|80 70|01|1O0W0|39e2",
-			"America/Halifax|AST ADT|40 30|01010101010101010101010|1O0S0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|39e4",
-			"America/Godthab|-03 -02|30 20|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|17e3",
-			"America/Grand_Turk|EST EDT AST|50 40 40|0121010101010101010|1O0T0 1zb0 5Ip0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|37e2",
-			"America/Havana|CST CDT|50 40|01010101010101010101010|1O0R0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0|21e5",
-			"America/Metlakatla|PST AKST AKDT|80 90 80|01212120121212121212121|1PAa0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 uM0 jB0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|14e2",
-			"America/Miquelon|-03 -02|30 20|01010101010101010101010|1O0R0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|61e2",
-			"America/Montevideo|-02 -03|20 30|01|1O0Q0|17e5",
+			"America/Whitehorse|PST PDT MST|80 70 70|01010101012|1Qtm0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1z90|23e3",
+			"America/New_York|EST EDT|50 40|01010101010101010101010|1Qtj0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|21e6",
+			"America/Los_Angeles|PST PDT|80 70|01010101010101010101010|1Qtm0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|15e6",
+			"America/Halifax|AST ADT|40 30|01010101010101010101010|1Qti0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|39e4",
+			"America/Godthab|-03 -02|30 20|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|17e3",
+			"America/Grand_Turk|AST EDT EST|40 40 50|0121212121212121212|1Vkv0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|37e2",
+			"America/Havana|CST CDT|50 40|01010101010101010101010|1Qth0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0|21e5",
+			"America/Metlakatla|AKST AKDT PST|90 80 80|010101201010101010101010|1Qtn0 1zb0 Op0 1zb0 Op0 1zb0 uM0 jB0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|14e2",
+			"America/Miquelon|-03 -02|30 20|01010101010101010101010|1Qth0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|61e2",
 			"America/Noronha|-02|20|0||30e2",
-			"America/Port-au-Prince|EST EDT|50 40|010101010101010101010|1O0T0 1zb0 3iN0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|23e5",
+			"America/Port-au-Prince|EST EDT|50 40|010101010101010101010|1SST0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|23e5",
 			"Antarctica/Palmer|-03 -04|30 40|010|1QSr0 Ap0|40",
-			"America/Santiago|-03 -04|30 40|010101010101010101010|1QSr0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 11B0 1nX0 11B0|62e5",
-			"America/Sao_Paulo|-02 -03|20 30|0101010101|1NTe0 1zd0 On0 1zd0 On0 1zd0 On0 1HB0 FX0|20e6",
-			"Atlantic/Azores|-01 +00|10 0|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|25e4",
-			"America/St_Johns|NST NDT|3u 2u|01010101010101010101010|1O0Ru 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|11e4",
-			"Antarctica/Casey|+08 +11|-80 -b0|010|1RWg0 3m10|10",
+			"America/Santiago|-03 -04|30 40|01010101010101010101010|1QSr0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 11B0 1nX0 11B0 1nX0 11B0|62e5",
+			"America/Sao_Paulo|-02 -03|20 30|01010101|1QkO0 1zd0 On0 1zd0 On0 1HB0 FX0|20e6",
+			"Atlantic/Azores|-01 +00|10 0|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|25e4",
+			"America/St_Johns|NST NDT|3u 2u|01010101010101010101010|1Qthu 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|11e4",
+			"Antarctica/Casey|+08 +11|-80 -b0|01010101|1RWg0 3m10 1o30 14k0 1kr0 12l0 1o01|10",
 			"Asia/Bangkok|+07|-70|0||15e6",
 			"Asia/Vladivostok|+10|-a0|0||60e4",
-			"Pacific/Bougainville|+11|-b0|0||18e4",
+			"Australia/Sydney|AEDT AEST|-b0 -a0|01010101010101010101010|1QBs0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0|40e5",
 			"Asia/Tashkent|+05|-50|0||23e5",
-			"Pacific/Auckland|NZDT NZST|-d0 -c0|01010101010101010101010|1ObO0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00|14e5",
+			"Pacific/Auckland|NZDT NZST|-d0 -c0|01010101010101010101010|1QBq0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00 1fA0 1a00|14e5",
 			"Asia/Baghdad|+03|-30|0||66e5",
-			"Antarctica/Troll|+00 +02|0 -20|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|40",
+			"Antarctica/Troll|+00 +02|0 -20|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|40",
 			"Asia/Dhaka|+06|-60|0||16e6",
-			"Asia/Amman|EET EEST|-20 -30|01010101010101010101010|1O8m0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0|25e5",
+			"Asia/Amman|EET EEST|-20 -30|01010101010101010101010|1QAK0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|25e5",
 			"Asia/Kamchatka|+12|-c0|0||18e4",
-			"Asia/Baku|+04 +05|-40 -50|010|1O9c0 1o00|27e5",
+			"Asia/Dubai|+04|-40|0||39e5",
 			"Asia/Barnaul|+06 +07|-60 -70|01|1QyI0|",
-			"Asia/Beirut|EET EEST|-20 -30|01010101010101010101010|1O9a0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0|22e5",
+			"Asia/Beirut|EET EEST|-20 -30|01010101010101010101010|1QyK0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0|22e5",
 			"Asia/Kuala_Lumpur|+08|-80|0||71e5",
 			"Asia/Kolkata|IST|-5u|0||15e6",
 			"Asia/Chita|+08 +09|-80 -90|01|1QyG0|33e4",
-			"Asia/Ulaanbaatar|+08 +09|-80 -90|01010|1O8G0 1cJ0 1cP0 1cJ0|12e5",
+			"Asia/Ulaanbaatar|+08 +09|-80 -90|010|1Qyi0 1cJ0|12e5",
 			"Asia/Shanghai|CST|-80|0||23e6",
 			"Asia/Colombo|+0530|-5u|0||22e5",
-			"Asia/Damascus|EET EEST|-20 -30|01010101010101010101010|1O8m0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0|26e5",
+			"Asia/Damascus|EET EEST|-20 -30|01010101010101010101010|1QxW0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0|26e5",
 			"Asia/Yakutsk|+09|-90|0||28e4",
-			"Asia/Dubai|+04|-40|0||39e5",
-			"Asia/Famagusta|EET EEST +03|-20 -30 -30|0101201010101010101010|1O9d0 1o00 11A0 15U0 2Ks0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|",
-			"Asia/Gaza|EET EEST|-20 -30|01010101010101010101010|1O8K0 1nz0 1220 1qL0 WN0 1qL0 WN0 1qL0 11c0 1oo0 11c0 1rc0 Wo0 1rc0 Wo0 1rc0 11c0 1oo0 11c0 1oo0 11c0 1oo0|18e5",
+			"Asia/Famagusta|EET EEST +03|-20 -30 -30|0120101010101010101010|1QyN0 15U0 2Ks0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|",
+			"Asia/Gaza|EET EEST|-20 -30|01010101010101010101010|1Qyn0 1qL0 WN0 1qL0 WN0 1qL0 11c0 1on0 11B0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|18e5",
 			"Asia/Hong_Kong|HKT|-80|0||73e5",
-			"Asia/Hovd|+07 +08|-70 -80|01010|1O8H0 1cJ0 1cP0 1cJ0|81e3",
-			"Europe/Istanbul|EET EEST +03|-20 -30 -30|01012|1O9d0 1tA0 U00 15w0|13e6",
+			"Asia/Hovd|+07 +08|-70 -80|010|1Qyj0 1cJ0|81e3",
+			"Europe/Istanbul|EET EEST +03|-20 -30 -30|012|1QyN0 15w0|13e6",
 			"Asia/Jakarta|WIB|-70|0||31e6",
 			"Asia/Jayapura|WIT|-90|0||26e4",
-			"Asia/Jerusalem|IST IDT|-20 -30|01010101010101010101010|1O8o0 1oL0 10N0 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0 10N0 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0|81e4",
+			"Asia/Jerusalem|IST IDT|-20 -30|01010101010101010101010|1Qy00 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0 10N0 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0 10N0 1oL0|81e4",
 			"Asia/Kabul|+0430|-4u|0||46e5",
 			"Asia/Karachi|PKT|-50|0||24e6",
 			"Asia/Kathmandu|+0545|-5J|0||12e5",
 			"Asia/Magadan|+10 +11|-a0 -b0|01|1QJQ0|95e3",
 			"Asia/Makassar|WITA|-80|0||15e5",
 			"Asia/Manila|PST|-80|0||24e6",
-			"Europe/Athens|EET EEST|-20 -30|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|35e5",
+			"Europe/Athens|EET EEST|-20 -30|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|35e5",
 			"Asia/Novosibirsk|+06 +07|-60 -70|01|1Rmk0|15e5",
-			"Asia/Pyongyang|KST KST|-90 -8u|010|1P4D0 6BA0|29e5",
+			"Asia/Pyongyang|KST KST|-8u -90|01|1VGf0|29e5",
 			"Asia/Qyzylorda|+06 +05|-60 -50|01|1Xei0|73e4",
 			"Asia/Rangoon|+0630|-6u|0||48e5",
 			"Asia/Sakhalin|+10 +11|-a0 -b0|01|1QyE0|58e4",
 			"Asia/Seoul|KST|-90|0||23e6",
-			"Asia/Tehran|+0330 +0430|-3u -4u|01010101010101010101010|1O6ku 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0|14e6",
+			"Pacific/Bougainville|+11|-b0|0||18e4",
+			"Asia/Tehran|+0330 +0430|-3u -4u|01010101010101010101010|1Qwku 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0|14e6",
 			"Asia/Tokyo|JST|-90|0||38e6",
 			"Asia/Tomsk|+06 +07|-60 -70|01|1QXU0|10e5",
-			"Europe/Lisbon|WET WEST|0 -10|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|27e5",
+			"Europe/Lisbon|WET WEST|0 -10|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|27e5",
 			"Atlantic/Cape_Verde|-01|10|0||50e4",
-			"Australia/Sydney|AEDT AEST|-b0 -a0|01010101010101010101010|1ObQ0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0|40e5",
-			"Australia/Adelaide|ACDT ACST|-au -9u|01010101010101010101010|1ObQu 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0|11e5",
+			"Australia/Adelaide|ACDT ACST|-au -9u|01010101010101010101010|1QBsu 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0|11e5",
 			"Australia/Brisbane|AEST|-a0|0||20e5",
 			"Australia/Darwin|ACST|-9u|0||12e4",
 			"Australia/Eucla|+0845|-8J|0||368",
-			"Australia/Lord_Howe|+11 +1030|-b0 -au|01010101010101010101010|1ObP0 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1fAu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1fzu 1cMu 1cLu 1cMu|347",
+			"Australia/Lord_Howe|+11 +1030|-b0 -au|01010101010101010101010|1QBr0 1cMu 1cLu 1cMu 1cLu 1fAu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1fzu 1cMu 1cLu 1cMu 1cLu 1cMu|347",
 			"Australia/Perth|AWST|-80|0||18e5",
-			"Pacific/Easter|-05 -06|50 60|010101010101010101010|1QSr0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 11B0 1nX0 11B0|30e2",
-			"Europe/Dublin|GMT IST|0 -10|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|12e5",
+			"Pacific/Easter|-05 -06|50 60|01010101010101010101010|1QSr0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 11B0 1nX0 11B0 1nX0 11B0|30e2",
+			"Europe/Dublin|GMT IST|0 -10|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|12e5",
 			"Etc/GMT-1|+01|-10|0||",
 			"Pacific/Fakaofo|+13|-d0|0||483",
 			"Pacific/Kiritimati|+14|-e0|0||51e2",
@@ -66570,20 +66979,20 @@ return index;
 			"Pacific/Gambier|-09|90|0||125",
 			"Etc/UTC|UTC|0|0||",
 			"Europe/Ulyanovsk|+03 +04|-30 -40|01|1QyL0|13e5",
-			"Europe/London|GMT BST|0 -10|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|10e6",
-			"Europe/Chisinau|EET EEST|-20 -30|01010101010101010101010|1O9c0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|67e4",
+			"Europe/London|GMT BST|0 -10|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|10e6",
+			"Europe/Chisinau|EET EEST|-20 -30|01010101010101010101010|1QyM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|67e4",
 			"Europe/Moscow|MSK|-30|0||16e6",
 			"Europe/Saratov|+03 +04|-30 -40|01|1Sfz0|",
-			"Europe/Volgograd|+03 +04|-30 -40|01|1WQL0|10e5",
+			"Europe/Volgograd|+03 +04|-30 -40|010|1WQL0 5gn0|10e5",
 			"Pacific/Honolulu|HST|a0|0||37e4",
-			"MET|MET MEST|-10 -20|01010101010101010101010|1O9d0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|",
-			"Pacific/Chatham|+1345 +1245|-dJ -cJ|01010101010101010101010|1ObO0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00|600",
-			"Pacific/Apia|+14 +13|-e0 -d0|01010101010101010101010|1ObO0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00|37e3",
-			"Pacific/Fiji|+13 +12|-d0 -c0|01010101010101010101010|1NF20 1SM0 uM0 1VA0 s00 1VA0 s00 1VA0 s00 20o0 pc0 20o0 s00 20o0 pc0 20o0 pc0 20o0 pc0 20o0 pc0 20o0|88e4",
+			"MET|MET MEST|-10 -20|01010101010101010101010|1QyN0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|",
+			"Pacific/Chatham|+1345 +1245|-dJ -cJ|01010101010101010101010|1QBq0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00 1fA0 1a00|600",
+			"Pacific/Apia|+14 +13|-e0 -d0|01010101010101010101010|1QBq0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00 1fA0 1a00|37e3",
+			"Pacific/Fiji|+13 +12|-d0 -c0|01010101010101010101010|1Q6C0 1VA0 s00 1VA0 s00 1VA0 s00 20o0 pc0 2hc0 bc0 20o0 pc0 20o0 pc0 20o0 pc0 20o0 pc0 20o0 s00 1VA0|88e4",
 			"Pacific/Guam|ChST|-a0|0||17e4",
 			"Pacific/Marquesas|-0930|9u|0||86e2",
 			"Pacific/Pago_Pago|SST|b0|0||37e2",
-			"Pacific/Norfolk|+1130 +11 +12|-bu -b0 -c0|012121212121212|1PoCu 9Jcu 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0|25e4",
+			"Pacific/Norfolk|+11 +12|-b0 -c0|0101010101010101|219P0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0|25e4",
 			"Pacific/Tongatapu|+13 +14|-d0 -e0|010|1S4d0 s00|75e3"
 		],
 		"links": [
@@ -66643,7 +67052,6 @@ return index;
 			"Africa/Nairobi|Africa/Asmera",
 			"Africa/Nairobi|Africa/Dar_es_Salaam",
 			"Africa/Nairobi|Africa/Djibouti",
-			"Africa/Nairobi|Africa/Juba",
 			"Africa/Nairobi|Africa/Kampala",
 			"Africa/Nairobi|Africa/Mogadishu",
 			"Africa/Nairobi|Indian/Antananarivo",
@@ -66709,6 +67117,7 @@ return index;
 			"America/Fortaleza|America/Jujuy",
 			"America/Fortaleza|America/Maceio",
 			"America/Fortaleza|America/Mendoza",
+			"America/Fortaleza|America/Montevideo",
 			"America/Fortaleza|America/Paramaribo",
 			"America/Fortaleza|America/Recife",
 			"America/Fortaleza|America/Rosario",
@@ -66745,7 +67154,6 @@ return index;
 			"America/Los_Angeles|Mexico/BajaNorte",
 			"America/Los_Angeles|PST8PDT",
 			"America/Los_Angeles|US/Pacific",
-			"America/Los_Angeles|US/Pacific-New",
 			"America/Managua|America/Belize",
 			"America/Managua|America/Costa_Rica",
 			"America/Managua|America/El_Salvador",
@@ -66786,6 +67194,7 @@ return index;
 			"America/Noronha|Brazil/DeNoronha",
 			"America/Noronha|Etc/GMT+2",
 			"America/Panama|America/Atikokan",
+			"America/Panama|America/Cancun",
 			"America/Panama|America/Cayman",
 			"America/Panama|America/Coral_Harbour",
 			"America/Panama|America/Jamaica",
@@ -66793,6 +67202,7 @@ return index;
 			"America/Panama|Jamaica",
 			"America/Phoenix|America/Creston",
 			"America/Phoenix|America/Dawson_Creek",
+			"America/Phoenix|America/Fort_Nelson",
 			"America/Phoenix|America/Hermosillo",
 			"America/Phoenix|MST",
 			"America/Phoenix|US/Arizona",
@@ -66855,6 +67265,7 @@ return index;
 			"Asia/Dhaka|Asia/Urumqi",
 			"Asia/Dhaka|Etc/GMT-6",
 			"Asia/Dhaka|Indian/Chagos",
+			"Asia/Dubai|Asia/Baku",
 			"Asia/Dubai|Asia/Muscat",
 			"Asia/Dubai|Asia/Tbilisi",
 			"Asia/Dubai|Asia/Yerevan",
@@ -66936,6 +67347,7 @@ return index;
 			"Australia/Darwin|Australia/North",
 			"Australia/Lord_Howe|Australia/LHI",
 			"Australia/Perth|Australia/West",
+			"Australia/Sydney|Antarctica/Macquarie",
 			"Australia/Sydney|Australia/ACT",
 			"Australia/Sydney|Australia/Canberra",
 			"Australia/Sydney|Australia/Currie",
@@ -67021,7 +67433,6 @@ return index;
 			"Pacific/Auckland|Antarctica/McMurdo",
 			"Pacific/Auckland|Antarctica/South_Pole",
 			"Pacific/Auckland|NZ",
-			"Pacific/Bougainville|Antarctica/Macquarie",
 			"Pacific/Bougainville|Asia/Srednekolymsk",
 			"Pacific/Bougainville|Etc/GMT-11",
 			"Pacific/Bougainville|Pacific/Efate",
@@ -67132,7 +67543,7 @@ return index;
 			"GG|Europe/London Europe/Guernsey",
 			"GH|Africa/Accra",
 			"GI|Europe/Gibraltar",
-			"GL|America/Godthab America/Danmarkshavn America/Scoresbysund America/Thule",
+			"GL|America/Nuuk America/Danmarkshavn America/Scoresbysund America/Thule",
 			"GM|Africa/Abidjan Africa/Banjul",
 			"GN|Africa/Abidjan Africa/Conakry",
 			"GP|America/Port_of_Spain America/Guadeloupe",
@@ -68324,12 +68735,12 @@ options:
 /*! @websanova/url - v2.6.3 - 2020-01-25 */
 !function(){function t(t,r){var a,o={};if("tld?"!==t){if(r=r||window.location.toString(),!t)return r;if(t=t.toString(),a=r.match(/^mailto:([^\/].+)/))o.protocol="mailto",o.email=a[1];else{if((a=r.match(/(.*?)\/#\!(.*)/))&&(r=a[1]+a[2]),(a=r.match(/(.*?)#(.*)/))&&(o.hash=a[2],r=a[1]),o.hash&&t.match(/^#/))return h(t,o.hash);if((a=r.match(/(.*?)\?(.*)/))&&(o.query=a[2],r=a[1]),o.query&&t.match(/^\?/))return h(t,o.query);if((a=r.match(/(.*?)\:?\/\/(.*)/))&&(o.protocol=a[1].toLowerCase(),r=a[2]),(a=r.match(/(.*?)(\/.*)/))&&(o.path=a[2],r=a[1]),o.path=(o.path||"").replace(/^([^\/])/,"/$1"),t.match(/^[\-0-9]+$/)&&(t=t.replace(/^([^\/])/,"/$1")),t.match(/^\//))return e(t,o.path.substring(1));if((a=(a=e("/-1",o.path.substring(1)))&&a.match(/(.*?)\.([^.]+)$/))&&(o.file=a[0],o.filename=a[1],o.fileext=a[2]),(a=r.match(/(.*)\:([0-9]+)$/))&&(o.port=a[2],r=a[1]),(a=r.match(/(.*?)@(.*)/))&&(o.auth=a[1],r=a[2]),o.auth&&(a=o.auth.match(/(.*)\:(.*)/),o.user=a?a[1]:o.auth,o.pass=a?a[2]:void 0),o.hostname=r.toLowerCase(),"."===t.charAt(0))return e(t,o.hostname);o.port=o.port||("https"===o.protocol?"443":"80"),o.protocol=o.protocol||("443"===o.port?"https":"http")}return t in o?o[t]:"{}"===t?o:void 0}}function e(t,r){var a=t.charAt(0),o=r.split(a);return a===t?o:o[(t=parseInt(t.substring(1),10))<0?o.length+t:t-1]}function h(t,r){for(var a,o=t.charAt(0),e=r.split("&"),h=[],n={},c=[],i=t.substring(1),p=0,u=e.length;p<u;p++)if(""!==(h=(h=e[p].match(/(.*?)=(.*)/))||[e[p],e[p],""])[1].replace(/\s/g,"")){if(h[2]=(a=h[2]||"",decodeURIComponent(a.replace(/\+/g," "))),i===h[1])return h[2];(c=h[1].match(/(.*)\[([0-9]+)\]/))?(n[c[1]]=n[c[1]]||[],n[c[1]][c[2]]=h[2]):n[h[1]]=h[2]}return o===t?n:n[i]}window.url=t}();
 ;
-/*
-  @package NOTY - Dependency-free notification library
-  @version version: 3.1.4
-  @contributors https://github.com/needim/noty/graphs/contributors
-  @documentation Examples and Documentation - http://needim.github.com/noty
-  @license Licensed under the MIT licenses: http://www.opensource.org/licenses/mit-license.php
+/* 
+  @package NOTY - Dependency-free notification library 
+  @version version: 3.1.4 
+  @contributors https://github.com/needim/noty/graphs/contributors 
+  @documentation Examples and Documentation - http://needim.github.com/noty 
+  @license Licensed under the MIT licenses: http://www.opensource.org/licenses/mit-license.php 
 */
 
 (function webpackUniversalModuleDefinition(root, factory) {
@@ -70362,7 +70773,7 @@ Promise$2.prototype = {
     The primary way of interacting with a promise is through its `then` method,
     which registers callbacks to receive either a promise's eventual value or the
     reason why the promise cannot be fulfilled.
-
+  
     ```js
     findUser().then(function(user){
       // user is available
@@ -70370,14 +70781,14 @@ Promise$2.prototype = {
       // user is unavailable, and you are given the reason why
     });
     ```
-
+  
     Chaining
     --------
-
+  
     The return value of `then` is itself a promise.  This second, 'downstream'
     promise is resolved with the return value of the first promise's fulfillment
     or rejection handler, or rejected if the handler throws an exception.
-
+  
     ```js
     findUser().then(function (user) {
       return user.name;
@@ -70387,7 +70798,7 @@ Promise$2.prototype = {
       // If `findUser` fulfilled, `userName` will be the user's name, otherwise it
       // will be `'default name'`
     });
-
+  
     findUser().then(function (user) {
       throw new Error('Found user, but still unhappy');
     }, function (reason) {
@@ -70400,7 +70811,7 @@ Promise$2.prototype = {
     });
     ```
     If the downstream promise does not specify a rejection handler, rejection reasons will be propagated further downstream.
-
+  
     ```js
     findUser().then(function (user) {
       throw new PedagogicalException('Upstream error');
@@ -70412,15 +70823,15 @@ Promise$2.prototype = {
       // The `PedgagocialException` is propagated all the way down to here
     });
     ```
-
+  
     Assimilation
     ------------
-
+  
     Sometimes the value you want to propagate to a downstream promise can only be
     retrieved asynchronously. This can be achieved by returning a promise in the
     fulfillment or rejection handler. The downstream promise will then be pending
     until the returned promise is settled. This is called *assimilation*.
-
+  
     ```js
     findUser().then(function (user) {
       return findCommentsByAuthor(user);
@@ -70428,9 +70839,9 @@ Promise$2.prototype = {
       // The user's comments are now available
     });
     ```
-
+  
     If the assimliated promise rejects, then the downstream promise will also reject.
-
+  
     ```js
     findUser().then(function (user) {
       return findCommentsByAuthor(user);
@@ -70440,15 +70851,15 @@ Promise$2.prototype = {
       // If `findCommentsByAuthor` rejects, we'll have the reason here
     });
     ```
-
+  
     Simple Example
     --------------
-
+  
     Synchronous Example
-
+  
     ```javascript
     let result;
-
+  
     try {
       result = findResult();
       // success
@@ -70456,9 +70867,9 @@ Promise$2.prototype = {
       // failure
     }
     ```
-
+  
     Errback Example
-
+  
     ```js
     findResult(function(result, err){
       if (err) {
@@ -70468,9 +70879,9 @@ Promise$2.prototype = {
       }
     });
     ```
-
+  
     Promise Example;
-
+  
     ```javascript
     findResult().then(function(result){
       // success
@@ -70478,15 +70889,15 @@ Promise$2.prototype = {
       // failure
     });
     ```
-
+  
     Advanced Example
     --------------
-
+  
     Synchronous Example
-
+  
     ```javascript
     let author, books;
-
+  
     try {
       author = findAuthor();
       books  = findBooksByAuthor(author);
@@ -70495,19 +70906,19 @@ Promise$2.prototype = {
       // failure
     }
     ```
-
+  
     Errback Example
-
+  
     ```js
-
+  
     function foundBooks(books) {
-
+  
     }
-
+  
     function failure(reason) {
-
+  
     }
-
+  
     findAuthor(function(author, err){
       if (err) {
         failure(err);
@@ -70532,9 +70943,9 @@ Promise$2.prototype = {
       }
     });
     ```
-
+  
     Promise Example;
-
+  
     ```javascript
     findAuthor().
       then(findBooksByAuthor).
@@ -70544,7 +70955,7 @@ Promise$2.prototype = {
       // something went wrong
     });
     ```
-
+  
     @method then
     @param {Function} onFulfilled
     @param {Function} onRejected
@@ -70556,25 +70967,25 @@ Promise$2.prototype = {
   /**
     `catch` is simply sugar for `then(undefined, onRejection)` which makes it the same
     as the catch block of a try/catch statement.
-
+  
     ```js
     function findAuthor(){
       throw new Error('couldn't find that author');
     }
-
+  
     // synchronous
     try {
       findAuthor();
     } catch(reason) {
       // something went wrong
     }
-
+  
     // async with promises
     findAuthor().catch(function(reason){
       // something went wrong
     });
     ```
-
+  
     @method catch
     @param {Function} onRejection
     Useful for tooling.
@@ -71403,10 +71814,10 @@ module.exports = g;
 //# sourceMappingURL=noty.js.map
 ;
 /**
- *  PDFObject v2.2.4
+ *  PDFObject v2.2.5
  *  https://github.com/pipwerks/PDFObject
  *  @license
- *  Copyright (c) 2008-2020 Philip Hutchison
+ *  Copyright (c) 2008-2021 Philip Hutchison
  *  MIT-style license: http://pipwerks.mit-license.org/
  *  UMD module pattern from https://github.com/umdjs/umd/blob/master/templates/returnExports.js
  */
@@ -71432,10 +71843,10 @@ module.exports = g;
     //Will choke on undefined navigator and window vars when run on server
     //Return boolean false and exit function when running server-side
 
-    if( typeof window === "undefined" ||
-        window.navigator === undefined ||
-        window.navigator.userAgent === undefined ||
-        window.navigator.mimeTypes === undefined){
+    if( typeof window === "undefined" || 
+        window.navigator === undefined || 
+        window.navigator.userAgent === undefined || 
+        window.navigator.mimeTypes === undefined){ 
             return false;
     }
 
@@ -71446,8 +71857,8 @@ module.exports = g;
     //Time to jump through hoops -- browser vendors do not make it easy to detect PDF support.
 
     /*
-        IE11 still uses ActiveX for Adobe Reader, but IE 11 doesn't expose window.ActiveXObject the same way
-        previous versions of IE did. window.ActiveXObject will evaluate to false in IE 11, but "ActiveXObject"
+        IE11 still uses ActiveX for Adobe Reader, but IE 11 doesn't expose window.ActiveXObject the same way 
+        previous versions of IE did. window.ActiveXObject will evaluate to false in IE 11, but "ActiveXObject" 
         in window evaluates to true.
 
         MS Edge does not support ActiveX so this test will evaluate false
@@ -71465,22 +71876,22 @@ module.exports = g;
     let supportsPdfMimeType = (nav.mimeTypes["application/pdf"] !== undefined);
 
     //Safari on iPadOS doesn't report as 'mobile' when requesting desktop site, yet still fails to embed PDFs
-    let isSafariIOSDesktopMode = (  nav.platform !== undefined &&
-                                    nav.platform === "MacIntel" &&
-                                    nav.maxTouchPoints !== undefined &&
+    let isSafariIOSDesktopMode = (  nav.platform !== undefined && 
+                                    nav.platform === "MacIntel" && 
+                                    nav.maxTouchPoints !== undefined && 
                                     nav.maxTouchPoints > 1 );
 
     //Quick test for mobile devices.
     let isMobileDevice = (isSafariIOSDesktopMode || /Mobi|Tablet|Android|iPad|iPhone/.test(ua));
 
-    //Safari desktop requires special handling
-    let isSafariDesktop = ( !isMobileDevice &&
-                            nav.vendor !== undefined &&
-                            /Apple/.test(nav.vendor) &&
+    //Safari desktop requires special handling 
+    let isSafariDesktop = ( !isMobileDevice && 
+                            nav.vendor !== undefined && 
+                            /Apple/.test(nav.vendor) && 
                             /Safari/.test(ua) );
-
+    
     //Firefox started shipping PDF.js in Firefox 19. If this is Firefox 19 or greater, assume PDF.js is available
-    let isFirefoxWithPDFJS = (!isMobileDevice && /irefox/.test(ua)) ? (parseInt(ua.split("rv:")[1].split(".")[0], 10) > 18) : false;
+    let isFirefoxWithPDFJS = (!isMobileDevice && /irefox/.test(ua) && ua.split("rv:").length > 1) ? (parseInt(ua.split("rv:")[1].split(".")[0], 10) > 18) : false;
 
 
     /* ----------------------------------------------------
@@ -71505,6 +71916,8 @@ module.exports = g;
     let supportsPDFs = (
         //As of Sept 2020 no mobile browsers properly support PDF embeds
         !isMobileDevice && (
+            //We're moving into the age of MIME-less browsers. They mostly all support PDF rendering without plugins.
+            isModernBrowser ||
             //Modern versions of Firefox come bundled with PDFJS
             isFirefoxWithPDFJS ||
             //Browsers that still support the original MIME type check
@@ -71594,12 +72007,13 @@ module.exports = g;
         let fullURL = PDFJS_URL + "?file=" + encodeURIComponent(url) + pdfOpenFragment;
         let div = document.createElement("div");
         let iframe = document.createElement("iframe");
-
+        
         iframe.src = fullURL;
         iframe.className = "pdfobject";
         iframe.type = "application/pdf";
         iframe.frameborder = "0";
-
+        iframe.allow = "fullscreen";
+        
         if(id){
             iframe.id = id;
         }
@@ -71608,13 +72022,13 @@ module.exports = g;
             div.style.cssText = "position: absolute; top: 0; right: 0; bottom: 0; left: 0;";
             iframe.style.cssText = "border: none; width: 100%; height: 100%;";
             targetNode.style.position = "relative";
-            targetNode.style.overflow = "auto";
+            targetNode.style.overflow = "auto";        
         }
 
         div.appendChild(iframe);
         targetNode.appendChild(div);
         targetNode.classList.add("pdfobject-container");
-
+        
         return targetNode.getElementsByTagName("iframe")[0];
 
     };
@@ -71633,6 +72047,10 @@ module.exports = g;
             embed.id = id;
         }
 
+        if(embedType === "iframe"){
+            embed.allow = "fullscreen";
+        }
+
         if(!omitInlineStyles){
 
             let style = (embedType === "embed") ? "overflow: auto;" : "border: none;";
@@ -71643,7 +72061,7 @@ module.exports = g;
                 style += "position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%;";
             }
 
-            embed.style.cssText = style;
+            embed.style.cssText = style; 
 
         }
 
@@ -71700,31 +72118,31 @@ module.exports = g;
         if(forcePDFJS && PDFJS_URL){
             return generatePDFJSMarkup(targetNode, url, pdfOpenFragment, PDFJS_URL, id, omitInlineStyles);
         }
-
+ 
         // --== Embed attempt #2 ==--
 
         //Embed PDF if traditional support is provided, or if this developer is willing to roll with assumption
-        //that modern desktop (not mobile) browsers natively support PDFs
-        if(supportsPDFs || (assumptionMode && isModernBrowser && !isMobileDevice)){
-
-            //Should we use <embed> or <iframe>? In most cases <embed>.
+        //that modern desktop (not mobile) browsers natively support PDFs 
+        if(supportsPDFs || (assumptionMode && !isMobileDevice)){
+            
+            //Should we use <embed> or <iframe>? In most cases <embed>. 
             //Allow developer to force <iframe>, if desired
             //There is an edge case where Safari does not respect 302 redirect requests for PDF files when using <embed> element.
             //Redirect appears to work fine when using <iframe> instead of <embed> (Addresses issue #210)
             let embedtype = (forceIframe || (supportRedirect && isSafariDesktop)) ? "iframe" : "embed";
-
+            
             return generatePDFObjectMarkup(embedtype, targetNode, targetSelector, url, pdfOpenFragment, width, height, id, omitInlineStyles);
 
         }
-
+        
         // --== Embed attempt #3 ==--
-
+        
         //If everything else has failed and a PDFJS fallback is provided, try to use it
         if(PDFJS_URL){
             return generatePDFJSMarkup(targetNode, url, pdfOpenFragment, PDFJS_URL, id, omitInlineStyles);
         }
-
-        // --== PDF embed not supported! Use fallback ==--
+        
+        // --== PDF embed not supported! Use fallback ==-- 
 
         //Display the fallback link if available
         if(fallbackLink){
@@ -72012,14 +72430,16 @@ module.exports = g;
     **********************************************************/
     $.bsButton = function( options ){
         var optionToClassName = {
-                primary        : 'primary',
-                transparent    : 'transparent',
-                semiTransparent: 'semi-transparent',
-                square         : 'square',
-                bigIcon        : 'big-icon',
-                extraLargeIcon : 'extra-large-icon',
-                selected       : 'active',
-                focus          : 'init_focus'
+                primary             : 'primary',
+                transparent         : 'transparent',
+                transparentOnDark   : 'transparent-on-dark',
+                semiTransparent     : 'semi-transparent',
+                square              : 'square',
+                bigIcon             : 'big-icon',
+                extraLargeIcon      : 'extra-large-icon',
+                selected            : 'active',
+                noBorder            : 'no-border',
+                focus               : 'init_focus'
             };
 
         options = options || {};
@@ -72126,15 +72546,29 @@ module.exports = g;
     Bootstrap-button as a checkbox with check-icon in blue box
     **********************************************************/
     $.bsStandardCheckboxButton = function( options ){
+        options = options || {};
+
+        if (!options.icon)
+            options.icon =
+                options.type == 'radio' ?
+                    //Radio-button icons
+                    [[
+                        'fas fa-circle text-checked   icon-show-for-checked', //"Blue" background
+                        'far fa-dot-circle text-white icon-show-for-checked', //Dot marker
+                        'far fa-circle'                                       //Border
+                    ]] :
+                    //Checkbox-button icons
+                    [[
+                        'fas fa-square text-checked      icon-show-for-checked', //"Blue" background
+                        'far fa-check-square text-white  icon-show-for-checked', //Check marker
+                        'far fa-square'                                          //Border
+                    ]];
+
+
         //Clone options to avoid reflux
         options = $.extend({}, options, {
             class    : 'allow-zero-selected',
             modernizr: true,
-            icon: [[
-                'fas fa-square text-checked      icon-show-for-checked', //"Blue" background
-                'far fa-check-square text-white  icon-show-for-checked', //Check marker
-                'far fa-square'                                          //Border
-            ]]
         });
 
         //Bug fix: To avoid bsButton to add class 'active', selected is set to false in options for bsButton
@@ -72143,6 +72577,23 @@ module.exports = g;
         var $result = $.bsButton( bsButtonOptions ).checkbox( $.extend(options, {className: 'checked'}) );
 
         return $result;
+    };
+
+    /**********************************************************
+    bsIconCheckboxButton( options ) - create a square
+    Bootstrap-button as a checkbox with two given icons for
+    checked and no-checked. No blue color
+    icon = ["ICONS WHEN UNSELECTED", "ICONS WHEN SELECTED", "ICONS ALWAYS SHOWN (optional)"]
+    **********************************************************/
+    $.bsIconCheckboxButton = function( options ){
+        var icon = [
+                options.icon[0] + ' icon-hide-for-checked',
+                options.icon[1] + ' icon-show-for-checked'
+            ];
+        if (options.icon.length > 2)
+            icon.push( options.icon[2] );
+
+        return $.bsStandardCheckboxButton( $.extend({}, options, {square: true, icon: [icon]}) );
     };
 
     /**********************************************************
@@ -72167,7 +72618,6 @@ module.exports = g;
             });
 
         options.baseClassPostfix = options.vertical ? options.verticalClassPostfix : options.horizontalClassPostfix;
-
         var result = $('<'+ options.tagName + '/>')
                         ._bsAddIdAndName( options )
                         ._bsAddBaseClassAndSize( options );
@@ -72279,6 +72729,12 @@ module.exports = g;
     **********************************************************/
     $.bsCheckbox = function( options ){
         options.type = options.type || 'checkbox';
+
+        if (options.semiSelected){
+            options.className_semi = 'semi-selected';
+            options.selected = true;
+        }
+
         options =
             $._bsAdjustOptions( options, {
                 useTouchSize: true,
@@ -72311,8 +72767,10 @@ module.exports = g;
                         .appendTo( $result );
 
         //Add <i> with check-icon if it is a checkbox
-        if (options.type == 'checkbox')
-            $('<i class="fas fa-check"/>').appendTo( $label );
+        $('<i/>')
+            .addClass('fas')
+            .addClass(options.type == 'checkbox' ? 'fa-check' : 'fa-circle')
+            .appendTo( $label );
 
         if (options.text)
             $('<span/>').i18n( options.text ).appendTo( $label );
@@ -72561,7 +73019,20 @@ module.exports = g;
             switch (this.options.type || 'input'){
                 case 'input'            : $elem.val( value );                      break;
                 case 'select'           : $elem.selectpicker('val', value );       break;
-                case 'checkbox'         : $elem.prop('checked', !!value );         break;
+                case 'checkbox'         :
+                    //Special case: If value is a string => the checkbox get semi-selected mode (yellow background)
+                    var isSemiSelected = (typeof value == 'string');
+                    $elem.toggleClass('semi-selected', isSemiSelected);
+
+                    //Update options for the checkbox
+                    var options = $elem.data('cbx_options');
+                    options.className_semi = isSemiSelected ? 'semi-selected' : '';
+                    options.semiSelectedValue = isSemiSelected ? value : '';
+                    $elem.data('cbx_options', options );
+
+                    $elem.prop('checked', value );
+                    break;
+
                 case 'selectlist'       : this.getRadioGroup().setSelected(value); break;
                 case 'radiobuttongroup' : this.getRadioGroup().setSelected(value); break;
 
@@ -72619,7 +73090,16 @@ module.exports = g;
             switch (this.options.type || 'input'){
                 case 'input'            : result = $elem.val();               break;
                 case 'select'           : result = $elem.selectpicker('val'); break;
-                case 'checkbox'         : result = !!$elem.prop('checked');   break;
+                case 'checkbox'         :
+                    result = !!$elem.prop('checked');
+
+                    //Special case: If $elem is semi-selected: return special value from option
+                    var options = $elem.data('cbx_options');
+                    if (result && options.semiSelectedValue && options.className_semi && $elem.hasClass(options.className_semi))
+                        result = options.semiSelectedValue;
+
+                    break;
+
                 case 'selectlist'       : result = this.getRadioGroup().getSelected(); break;
                 case 'radiobuttongroup' : result = this.getRadioGroup().getSelected(); break;
                 case 'slider'           :
@@ -72725,7 +73205,7 @@ module.exports = g;
         //this.input = simple object with all input-elements. Also convert element-id to unique id for input-element
         this.inputs = {};
 
-        var types = ['input', 'select', 'selectlist', 'radiobuttongroup', 'checkbox', 'radio', 'table', 'slider', 'timeslider', 'hidden', 'inputgroup'];
+        var types = ['button', 'input', 'select', 'selectlist', 'radiobuttongroup', 'checkbox', 'radio', 'table', 'slider', 'timeslider', 'hidden', 'inputgroup'];
 
         function setId( dummy, obj ){
             if ($.isPlainObject(obj) && (obj.type !== undefined) && (types.indexOf(obj.type) >= 0) && obj.id){
@@ -73516,6 +73996,9 @@ options
         //Append the items
         $.each(list, function(index, itemOptions){
             var $item = null, radioGroup = null;
+
+            itemOptions.small = options.small;
+
             switch (itemOptions.type){
                 case 'button':
                     $item = $.bsButton($.extend(itemOptions, {returnFromClick: true}));
@@ -73797,8 +74280,8 @@ options
             fileNameExt = window.url('fileext', theFileName),
             $content,
             footer = {
-                da: 'Hvis filen ikke kan vises, klik på <i class="fas ' + $.bsExternalLinkIcon + '"/> for at se dokumentet i en ny fane',
-                en: 'If the file doesn\'t show correctly click on <i class="fas ' + $.bsExternalLinkIcon + '"/> to see the document in a new Tab Page'
+                da: 'Hvis filen ikke kan vises, klik på <i class="fas ' + $.bsExternalLinkIcon + '"></i> for at se dokumentet i en ny fane',
+                en: 'If the file doesn\'t show correctly click on <i class="fas ' + $.bsExternalLinkIcon + '"></i> to see the document in a new Tab Page'
             },
             fullWidth       = true,
             noPadding       = true,
@@ -74098,10 +74581,14 @@ jquery-bootstrap-modal-promise.js
         modalVerticalMargin = 10, //Top and bottom margin for modal windows
 
         //Const to set different size of modal-window
-        MODAL_SIZE_NORMAL    = 1, //'normal',
-        MODAL_SIZE_MINIMIZED = 2, //'minimized',
-        MODAL_SIZE_EXTENDED  = 4; //'extended';
+        MODAL_SIZE_NORMAL    = $.MODAL_SIZE_NORMAL    = 1, //'normal',
+        MODAL_SIZE_MINIMIZED = $.MODAL_SIZE_MINIMIZED = 2, //'minimized',
+        MODAL_SIZE_EXTENDED  = $.MODAL_SIZE_EXTENDED  = 4, //'extended';
 
+        modalSizeName = {};
+        modalSizeName[MODAL_SIZE_NORMAL   ] = 'normal';
+        modalSizeName[MODAL_SIZE_MINIMIZED] = 'minimized';
+        modalSizeName[MODAL_SIZE_EXTENDED ] = 'extended';
 
     /**********************************************************
     MAX-HEIGHT ISSUES ON SAFARI (AND OTHER BROWSER ON IOS)
@@ -74339,17 +74826,17 @@ jquery-bootstrap-modal-promise.js
         update: function( options ){
             var _this = this;
             //***********************************************************
-            function updateElement( test, $element, newOptions, methodName, param ){
+            function updateElement($element, newOptions, methodName, param, param2 ){
                 if ($element && newOptions){
                     $element.empty();
-                    $element[methodName](newOptions, param);
+                    $element[methodName](newOptions, param, param2);
                 }
             }
             //***********************************************************
 
             //Update header
             var $iconContainer = this.bsModal.$header.find('.header-icon-container').detach();
-            updateElement(0, this.bsModal.$header, options, '_bsHeaderAndIcons');
+            updateElement(this.bsModal.$header, options, '_bsHeaderAndIcons');
             this.bsModal.$header.append($iconContainer);
 
             _updateFixedAndFooterInOptions(options);
@@ -74360,10 +74847,9 @@ jquery-bootstrap-modal-promise.js
                     contentOptions = id ? options[id]       : options;
 
                 if (containers && contentOptions){
-//Changed 2020-05-22                    updateElement( 1, containers.$fixedContent, contentOptions.fixedContent, '_bsAddHtml',       true );
-                    updateElement( 1, containers.$fixedContent, contentOptions.fixedContent, '_bsAppendContent', contentOptions.fixedContentContext );
-                    updateElement( 2, containers.$content,      contentOptions.content,      '_bsAppendContent', contentOptions.contentContext );
-                    updateElement( 3, containers.$footer,       contentOptions.footer,       '_bsAddHtml' );
+                    updateElement(containers.$fixedContent, contentOptions.fixedContent, '_bsAppendContent', contentOptions.fixedContentContext, contentOptions.fixedContentArg );
+                    updateElement(containers.$content,      contentOptions.content,      '_bsAppendContent', contentOptions.contentContext,      contentOptions.contentArg      );
+                    updateElement(containers.$footer,       contentOptions.footer,       '_bsAddHtml' );
                 }
             });
             return this;
@@ -74383,7 +74869,7 @@ jquery-bootstrap-modal-promise.js
     Create the body and footer content (exc header and bottoms)
     of a modal inside this. Created elements are saved in parts
     ******************************************************/
-    $.fn._bsModalBodyAndFooter = function(size, options, parts, className){
+    $.fn._bsModalBodyAndFooter = function(size, options, parts, className, initSize){
 
         //Set variables used to set scroll-bar (if any)
         var hasScroll       = !!options.scroll,
@@ -74391,7 +74877,7 @@ jquery-bootstrap-modal-promise.js
             scrollDirection = options.scroll === true ? 'vertical' : options.scroll,
             scrollbarClass  = hasScroll ? 'scrollbar-'+scrollDirection : '';
 
-        className = (className || '') + ' show-for-modal-'+size;
+        className = (className || '') + ' show-for-modal-'+modalSizeName[size];
 
         //Remove padding if the content is tabs and content isn't created from bsModal - not pretty :-)
         if (isTabs){
@@ -74415,7 +74901,6 @@ jquery-bootstrap-modal-promise.js
                     .appendTo( this );
 
         if (options.fixedContent)
-//Changed 2020-05-22            $modalFixedContent._bsAddHtml( options.fixedContent, true );
             $modalFixedContent._bsAppendContent( options.fixedContent, options.fixedContentContext );
 
         //Append body and content
@@ -74444,8 +74929,14 @@ jquery-bootstrap-modal-promise.js
                         }) :
                     $modalBody;
 
-        //Add content
-        $modalContent._bsAppendContent( options.content, options.contentContext );
+        //Add content. If the content is 'dynamic' ie options.dynamic == true and options.content is a function, AND it is a different size => save function
+        if (options.dynamic && (typeof options.content == 'function') && (size != initSize)){
+            parts.dynamicContent        = options.content;
+            parts.dynamicContentContext = options.contentContext;
+            parts.dynamicContentArg     = options.contentArg;
+        }
+        else
+            $modalContent._bsAppendContent( options.content, options.contentContext, options.contentArg );
 
         //Add scroll-event to close any bootstrapopen -select
         if (hasScroll)
@@ -74463,9 +74954,12 @@ jquery-bootstrap-modal-promise.js
 
         //Add onClick to all elements - if nedded
         if (options.onClick){
+            this.addClass('modal-' + modalSizeName[size] + '-clickable');
+            if (options.fixedContent)
+                $modalFixedContent.on('click', options.onClick);
+
             $modalContent.on('click', options.onClick);
         }
-
         return this;
     };
 
@@ -74545,13 +75039,13 @@ jquery-bootstrap-modal-promise.js
         //Add class to make content semi-transparent
         setStateClass('semi-transparent', 'semiTransparent');
 
-        this._bsModalSetSizeClass(
-            options.minimized && options.isMinimized ?
-                MODAL_SIZE_MINIMIZED :
-            options.extended && options.isExtended ?
-                MODAL_SIZE_EXTENDED :
-                MODAL_SIZE_NORMAL
-        );
+        var initSize =  options.minimized && options.isMinimized ?
+                            MODAL_SIZE_MINIMIZED :
+                        options.extended && options.isExtended ?
+                            MODAL_SIZE_EXTENDED :
+                            MODAL_SIZE_NORMAL;
+
+        this._bsModalSetSizeClass(initSize);
         this._bsModalSetHeightAndWidth();
 
         var modalExtend       = $.proxy( this._bsModalExtend,       this),
@@ -74651,7 +75145,7 @@ jquery-bootstrap-modal-promise.js
             if (options.minimized.showHeaderOnClick)
                 this.bsModal.$header.on('click', bsModalToggleMinimizedHeader);
 
-            $modalContent._bsModalBodyAndFooter( 'minimized', options.minimized, this.bsModal.minimized );
+            $modalContent._bsModalBodyAndFooter( MODAL_SIZE_MINIMIZED/*'minimized'*/, options.minimized, this.bsModal.minimized, '', initSize );
 
             if (options.minimized.showHeaderOnClick){
                 //Using fixed-height as height of content
@@ -74673,22 +75167,24 @@ jquery-bootstrap-modal-promise.js
                     modalDiminish :
                     null;
 
-        $modalContent._bsModalBodyAndFooter('normal', options, this.bsModal);
+        $modalContent._bsModalBodyAndFooter(MODAL_SIZE_NORMAL/*'normal'*/, options, this.bsModal, '', initSize);
 
         //Create extended content (if any)
         if (options.extended){
             this.bsModal.extended = {};
             if (options.extended.clickable)
                 options.extended.onClick = options.extended.onClick || modalDiminish;
-            $modalContent._bsModalBodyAndFooter( 'extended', options.extended, this.bsModal.extended);
+            $modalContent._bsModalBodyAndFooter( MODAL_SIZE_EXTENDED/*'extended'*/, options.extended, this.bsModal.extended, '', initSize);
         }
 
-        //Add buttons (if any). Allways hidden for minimized
-        var $modalButtonContainer = this.bsModal.$buttonContainer =
+        //Add buttons (if any). Allways hidden for minimized. Need to add outer-div ($outer) to avoid
+        //that $modalButtonContainer is direct children since show-for-modal-XX overwrite direct children display: flex with display: initial
+        var $outer = $('<div/>').appendTo( $modalContent ),
+            $modalButtonContainer = this.bsModal.$buttonContainer =
                 $('<div/>')
-                    .addClass('modal-footer show-for-no-modal-minimized')
+                    .addClass('modal-footer')
                     .toggleClass('modal-footer-vertical', !!options.verticalButtons)
-                    .appendTo( $modalContent ),
+                    .appendTo( $outer ),
             $modalButtons = this.bsModal.$buttons = [],
 
             buttons = options.buttons || [],
@@ -74697,6 +75193,12 @@ jquery-bootstrap-modal-promise.js
                 addOnClick  : true,
                 small       : options.smallButtons
             };
+
+        //If extende-content and extended.buttons = false => no buttons in extended
+        if (options.extended && (options.extended.buttons === false))
+            $modalButtonContainer.addClass('show-for-modal-normal');
+        else
+            $modalButtonContainer.addClass('show-for-no-modal-minimized');
 
         //If no button is given focus by options.focus: true => Last button gets focus
         var focusAdded = false;
@@ -74813,9 +75315,29 @@ jquery-bootstrap-modal-promise.js
 
     //Set new size of modal-window
     $.fn._bsModalSetSize = function(size){
+        //Check to see if the content of the new size need to be created dynamically
+        var parts = this.bsModal[ modalSizeName[size] ] || this.bsModal;
+
+        if (parts && parts.dynamicContent){
+            parts.$content._bsAppendContent( parts.dynamicContent, parts.dynamicContentContext, parts.dynamicContentArg );
+
+            parts.dynamicContent        = null;
+            parts.dynamicContentContext = null;
+            parts.dynamicContentArg     = null;
+        }
+
         this._bsModalSetSizeClass(size);
         this._bsModalSetHeightAndWidth();
-        return false; //Prevent onclick-event on header
+
+
+        /*
+        NOTE: 2021-04-16
+        Original this methods returns false to prevent onclick-event on the header.
+        That prevented other more general events to be fired. Eg. in fcoo/leaflet-bootstrap
+        where the focus of a popup window was set when the window was clicked
+        It appear not to have any other effect when removed.
+        */
+        //return false; //Prevent onclick-event on header
     };
 
     //hid/show header for size = minimized
@@ -77053,6 +77575,8 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
     //FONTAWESOME_PREFIX = the classname-prefix used when non is given. Fontawesome 4.X: 'fa', Fontawesome 5: Free: 'fas' Pro: 'far' or 'fal'
     $.FONTAWESOME_PREFIX = $.FONTAWESOME_PREFIX || 'fa';
 
+    //ICONFONT_PREFIXES = STRING or []STRING with regexp to match class-name setting font-icon class-name. Fontawesome 5: 'fa.?' accepts 'fas', 'far', etc. as class-names => will not add $.FONTAWESOME_PREFIX
+    $.ICONFONT_PREFIXES = 'fa.?';
 
     /******************************************************
     $divXXGroup
@@ -77216,7 +77740,13 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
     /****************************************************************************************
     $._bsCreateIcon = internal method to create $-icon
     ****************************************************************************************/
+    var iconfontPrefixRegExp = null;
     $._bsCreateIcon = function( options, $appendTo, title, className/*, insideStack*/ ){
+        if (!iconfontPrefixRegExp){
+            var prefixes = $.isArray($.ICONFONT_PREFIXES) ? $.ICONFONT_PREFIXES : [$.ICONFONT_PREFIXES];
+            iconfontPrefixRegExp = new window.RegExp('(\\s|^)(' + prefixes.join('|') + ')(\\s|$)', 'g');
+        }
+
         var $icon;
 
         if ($.type(options) == 'string')
@@ -77238,7 +77768,7 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
             var allClassNames = options.icon || options.class || '';
 
             //Append $.FONTAWESOME_PREFIX if icon don't contain fontawesome prefix ("fa?")
-            if (allClassNames.search(/(fa.?\s)|(\sfa.?(\s|$))/g) == -1)
+            if (allClassNames.search(iconfontPrefixRegExp) == -1)
                 allClassNames = $.FONTAWESOME_PREFIX + ' ' + allClassNames;
 
             allClassNames = allClassNames + ' ' + (className || '');
@@ -77563,7 +78093,7 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
         },
 
         /****************************************************************************************
-        _bsAppendContent( options, context )
+        _bsAppendContent( options, context, arg )
         Create and append any content to this.
         options can be $-element, function, json-object or array of same
 
@@ -77585,7 +78115,7 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
             </div>
         </div>
         ****************************************************************************************/
-        _bsAppendContent: function( options, context ){
+        _bsAppendContent: function( options, context, arg ){
 
             //Internal functions to create baseSlider and timeSlider
             function buildSlider(options, constructorName, $parent){
@@ -77629,9 +78159,11 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
                 return this;
             }
 
-            //Function
+            //Function: Include arg (if any) in call to method (=options)
             if ($.isFunction( options )){
-                options.call( context, this );
+                arg = arg ? $.isArray(arg) ? arg : [arg] : [];
+                arg.unshift(this);
+                options.apply( context, arg );
                 return this;
             }
 
@@ -77704,6 +78236,10 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
                     if (addBorder && !options.noBorder){
                         //Add border and label (if any)
                         $inputGroup.addClass('input-group-border');
+
+                        if (options.darkBorderlabel)
+                            $inputGroup.addClass('input-group-border-dark');
+
                         if (options.label){
                             $inputGroup.addClass('input-group-border-with-label');
                             $('<span/>')
@@ -77783,6 +78319,7 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
       };
     */
 
+    /* First fix by Niels Holt
     L.Path.prototype.setStyle = function (style) {
         L.setOptions(this, style);
         if (this._renderer) {
@@ -77792,6 +78329,23 @@ TODO:   truncate     : false. If true the column will be truncated. Normally onl
             }
         }
         return this;
+    };
+    */
+
+    //Fix by https://github.com/fodor0205:
+    L.Polyline.prototype._updateBounds = function () {
+          var w = this._clickTolerance(),
+              p = new L.Point(w, w);
+
+        if (!this._rawPxBounds) {
+            return;
+        }
+
+
+        this._pxBounds = new L.Bounds([
+            this._rawPxBounds.min.subtract(p),
+            this._rawPxBounds.max.add(p)
+        ]);
     };
 
 }(L, this, document));
@@ -77876,21 +78430,65 @@ Base object-class for all type of markers
     L.bsMarkerAsIcon
     Return the options to create a icon locking like a bsMarker[TYPE]
     with the given color and border-color
-    Can be used in two ways:
-        1: L.bsMarkerAsIcon(colorName, borderColorName, options)
-              options = {faClassName (default = 'fa-circle'), extraClassName (default = '')}
-        2: L.bsMarkerAsIcon(colorName, borderColorName, faClassName[String])
+    Can be used in four ways:
+        1:  L.bsMarkerAsIcon(options: OBJECT)
+                options = same as for BsMarkerBase BsMarkerCircle
+
+        2:  L.bsMarkerAsIcon(colorName: STRING, borderColorName: STRING, round: BOOLEAN = true)
+
+        3:  L.bsMarkerAsIcon(colorName: STRING, borderColorName: STRING, faClassName: STRING)
+
+        4:  L.bsMarkerAsIcon(colorName: STRING, borderColorName: STRING, options: OBJECT)
+                options = {
+                    faClassName   : STRING (default = 'fa-circle'),
+                    extraClassName: STRING (default = '')}
+                }
     *****************************************************/
-    L.bsMarkerAsIcon = function(colorName, borderColorName, faClassNameOrOptions){
-        var options =   faClassNameOrOptions ?
-                            $.type(faClassNameOrOptions) == 'string' ?
-                                options = {faClassName: faClassNameOrOptions} :
-                                options = faClassNameOrOptions
-                            : null;
+    L.bsMarkerAsIcon = function(a, b = '', c = true){
+        var colorName       = 'white',
+            borderColorName = 'black',
+            options         = {};
+
+        //1: (OBJECT)
+        if (typeof a === 'object'){
+            colorName       = a.colorName || colorName;
+            borderColorName = a.borderColorName || borderColorName;
+            if (a.noBorder)
+                borderColorName = colorName;
+
+            if (a.faClassName)
+                options.faClassName = a.faClassName;
+
+            if (!options.faClassName && (a.round === false))
+                options.faClassName = 'fa-square';
+        }
+        else {
+            //2:, 3:, or 4:
+            colorName = a || colorName;
+            borderColorName = b || borderColorName;
+
+            if (typeof c === 'boolean')
+                //2: (STRING, STRING, BOOLEAN)
+                if (!c)
+                    options.faClassName = 'fa-square';
+
+            else
+
+            if (typeof c === 'string')
+                //3: (STRING, STRING, STRING)
+                options.faClassName = c;
+
+            else
+
+            if (typeof c === 'object')
+                //4: (STRING, STRING, OBJECT)
+                options = c;
+
+        }
 
         return $.bsMarkerAsIcon(
-                    'fa-lbm-color-'+(colorName || 'white'),
-                    'fa-lbm-border-color-'+(borderColorName || 'black'),
+                    'fa-lbm-color-'+colorName,
+                    'fa-lbm-border-color-'+borderColorName,
                     options
                );
     };
@@ -77928,11 +78526,14 @@ Base object-class for all type of markers
             shadow          : false, //true to add a shadow to the marker
             puls            : false, //true to have a pulsart icon
             thickBorder     : false, //true to have thicker border
+            thinBorder      : false, //True to have a thin border
+            noBorder        : false, //True to have no border
 
-            optionsWithClass: ['transparent', 'shadow', 'hover', 'thickBorder', 'puls'],
+            optionsWithClass: ['transparent', 'shadow', 'hover', 'thickBorder', 'thinBorder', 'noBorder', 'puls'],
 
-            colorName      : '',    //or fillColor: Name of inside fill-color of the marker
-            borderColorName: '',    //or lineColor: Name of border/line-color of the marker
+            colorName      : '',    //or fillColorName: Name of inside fill-color of the marker
+            borderColorName: '',    //or lineColorName: Name of border/line-color of the marker
+            iconColorName  : '',    //or textColorName: Name of color of the inner icon or text
 
             noFill         : false, //When true only colorName is used and no background-icon is used
 
@@ -77973,7 +78574,9 @@ Base object-class for all type of markers
 
             options.colorName = options.colorName || options.fillColorName;
             options.borderColorName = options.borderColorName || options.lineColorName;
+            options.iconColorName = options.iconColorName || options.textColorName;
 //BRUGES MÅSKE IKKE:             options.color = options.color || options.textColor || options.iconColor;
+
             options.size = options.size.toLowerCase();
             options.size =  options.size == 'extrasmall' ? 'xs' :
                             options.size == 'small' ? 'sm' :
@@ -78063,7 +78666,8 @@ Base object-class for all type of markers
                     iconAnchor : point( width, height, this.options.iconAnchor  ),
                     popupAnchor: point( width, height, this.options.popupAnchor ),
                 },
-                iconId = sizeId + '_' + (this.options.iconClass || '') + '_' + (this.options.innerIconClass || '') + (this.options.round ? '_round' : ''),
+                //iconId = unique for the same inner-icon
+                iconId = sizeId + '_' + (this.options.iconClass || '') + '_' + (this.options.innerIconClass || '') + '_' + (this.options.scaleInner || '') + (this.options.round ? '_round' : ''),
                 result = iconList[iconId] = iconList[iconId] || this.createIcon(sizeId, iconOptions);
             return result;
         },
@@ -78177,7 +78781,7 @@ Base object-class for all type of markers
         setColor: function( colorName, force ){
             if (colorName && ((colorName != this.colorName) || force)){
                 this._setAnyColor( 'colorName', colorName, 'lbm-color-', this.$background, this.options.setColor);
-                this._setTextColor();
+                this._setInnerColor();
             }
             return this;
         },
@@ -78191,7 +78795,15 @@ Base object-class for all type of markers
             return this;
         },
 
-        _setAnyColor: function( id, newColorName, classNamePrefix, $element, options ){
+        /*****************************************************
+        setIconColor( iconColorName )
+        *****************************************************/
+        setIconColor: function( iconColorName ){
+            this.options.iconColorName = iconColorName;
+            return this._setInnerColor();
+        },
+
+        _setAnyColor: function( id, newColorName, classNamePrefix, $element, options = {}){
             if (this[id])
                 this.removeClass(classNamePrefix + this[id]);
             this[id] = newColorName;
@@ -78203,24 +78815,32 @@ Base object-class for all type of markers
         },
 
         /*****************************************************
-        _setTextColor()
+        _setInnerColor()
         *****************************************************/
-        _setTextColor: function(){
-            if (this.$background && this.$background.first().length){
-                var bgColorRGBStr = this.$background.first().css( this.options.setColor.cssAttrName );
+        _setInnerColor: function(){
+            //If the color of the inner text/icon is given in options.iconColorName => use it
+            if (this.options.iconColorName){
+                this.$inner.removeClass(this['iconColorName']);
+                this['iconColorName'] = 'fa-lbm-color-'+this.options.iconColorName;
+                this.$inner.addClass(this['iconColorName']);
+            }
+            else
+                //..else use white or black with the best contrast to the background-color
+                if (this.$background && this.$background.first().length){
+                    var bgColorRGBStr = this.$background.first().css( this.options.setColor.cssAttrName );
 
-                //Validate that it is rgba(123,123,123,...)
-                var regex = /\((\d{1,3}%?,\s?){3}.*\)/;
-                if (regex.test(bgColorRGBStr)) {
-                    var bgColorRGB = bgColorRGBStr ? bgColorRGBStr.split("(")[1].split(")")[0].split(',') : null,
-                        color = bgColorRGB ? window.colorContrastRGB(parseInt(bgColorRGB[0]), parseInt(bgColorRGB[1]), parseInt(bgColorRGB[2])) : null;
-                    if (color){
-                        var colorIsBlack = (color == '#000000');
-                        this.$icon.toggleClass('lbm-text-is-black', colorIsBlack);
-                        this.$icon.toggleClass('lbm-text-is-white', !colorIsBlack);
+                    //Validate that it is rgba(123,123,123,...)
+                    var regex = /\((\d{1,3}%?,\s?){3}.*\)/;
+                    if (regex.test(bgColorRGBStr)) {
+                        var bgColorRGB = bgColorRGBStr ? bgColorRGBStr.split("(")[1].split(")")[0].split(',') : null,
+                            color = bgColorRGB ? window.colorContrastRGB(parseInt(bgColorRGB[0]), parseInt(bgColorRGB[1]), parseInt(bgColorRGB[2])) : null;
+                        if (color){
+                            var colorIsBlack = (color == '#000000');
+                            this.$icon.toggleClass('lbm-text-is-black', colorIsBlack);
+                            this.$icon.toggleClass('lbm-text-is-white', !colorIsBlack);
+                        }
                     }
                 }
-            }
             return this;
         },
 
@@ -78683,7 +79303,7 @@ Extent L.Map with methods
             //bottomcenter need an extra container to be placed at the bottom
             this._controlCorners['bottomcenter'] =
                 L.DomUtil.create(
-                    'div',
+                    'div', 
                     'leaflet-bottom leaflet-center',
                     L.DomUtil.create('div', 'leaflet-control-bottomcenter',    this._controlContainer)
                 );
@@ -79383,7 +80003,7 @@ Extent L.Map with methods
         }
     });
 
-
+    
 
 (function() {
         numeral.register('format', 'bps', {
@@ -81492,6 +82112,622 @@ Set methodes and options for format utm
 
 
 ;
+/*****************************************************************************
+leaflet-latlng-geodesy.js
+
+This is a adjusted "Leaflet"-version of latlon-spherical.js from
+https://github.com/chrisveness/geodesy by Chris Veness
+See http://www.movable-type.co.uk/scripts/latlong.html
+
+The LatLon-object is replaced with standard Leaflet LatLng-object and the
+code is packed in a define-function
+
+
+*****************************************************************************/
+(function (L/*, window, document, undefined*/) {
+
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
+/* Latitude/longitude spherical geodesy tools                         (c) Chris Veness 2002-2017  */
+/*                                                                                   MIT Licence  */
+/* www.movable-type.co.uk/scripts/latlong.html                                                    */
+/* www.movable-type.co.uk/scripts/geodesy/docs/module-latlon-spherical.html                       */
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
+
+'use strict';
+
+
+/**
+ * Library of geodesy functions for operations on a spherical earth model.
+ *
+ * @module   latlon-spherical
+ * @requires dms
+ */
+
+
+/**
+ * Returns the distance from ‘this’ point to destination point (using haversine formula).
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of destination point.
+ * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
+ * @returns {number} Distance between this point and destination point, in same units as radius.
+ *
+ * @example
+ *     var p1 = new L.LatLng(52.205, 0.119);
+ *     var p2 = new L.LatLng(48.857, 2.351);
+ *     var d = p1.distanceTo(p2); // 404.3 km
+ */
+
+
+L.LatLng.prototype.distanceTo = function(point, radius) {
+    radius = (radius === undefined) ? 6371e3 : Number(radius);
+
+    // a = sin²(Δφ/2) + cos(φ1)⋅cos(φ2)⋅sin²(Δλ/2)
+    // tanδ = √(a) / √(1−a)
+    // see mathforum.org/library/drmath/view/51879.html for derivation
+
+    var R = radius;
+    var φ1 = this.lat.toRadians(),  λ1 = this.lng.toRadians();
+    var φ2 = point.lat.toRadians(), λ2 = point.lng.toRadians();
+    var Δφ = φ2 - φ1;
+    var Δλ = λ2 - λ1;
+
+    var a = Math.sin(Δφ/2) * Math.sin(Δφ/2)
+          + Math.cos(φ1) * Math.cos(φ2)
+          * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    var d = R * c;
+
+    return d;
+};
+
+
+/**
+ * Returns the (initial) bearing from ‘this’ point to destination point.
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of destination point.
+ * @returns {number} Initial bearing in degrees from north.
+ *
+ * @example
+ *     var p1 = new L.LatLng(52.205, 0.119);
+ *     var p2 = new L.LatLng(48.857, 2.351);
+ *     var b1 = p1.bearingTo(p2); // 156.2°
+ */
+L.LatLng.prototype.bearingTo = function(point) {
+
+    // tanθ = sinΔλ⋅cosφ2 / cosφ1⋅sinφ2 − sinφ1⋅cosφ2⋅cosΔλ
+    // see mathforum.org/library/drmath/view/55417.html for derivation
+
+    var φ1 = this.lat.toRadians(), φ2 = point.lat.toRadians();
+    var Δλ = (point.lng-this.lng).toRadians();
+    var y = Math.sin(Δλ) * Math.cos(φ2);
+    var x = Math.cos(φ1)*Math.sin(φ2) -
+            Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+    var θ = Math.atan2(y, x);
+
+    return (θ.toDegrees()+360) % 360;
+};
+
+
+/**
+ * Returns final bearing arriving at destination destination point from ‘this’ point; the final bearing
+ * will differ from the initial bearing by varying degrees according to distance and latitude.
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of destination point.
+ * @returns {number} Final bearing in degrees from north.
+ *
+ * @example
+ *     var p1 = new L.LatLng(52.205, 0.119);
+ *     var p2 = new L.LatLng(48.857, 2.351);
+ *     var b2 = p1.finalBearingTo(p2); // 157.9°
+ */
+L.LatLng.prototype.finalBearingTo = function(point) {
+
+    // get initial bearing from destination point to this point & reverse it by adding 180°
+    return ( point.bearingTo(this)+180 ) % 360;
+};
+
+
+/**
+ * Returns the midpoint between ‘this’ point and the supplied point.
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of destination point.
+ * @returns {L.LatLng} Midpoint between this point and the supplied point.
+ *
+ * @example
+ *     var p1 = new L.LatLng(52.205, 0.119);
+ *     var p2 = new L.LatLng(48.857, 2.351);
+ *     var pMid = p1.midpointTo(p2); // 50.5363°N, 001.2746°E
+ */
+L.LatLng.prototype.midpointTo = function(point) {
+
+    // φm = atan2( sinφ1 + sinφ2, √( (cosφ1 + cosφ2⋅cosΔλ) ⋅ (cosφ1 + cosφ2⋅cosΔλ) ) + cos²φ2⋅sin²Δλ )
+    // λm = λ1 + atan2(cosφ2⋅sinΔλ, cosφ1 + cosφ2⋅cosΔλ)
+    // see mathforum.org/library/drmath/view/51822.html for derivation
+
+    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
+    var φ2 = point.lat.toRadians();
+    var Δλ = (point.lng-this.lng).toRadians();
+
+    var Bx = Math.cos(φ2) * Math.cos(Δλ);
+    var By = Math.cos(φ2) * Math.sin(Δλ);
+
+    var x = Math.sqrt((Math.cos(φ1) + Bx) * (Math.cos(φ1) + Bx) + By * By);
+    var y = Math.sin(φ1) + Math.sin(φ2);
+    var φ3 = Math.atan2(y, x);
+
+    var λ3 = λ1 + Math.atan2(By, Math.cos(φ1) + Bx);
+
+    return new L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise to −180..+180°
+};
+
+
+/**
+ * Returns the point at given fraction between ‘this’ point and specified point.
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of destination point.
+ * @param   {number} fraction - Fraction between the two points (0 = this point, 1 = specified point).
+ * @returns {L.LatLng} Intermediate point between this point and destination point.
+ *
+ * @example
+ *   let p1 = new L.LatLng(52.205, 0.119);
+ *   let p2 = new L.LatLng(48.857, 2.351);
+ *   let pMid = p1.intermediatePointTo(p2, 0.25); // 51.3721°N, 000.7073°E
+ */
+L.LatLng.prototype.intermediatePointTo = function(point, fraction) {
+
+    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
+    var φ2 = point.lat.toRadians(), λ2 = point.lng.toRadians();
+    var sinφ1 = Math.sin(φ1), cosφ1 = Math.cos(φ1), sinλ1 = Math.sin(λ1), cosλ1 = Math.cos(λ1);
+    var sinφ2 = Math.sin(φ2), cosφ2 = Math.cos(φ2), sinλ2 = Math.sin(λ2), cosλ2 = Math.cos(λ2);
+
+    // distance between points
+    var Δφ = φ2 - φ1;
+    var Δλ = λ2 - λ1;
+    var a = Math.sin(Δφ/2) * Math.sin(Δφ/2)
+        + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    var δ = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    var A = Math.sin((1-fraction)*δ) / Math.sin(δ);
+    var B = Math.sin(fraction*δ) / Math.sin(δ);
+
+    var x = A * cosφ1 * cosλ1 + B * cosφ2 * cosλ2;
+    var y = A * cosφ1 * sinλ1 + B * cosφ2 * sinλ2;
+    var z = A * sinφ1 + B * sinφ2;
+
+    var φ3 = Math.atan2(z, Math.sqrt(x*x + y*y));
+    var λ3 = Math.atan2(y, x);
+
+    return new L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise lng to −180..+180°
+};
+
+
+/**
+ * Returns the destination point from ‘this’ point having travelled the given distance on the
+ * given initial bearing (bearing normally varies around path followed).
+ *
+ * @param   {number} distance - Distance travelled, in same units as earth radius (default: metres).
+ * @param   {number} bearing - Initial bearing in degrees from north.
+ * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
+ * @returns {L.LatLng} Destination point.
+ *
+ * @example
+ *     var p1 = new L.LatLng(51.4778, -0.0015);
+ *     var p2 = p1.destinationPoint(7794, 300.7); // 51.5135°N, 000.0983°W
+ */
+L.LatLng.prototype.destinationPoint = function(distance, bearing, radius) {
+    radius = (radius === undefined) ? 6371e3 : Number(radius);
+
+    // sinφ2 = sinφ1⋅cosδ + cosφ1⋅sinδ⋅cosθ
+    // tanΔλ = sinθ⋅sinδ⋅cosφ1 / cosδ−sinφ1⋅sinφ2
+    // see mathforum.org/library/drmath/view/52049.html for derivation
+
+    var δ = Number(distance) / radius; // angular distance in radians
+    var θ = Number(bearing).toRadians();
+
+    var φ1 = this.lat.toRadians();
+    var λ1 = this.lng.toRadians();
+
+    var sinφ1 = Math.sin(φ1), cosφ1 = Math.cos(φ1);
+    var sinδ = Math.sin(δ), cosδ = Math.cos(δ);
+    var sinθ = Math.sin(θ), cosθ = Math.cos(θ);
+
+    var sinφ2 = sinφ1*cosδ + cosφ1*sinδ*cosθ;
+    var φ2 = Math.asin(sinφ2);
+    var y = sinθ * sinδ * cosφ1;
+    var x = cosδ - sinφ1 * sinφ2;
+    var λ2 = λ1 + Math.atan2(y, x);
+
+    return new L.LatLng(φ2.toDegrees(), (λ2.toDegrees()+540)%360-180); // normalise to −180..+180°
+};
+
+
+/**
+ * Returns the point of intersection of two paths defined by point and bearing.
+ *
+ * @param   {L.LatLng} p1 - First point.
+ * @param   {number} brng1 - Initial bearing from first point.
+ * @param   {L.LatLng} p2 - Second point.
+ * @param   {number} brng2 - Initial bearing from second point.
+ * @returns {L.LatLng|null} Destination point (null if no unique intersection defined).
+ *
+ * @example
+ *     var p1 = L.LatLng(51.8853, 0.2545), brng1 = 108.547;
+ *     var p2 = L.LatLng(49.0034, 2.5735), brng2 =  32.435;
+ *     var pInt = LatLng.intersection(p1, brng1, p2, brng2); // 50.9078°N, 004.5084°E
+ */
+L.LatLng.intersection = function(p1, brng1, p2, brng2) {
+    // see www.edwilliams.org/avform.htm#Intersection
+
+    var φ1 = p1.lat.toRadians(), λ1 = p1.lng.toRadians();
+    var φ2 = p2.lat.toRadians(), λ2 = p2.lng.toRadians();
+    var θ13 = Number(brng1).toRadians(), θ23 = Number(brng2).toRadians();
+    var Δφ = φ2-φ1, Δλ = λ2-λ1;
+
+    // angular distance p1-p2
+    var δ12 = 2*Math.asin( Math.sqrt( Math.sin(Δφ/2)*Math.sin(Δφ/2)
+        + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)*Math.sin(Δλ/2) ) );
+    if (δ12 == 0) return null;
+
+    // initial/final bearings between points
+    var θa = Math.acos( ( Math.sin(φ2) - Math.sin(φ1)*Math.cos(δ12) ) / ( Math.sin(δ12)*Math.cos(φ1) ) );
+    if (isNaN(θa)) θa = 0; // protect against rounding
+    var θb = Math.acos( ( Math.sin(φ1) - Math.sin(φ2)*Math.cos(δ12) ) / ( Math.sin(δ12)*Math.cos(φ2) ) );
+
+    var θ12 = Math.sin(λ2-λ1)>0 ? θa : 2*Math.PI-θa;
+    var θ21 = Math.sin(λ2-λ1)>0 ? 2*Math.PI-θb : θb;
+
+    var α1 = θ13 - θ12; // angle 2-1-3
+    var α2 = θ21 - θ23; // angle 1-2-3
+
+    if (Math.sin(α1)==0 && Math.sin(α2)==0) return null; // infinite intersections
+    if (Math.sin(α1)*Math.sin(α2) < 0) return null;      // ambiguous intersection
+
+    var α3 = Math.acos( -Math.cos(α1)*Math.cos(α2) + Math.sin(α1)*Math.sin(α2)*Math.cos(δ12) );
+    var δ13 = Math.atan2( Math.sin(δ12)*Math.sin(α1)*Math.sin(α2), Math.cos(α2)+Math.cos(α1)*Math.cos(α3) );
+    var φ3 = Math.asin( Math.sin(φ1)*Math.cos(δ13) + Math.cos(φ1)*Math.sin(δ13)*Math.cos(θ13) );
+    var Δλ13 = Math.atan2( Math.sin(θ13)*Math.sin(δ13)*Math.cos(φ1), Math.cos(δ13)-Math.sin(φ1)*Math.sin(φ3) );
+    var λ3 = λ1 + Δλ13;
+
+    return new L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise to −180..+180°
+};
+
+
+/**
+ * Returns (signed) distance from ‘this’ point to great circle defined by start-point and end-point.
+ *
+ * @param   {L.LatLng} pathStart - Start point of great circle path.
+ * @param   {L.LatLng} pathEnd - End point of great circle path.
+ * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
+ * @returns {number} Distance to great circle (-ve if to left, +ve if to right of path).
+ *
+ * @example
+ *   var pCurrent = new L.LatLng(53.2611, -0.7972);
+ *   var p1 = new L.LatLng(53.3206, -1.7297);
+ *   var p2 = new L.LatLng(53.1887,  0.1334);
+ *   var d = pCurrent.crossTrackDistanceTo(p1, p2);  // -307.5 m
+ */
+L.LatLng.prototype.crossTrackDistanceTo = function(pathStart, pathEnd, radius) {
+    var R = (radius === undefined) ? 6371e3 : Number(radius);
+
+    var δ13 = pathStart.distanceTo(this, R) / R;
+    var θ13 = pathStart.bearingTo(this).toRadians();
+    var θ12 = pathStart.bearingTo(pathEnd).toRadians();
+
+    var δxt = Math.asin(Math.sin(δ13) * Math.sin(θ13-θ12));
+
+    return δxt * R;
+};
+
+
+/**
+ * Returns how far ‘this’ point is along a path from from start-point, heading towards end-point.
+ * That is, if a perpendicular is drawn from ‘this’ point to the (great circle) path, the along-track
+ * distance is the distance from the start point to where the perpendicular crosses the path.
+ *
+ * @param   {L.LatLng} pathStart - Start point of great circle path.
+ * @param   {L.LatLng} pathEnd - End point of great circle path.
+ * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
+ * @returns {number} Distance along great circle to point nearest ‘this’ point.
+ *
+ * @example
+ *   var pCurrent = new L.LatLng(53.2611, -0.7972);
+ *   var p1 = new L.LatLng(53.3206, -1.7297);
+ *   var p2 = new L.LatLng(53.1887,  0.1334);
+ *   var d = pCurrent.alongTrackDistanceTo(p1, p2);  // 62.331 km
+ */
+L.LatLng.prototype.alongTrackDistanceTo = function(pathStart, pathEnd, radius) {
+    var R = (radius === undefined) ? 6371e3 : Number(radius);
+
+    var δ13 = pathStart.distanceTo(this, R) / R;
+    var θ13 = pathStart.bearingTo(this).toRadians();
+    var θ12 = pathStart.bearingTo(pathEnd).toRadians();
+
+    var δxt = Math.asin(Math.sin(δ13) * Math.sin(θ13-θ12));
+
+    var δat = Math.acos(Math.cos(δ13) / Math.abs(Math.cos(δxt)));
+
+    return δat*Math.sign(Math.cos(θ12-θ13)) * R;
+};
+
+
+/**
+ * Returns maximum latitude reached when travelling on a great circle on given bearing from this
+ * point ('Clairaut's formula'). Negate the result for the minimum latitude (in the Southern
+ * hemisphere).
+ *
+ * The maximum latitude is independent of longitude; it will be the same for all points on a given
+ * latitude.
+ *
+ * @param {number} bearing - Initial bearing.
+ * @param {number} latitude - Starting latitude.
+ */
+L.LatLng.prototype.maxLatitude = function(bearing) {
+    var θ = Number(bearing).toRadians();
+
+    var φ = this.lat.toRadians();
+
+    var φMax = Math.acos(Math.abs(Math.sin(θ)*Math.cos(φ)));
+
+    return φMax.toDegrees();
+};
+
+
+/**
+ * Returns the pair of meridians at which a great circle defined by two points crosses the given
+ * latitude. If the great circle doesn't reach the given latitude, null is returned.
+ *
+ * @param {L.LatLng} point1 - First point defining great circle.
+ * @param {L.LatLng} point2 - Second point defining great circle.
+ * @param {number} latitude - Latitude crossings are to be determined for.
+ * @returns {Object|null} Object containing { lon1, lon2 } or null if given latitude not reached.
+ */
+L.LatLng.crossingParallels = function(point1, point2, latitude) {
+    var φ = Number(latitude).toRadians();
+
+    var φ1 = point1.lat.toRadians();
+    var λ1 = point1.lng.toRadians();
+    var φ2 = point2.lat.toRadians();
+    var λ2 = point2.lng.toRadians();
+
+    var Δλ = λ2 - λ1;
+
+    var x = Math.sin(φ1) * Math.cos(φ2) * Math.cos(φ) * Math.sin(Δλ);
+    var y = Math.sin(φ1) * Math.cos(φ2) * Math.cos(φ) * Math.cos(Δλ) - Math.cos(φ1) * Math.sin(φ2) * Math.cos(φ);
+    var z = Math.cos(φ1) * Math.cos(φ2) * Math.sin(φ) * Math.sin(Δλ);
+
+    if (z*z > x*x + y*y) return null; // great circle doesn't reach latitude
+
+    var λm = Math.atan2(-y, x);                  // longitude at max latitude
+    var Δλi = Math.acos(z / Math.sqrt(x*x+y*y)); // Δλ from λm to intersection points
+
+    var λi1 = λ1 + λm - Δλi;
+    var λi2 = λ1 + λm + Δλi;
+
+    return { lon1: (λi1.toDegrees()+540)%360-180, lon2: (λi2.toDegrees()+540)%360-180 }; // normalise to −180..+180°
+};
+
+
+/* Rhumb - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
+
+/**
+ * Returns the distance travelling from ‘this’ point to destination point along a rhumb line.
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of destination point.
+ * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
+ * @returns {number} Distance in km between this point and destination point (same units as radius).
+ *
+ * @example
+ *     var p1 = new L.LatLng(51.127, 1.338);
+ *     var p2 = new L.LatLng(50.964, 1.853);
+ *     var d = p1.distanceTo(p2); // 40.31 km
+ */
+L.LatLng.prototype.rhumbDistanceTo = function(point, radius) {
+    radius = (radius === undefined) ? 6371e3 : Number(radius);
+
+    // see www.edwilliams.org/avform.htm#Rhumb
+
+    var R = radius;
+    var φ1 = this.lat.toRadians(), φ2 = point.lat.toRadians();
+    var Δφ = φ2 - φ1;
+    var Δλ = Math.abs(point.lng-this.lng).toRadians();
+    // if dLon over 180° take shorter rhumb line across the anti-meridian:
+    if (Δλ > Math.PI) Δλ -= 2*Math.PI;
+
+    // on Mercator projection, longitude distances shrink by latitude; q is the 'stretch factor'
+    // q becomes ill-conditioned along E-W line (0/0); use empirical tolerance to avoid it
+    var Δψ = Math.log(Math.tan(φ2/2+Math.PI/4)/Math.tan(φ1/2+Math.PI/4));
+    var q = Math.abs(Δψ) > 10e-12 ? Δφ/Δψ : Math.cos(φ1);
+
+    // distance is pythagoras on 'stretched' Mercator projection
+    var δ = Math.sqrt(Δφ*Δφ + q*q*Δλ*Δλ); // angular distance in radians
+    var dist = δ * R;
+
+    return dist;
+};
+
+
+/**
+ * Returns the bearing from ‘this’ point to destination point along a rhumb line.
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of destination point.
+ * @returns {number} Bearing in degrees from north.
+ *
+ * @example
+ *     var p1 = new L.LatLng(51.127, 1.338);
+ *     var p2 = new L.LatLng(50.964, 1.853);
+ *     var d = p1.rhumbBearingTo(p2); // 116.7 m
+ */
+L.LatLng.prototype.rhumbBearingTo = function(point) {
+
+    var φ1 = this.lat.toRadians(), φ2 = point.lat.toRadians();
+    var Δλ = (point.lng-this.lng).toRadians();
+    // if dLon over 180° take shorter rhumb line across the anti-meridian:
+    if (Δλ >  Math.PI) Δλ -= 2*Math.PI;
+    if (Δλ < -Math.PI) Δλ += 2*Math.PI;
+
+    var Δψ = Math.log(Math.tan(φ2/2+Math.PI/4)/Math.tan(φ1/2+Math.PI/4));
+
+    var θ = Math.atan2(Δλ, Δψ);
+
+    return (θ.toDegrees()+360) % 360;
+};
+
+
+/**
+ * Returns the destination point having travelled along a rhumb line from ‘this’ point the given
+ * distance on the  given bearing.
+ *
+ * @param   {number} distance - Distance travelled, in same units as earth radius (default: metres).
+ * @param   {number} bearing - Bearing in degrees from north.
+ * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
+ * @returns {L.LatLng} Destination point.
+ *
+ * @example
+ *     var p1 = new L.LatLng(51.127, 1.338);
+ *     var p2 = p1.rhumbDestinationPoint(40300, 116.7); // 50.9642°N, 001.8530°E
+ */
+L.LatLng.prototype.rhumbDestinationPoint = function(distance, bearing, radius) {
+    radius = (radius === undefined) ? 6371e3 : Number(radius);
+
+    var δ = Number(distance) / radius; // angular distance in radians
+    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
+    var θ = Number(bearing).toRadians();
+
+    var Δφ = δ * Math.cos(θ);
+    var φ2 = φ1 + Δφ;
+
+    // check for some daft bugger going past the pole, normalise latitude if so
+    if (Math.abs(φ2) > Math.PI/2) φ2 = φ2>0 ? Math.PI-φ2 : -Math.PI-φ2;
+
+    var Δψ = Math.log(Math.tan(φ2/2+Math.PI/4)/Math.tan(φ1/2+Math.PI/4));
+    var q = Math.abs(Δψ) > 10e-12 ? Δφ / Δψ : Math.cos(φ1); // E-W course becomes ill-conditioned with 0/0
+
+    var Δλ = δ*Math.sin(θ)/q;
+    var λ2 = λ1 + Δλ;
+
+    return new L.LatLng(φ2.toDegrees(), (λ2.toDegrees()+540) % 360 - 180); // normalise to −180..+180°
+};
+
+
+/**
+ * Returns the loxodromic midpoint (along a rhumb line) between ‘this’ point and second point.
+ *
+ * @param   {L.LatLng} point - Latitude/longitude of second point.
+ * @returns {L.LatLng} Midpoint between this point and second point.
+ *
+ * @example
+ *     var p1 = new L.LatLng(51.127, 1.338);
+ *     var p2 = new L.LatLng(50.964, 1.853);
+ *     var pMid = p1.rhumbMidpointTo(p2); // 51.0455°N, 001.5957°E
+ */
+L.LatLng.prototype.rhumbMidpointTo = function(point) {
+
+    // see mathforum.org/kb/message.jspa?messageID=148837
+
+    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
+    var φ2 = point.lat.toRadians(), λ2 = point.lng.toRadians();
+
+    if (Math.abs(λ2-λ1) > Math.PI) λ1 += 2*Math.PI; // crossing anti-meridian
+
+    var φ3 = (φ1+φ2)/2;
+    var f1 = Math.tan(Math.PI/4 + φ1/2);
+    var f2 = Math.tan(Math.PI/4 + φ2/2);
+    var f3 = Math.tan(Math.PI/4 + φ3/2);
+    var λ3 = ( (λ2-λ1)*Math.log(f3) + λ1*Math.log(f2) - λ2*Math.log(f1) ) / Math.log(f2/f1);
+
+    if (!isFinite(λ3)) λ3 = (λ1+λ2)/2; // parallel of latitude
+
+    var p = L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise to −180..+180°
+
+    return p;
+};
+
+
+/* Area - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/**
+ * Calculates the area of a spherical polygon where the sides of the polygon are great circle
+ * arcs joining the vertices.
+ *
+ * @param   {L.LatLng[]} polygon - Array of points defining vertices of the polygon
+ * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
+ * @returns {number} The area of the polygon, in the same units as radius.
+ *
+ * @example
+ *   var polygon = [new L.LatLng(0,0), new L.LatLng(1,0), new L.LatLng(0,1)];
+ *   var area = LatLng.areaOf(polygon); // 6.18e9 m²
+ */
+L.LatLng.areaOf = function(polygon, radius) {
+    // uses method due to Karney: osgeo-org.1560.x6.nabble.com/Area-of-a-spherical-polygon-td3841625.html;
+    // for each edge of the polygon, tan(E/2) = tan(Δλ/2)·(tan(φ1/2) + tan(φ2/2)) / (1 + tan(φ1/2)·tan(φ2/2))
+    // where E is the spherical excess of the trapezium obtained by extending the edge to the equator
+
+    var R = (radius === undefined) ? 6371e3 : Number(radius);
+
+    // close polygon so that last point equals first point
+    var closed = polygon[0].equals(polygon[polygon.length-1]);
+    if (!closed) polygon.push(polygon[0]);
+
+    var nVertices = polygon.length - 1;
+
+    var S = 0; // spherical excess in steradians
+    for (var v=0; v<nVertices; v++) {
+        var φ1 = polygon[v].lat.toRadians();
+        var φ2 = polygon[v+1].lat.toRadians();
+        var Δλ = (polygon[v+1].lng - polygon[v].lng).toRadians();
+        var E = 2 * Math.atan2(Math.tan(Δλ/2) * (Math.tan(φ1/2)+Math.tan(φ2/2)), 1 + Math.tan(φ1/2)*Math.tan(φ2/2));
+        S += E;
+    }
+
+    if (isPoleEnclosedBy(polygon)) S = Math.abs(S) - 2*Math.PI;
+
+    var A = Math.abs(S * R*R); // area in units of R
+
+    if (!closed) polygon.pop(); // restore polygon to pristine condition
+
+    return A;
+
+    // returns whether polygon encloses pole: sum of course deltas around pole is 0° rather than
+    // normal ±360°: blog.element84.com/determining-if-a-spherical-polygon-contains-a-pole.html
+    function isPoleEnclosedBy(polygon) {
+        // TODO: any better test than this?
+        var ΣΔ = 0;
+        var prevBrng = polygon[0].bearingTo(polygon[1]);
+        var initBrng;
+        for (var v=0; v<polygon.length-1; v++) {
+            initBrng = polygon[v].bearingTo(polygon[v+1]);
+            var finalBrng = polygon[v].finalBearingTo(polygon[v+1]);
+            ΣΔ += (initBrng - prevBrng + 540) % 360 - 180;
+            ΣΔ += (finalBrng - initBrng + 540) % 360 - 180;
+            prevBrng = finalBrng;
+        }
+        initBrng = polygon[0].bearingTo(polygon[1]);
+        ΣΔ += (initBrng - prevBrng + 540) % 360 - 180;
+        // TODO: fix (intermittant) edge crossing pole - eg (85,90), (85,0), (85,-90)
+        var enclosed = Math.abs(ΣΔ) < 90; // 0°-ish
+        return enclosed;
+    }
+};
+
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
+
+/** Extend Number object with method to convert numeric degrees to radians */
+if (Number.prototype.toRadians === undefined) {
+    Number.prototype.toRadians = function() { return this * Math.PI / 180; };
+}
+
+/** Extend Number object with method to convert radians to numeric (signed) degrees */
+if (Number.prototype.toDegrees === undefined) {
+    Number.prototype.toDegrees = function() { return this * 180 / Math.PI; };
+}
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
+}(L, this, document));
+
+;
 /****************************************************************************
     leaflet-mouseposition.js,
 
@@ -81575,7 +82811,7 @@ Set methodes and options for format utm
 
 ;
 /*! =======================================================
-                      VERSION  11.0.2
+                      VERSION  11.0.2              
 ========================================================= */
 "use strict";
 
@@ -83666,6 +84902,43 @@ var windowIsDefined = (typeof window === "undefined" ? "undefined" : _typeof(win
     });
 
 
+    /**********************************************************
+    L.Map.getPaneBelow(paneId)
+    Create and return a pane named paneId+'below' that gets zIndex just below pane with paneId
+    **********************************************************/
+    L.Map.prototype.getPaneBelow = function(paneId){
+        return this._getPaneDeltaZIndex(paneId, 'below', -1);
+    };
+
+    /**********************************************************
+    L.Map.getPaneAbove(paneId)
+    Create and return a pane named paneId+'above' that gets zIndex just above pane with paneId
+    **********************************************************/
+    L.Map.prototype.getPaneAbove = function(paneId){
+        return this._getPaneDeltaZIndex(paneId, 'above', +1);
+    };
+
+    /**********************************************************
+    L.Map._getPaneDeltaZIndex(paneId, postfix, deltaZIndex)
+    Create and return a pane named paneId+postfix that gets
+    zIndex deltaZIndex (+/-) relative to pane with paneId
+    **********************************************************/
+    L.Map.prototype._getPaneDeltaZIndex = function(paneId, postfix, deltaZIndex){
+        var newPaneId = paneId+postfix;
+
+        if (!this.getPane(newPaneId)){
+            this.createPane(newPaneId);
+
+            this.whenReady( function(){
+                var zIndex = parseInt( $(this.getPanes()[paneId]).css('z-index') );
+                this[newPaneId] = this.getPane(newPaneId);
+                $(this[newPaneId]).css('z-index', zIndex + deltaZIndex);
+            }, this );
+        }
+
+        return this.getPane(newPaneId);
+
+    };
 }(jQuery, L, this, document));
 
 
@@ -83681,22 +84954,25 @@ Create standard attribution control, but with position='bottomleft' and hide by 
 (function ($, L/*, window, document, undefined*/) {
     "use strict";
 
-    var defaultBsAttributionOptions = {
+    L.Map.mergeOptions({
+        bsAttributionControl: false,
+        bsAttributionOptions: {
             position: 'bottomleft',
             prefix  : false
-        };
+        }
 
-    L.Map.mergeOptions({
-        bsAttributionControl: false
     });
 
     L.Map.addInitHook(function () {
         if (this.options.bsAttributionControl) {
-            this.bsAttributionControl = L.control.attribution( defaultBsAttributionOptions );
-
+            this.bsAttributionControl = L.control.attribution( this.options.bsAttributionOptions );
             this.bsAttributionControl.addTo(this);
             $(this.bsAttributionControl._container).addClass('leaflet-control-attribution-bs');
 
+            //Mark that the control-position has a bsAttribution-control
+            $(this.bsAttributionControl._container).parent().addClass('has-control-attribution-bs');
+
+            //Mark that the map has a bsAttribution-control
             $(this._container).addClass('has-control-attribution-bs');
         }
     });
@@ -83742,9 +85018,8 @@ L.BsControl = extention of L.Control with
         enabled: true,
 
         initialize: function ( options ) {
-            $.extend(options, this.forceOptions || {});
+            options = $.extend(true, {}, this.options, options, this.forceOptions || {});
             L.Util.setOptions(this, options);
-            this._controlTooltipContent = [];
         },
 
         _getTooltipElements: function( container ){
@@ -83756,6 +85031,8 @@ L.BsControl = extention of L.Control with
         },
 
         addTo: function(map) {
+            this._controlTooltipContent = [];
+
             var result = L.Control.prototype.addTo.apply(this, arguments);
             L.DomEvent.disableClickPropagation(this._container);
 
@@ -83785,7 +85062,7 @@ L.BsControl = extention of L.Control with
                 var controlContainer = map._controlContainer;
 
                 //Prevent event on control-container from map
-                L.DomEvent.on(controlContainer, 'contextmenu dblclick', L.DomEvent.stop);
+                L.DomEvent.on(controlContainer, 'contextmenu dblclick mousewheel', L.DomEvent.stop);
 
                 //Close all popup on the map when contextmenu on any control
                 $(controlContainer).on('touchstart mousedown', $.proxy(map.closeAllPopup, map));
@@ -84112,6 +85389,14 @@ Create leaflet-control for jquery-bootstrap button-classes:
     /********************************************************************************
     L.Control.BsButtonBox
     Create a bsButton that opens a box with bs-content given by options.content
+
+    Individual menu-items in the popup is set in
+    options.popupList = []{
+        id  : STRING - mandatory for type="checkbox" or "radio"
+        type: "checkbox", "radio", "button" etc.
+        onChange: function(value) called when the item is changed or setState is called on the control
+        icon, text
+    }
     ********************************************************************************/
     L.Control.BsButtonBox = L.Control.BsButton.extend({
         options: {
@@ -84126,14 +85411,54 @@ Create leaflet-control for jquery-bootstrap button-classes:
 
             //Set default onToggle-function
             this.onToggle = $.proxy(this.toggle, this);
-            if (this.options.addOnClose){
-                //If tooltips also is shown when not isExtended => create extra options and let adjustTooltip dynamic adjust tooltips
-                if (this.options.tooltipOnButton)
-                    this._controlTooltipContent.push({id:'open', icon: this.options.leftClickIcon, text: this.options.openText});
-
+            if (this.options.addOnClose)
                 this.options.onClose = this.onToggle;
-            }
         },
+
+        addTo: function(){
+            var result = L.Control.BsButton.prototype.addTo.apply(this, arguments);
+
+            //If tooltips also is shown when not isExtended => create extra options and let adjustTooltip dynamic adjust tooltips
+            if (this.options.addOnClose && this.options.tooltipOnButton)
+                this._controlTooltipContent.unshift({id:'open', icon: this.options.leftClickIcon, text: this.options.openText});
+
+            return result;
+        },
+
+        //_adjustPopupList: Adjust this.options.popupList with default items above and below
+        _adjustPopupList: function(aboveList = [], belowList = []){
+            var _this = this,
+                list = this.options.popupList || [],
+                onChange = $.proxy(this._popupList_onChange, this);
+
+            this.popups = {};
+            $.each(list, function(index, itemOptions){
+                var id = itemOptions.id;
+                if (id && ((itemOptions.type == 'radio') || (itemOptions.type == 'checkbox'))){
+                    itemOptions._onChange = itemOptions.onChange;
+                    itemOptions.onChange = onChange;
+
+                    if (itemOptions.type == 'radio')
+                        itemOptions.selectedId = itemOptions.selectedId || _this.options[id];
+
+                    if (itemOptions.type == 'checkbox')
+                        itemOptions.selected = itemOptions.selected == undefined ? _this.options[id] : itemOptions.selected;
+                    _this.popups[id] = itemOptions;
+                }
+            });
+
+            this.options.popupList = aboveList.concat( this.options.popupList || [], belowList);
+        },
+
+        _popupList_onChange: function(id, value){
+            this.options[id] = value;
+
+            if (this.popups[id]._onChange)
+                this.popups[id]._onChange(value, id, this);
+
+            this._onChange();
+        },
+
 
         _createContent: function(){
             //Create container
@@ -84253,8 +85578,17 @@ Create leaflet-control for jquery-bootstrap button-classes:
 
         getState: function(BsControl_getState){
             return function () {
+                var _this = this,
+                    popupListOptions = {};
+
+                //Get values from items in popupList (if any)
+                $.each(this.popups, function(id){
+                    popupListOptions[id] = _this.options[id];
+                });
+
                 return $.extend(
                     {isExtended: this.options.isExtended},
+                    popupListOptions,
                     BsControl_getState.call(this)
                 );
             };
@@ -84262,7 +85596,16 @@ Create leaflet-control for jquery-bootstrap button-classes:
 
         setState: function(BsControl_setState){
             return function (options) {
+                var _this = this;
                 BsControl_setState.call(this, options);
+
+                //Set values in items in popupList (if any)
+                $.each(this.popups, function(id, itemOptions){
+                    if (itemOptions._onChange)
+                        itemOptions._onChange(options[id], id, _this);
+                });
+
+
                 this.$container.modernizrToggle('extended', this.options.isExtended);
                 return this;
             };
@@ -84450,6 +85793,8 @@ https://github.com/nerik/leaflet-graphicscale
             icon                : 'fa-ruler-horizontal',//Icon for bsButton
             mode                : 'METRIC',             //'METRIC', 'NAUTICAL', or 'BOTH'
             showBoth            : false,
+            showReticle         : false,
+
             position            : 'bottomright',
             minUnitWidth        : 40,
             maxUnitsWidth       : 200,                  //Max width
@@ -84462,7 +85807,9 @@ https://github.com/nerik/leaflet-graphicscale
                 noHeader             : true,
                 content              : 'This is not empty'
             },
-            numeralFormat: '0,0[.]0' //String or function
+            numeralFormat  : '0,0[.]0',                  //String or function
+            shadowColor: 'rgba(255,255,255,.28)',        //Shadow for Reticle
+            textBackgroundColor: "rgba(255,255,255,.6)", //Background for reticle label
         },
 
         initialize: function(options){
@@ -84474,32 +85821,43 @@ https://github.com/nerik/leaflet-graphicscale
                 this.options.tooltipDirection = (this.options.position.indexOf('top') !== -1) ? 'bottom' : 'top';
 
             //Set popup-items - two different modes: With and without options.selectFormat
-            this.options.popupList = [];
-            if (options.selectFormat)
-                this.options.popupList.push(
-                    {                 icon: this.options.icon, text: {da:'Skala', en:'Scale'} },
-                    {type:'checkbox', id:'showBoth',           text: {da:'Vis km og nm', en:'Show km and nm'}, selected: this.options.showBoth, onChange: $.proxy(this._setBoth, this), closeOnClick: true},
-                    {type:'button',   icon:'fa-cog',           text: {da:'Format...', en:'Format...'}, onClick: $.proxy(this.options.selectFormat, this), closeOnClick: true, }
-                );
-                else
-                    this.options.popupList.push(
-                        {
-                            icon: this.options.icon,
-                            text: {da:'Vis', en:'Show'}
-                        },
-                        {
-                            radioGroupId: 'mode',
-                            type        :'radio',
-                            selectedId: this.options.mode,
-                            closeOnClick: true,
-                            onChange    : $.proxy(this.setMode, this),
-                            list: [
-                                {id:'METRIC',   text: {da:'Kilometer', en:'Metric'}     },
-                                {id:'NAUTICAL', text: {da:'Sømil', en:'Nautical miles'} },
-                                {id:'BOTH',     text: {da:'Begge', en:'Both'}           }
-                            ]
-                        }
-                    );
+            var reticlePopup = {
+                    id          : 'showReticle',
+                    icon        : 'fa-ruler-combined', text: {da:'Vis trådkors', en:'Show Reticle'},
+                    type        : 'checkbox',
+                    closeOnClick: false,
+                    selected    : this.options.showReticle,
+                    onChange    : $.proxy(this._onShowReticle, this)
+                };
+
+            this._adjustPopupList(
+                //Items above options.popupList
+                options.selectFormat ? [
+                    {icon: this.options.icon, text: {da:'Skala (in situ)', en:'Scale (in situ)'} },
+                    reticlePopup,
+                    {type:'checkbox', id:'showBoth', text: {da:'Vis km og nm', en:'Show km and nm'}, selected: this.options.showBoth, onChange: $.proxy(this._setBoth, this), closeOnClick: false},
+                ] : [
+                    {icon: this.options.icon, text: {da:'Vis', en:'Show'} },
+                    reticlePopup,
+                    {
+                        radioGroupId: 'mode',
+                        type        :'radio',
+                        selectedId  : this.options.mode,
+                        closeOnClick: true,
+                        onChange    : $.proxy(this.setMode, this),
+                        list: [
+                            {id:'METRIC',   text: {da:'Kilometer', en:'Metric'}     },
+                            {id:'NAUTICAL', text: {da:'Sømil', en:'Nautical miles'} },
+                            {id:'BOTH',     text: {da:'Begge', en:'Both'}           }
+                        ]
+                    }
+                ],
+
+                //Items belows options.popupList
+                options.selectFormat ?
+                    [{type:'button',   icon:'fa-cog',           text: {da:'Format...', en:'Format...'}, onClick: $.proxy(this.options.selectFormat, this), closeOnClick: true, }] :
+                    null
+            );
         },
 
         onAdd: function (map) {
@@ -84513,12 +85871,26 @@ https://github.com/nerik/leaflet-graphicscale
 
             //Create and add nautical-scale
             $contentContainer.empty();
-            this.naticalScale = new L.Control.SingleScale( L.extend({type:'NAUTICAL', labelPlacement:'top', parent:this}, this.options ) );
-            this.$naticalScaleContainer = $(this.naticalScale.onAdd( this._map )).appendTo( $contentContainer );
+            this.nauticalScale = new L.Control.SingleScale( L.extend({type:'NAUTICAL', labelPlacement:'top', parent:this}, this.options ) );
+            this.$nauticalScaleContainer = $(this.nauticalScale.onAdd( this._map )).appendTo( $contentContainer );
 
             //Create and add metric-scale
             this.metricScale = new L.Control.SingleScale( L.extend({type:'METRIC', labelPlacement:'bottom', parent:this}, this.options ) );
             this.$metricScaleContainer = $(this.metricScale.onAdd( this._map )).appendTo( $contentContainer );
+
+            //Create and add Reticle-marker
+            this.reticleMarker =
+                new L.Marker.Reticle([0,0], {
+                        interactive: false,
+                        keyboard   : false,
+                        icon       : new L.Icon.Reticle(),
+                        pane       : map.getPaneBelow('tooltipPane'),
+                        shadowColor        : this.options.shadowColor,
+                        textBackgroundColor: this.options.textBackgroundColor,
+                    });
+            this.reticleMarker.parent = this;
+            this.reticleMarker.addTo(map);
+            this.onShowReticle(this.options.showReticle);
 
             this.setMode( this.options.mode, result );
             return result;
@@ -84527,6 +85899,8 @@ https://github.com/nerik/leaflet-graphicscale
         onRemove: function (map) {
             this.metricScale.onRemove(map);
             this.nauticalScale.onRemove(map);
+
+            this.reticleMarker.remove();
         },
 
         _setBoth: function(id, selected){
@@ -84546,33 +85920,49 @@ https://github.com/nerik/leaflet-graphicscale
                 mode = this.options.showBoth ? 'BOTH' : mode;
             $(this.getContainer() || container).toggleClass('both', mode == 'BOTH');
 
-            //naticalScale
-            this.$naticalScaleContainer.toggleClass('hidden', (mode == 'METRIC'));
+            //nauticalScale
+            this.$nauticalScaleContainer.toggleClass('hidden', (mode == 'METRIC'));
             if ((mode == 'BOTH') || (mode == 'NAUTICAL'))
-                this.naticalScale._setLabelPlacement( mode == 'BOTH' ? 'top' : 'bottom' );
+                this.nauticalScale._setLabelPlacement( mode == 'BOTH' ? 'top' : 'bottom' );
 
             //metricScale
             this.$metricScaleContainer.toggleClass('hidden', mode == 'NAUTICAL');
 
             this._updateScales();
+
+            //Update the reticle-marker
+            this.reticleMarker._update();
+
             this._onChange();
         },
 
         _updateScales: function(){
-            if (this.naticalScale)
-                this.naticalScale._update();
+            if (this.nauticalScale)
+                this.nauticalScale._update();
             if (this.metricScale)
-            this.metricScale._update();
+                this.metricScale._update();
         },
 
         onChange: function(/*state*/){
             this._updateScales();
         },
 
+        _onShowReticle: function(id, selected){
+            this.onShowReticle(selected);
+        },
+        onShowReticle: function(show){
+            this.options.showReticle = show;
+            this.reticleMarker.setShow(this.options.showReticle && this.options.show);
+
+            this._onChange();
+
+        },
+
         getState: function(BsButtonBox_getState){
             return function () {
                 return $.extend(
                     this.options.selectFormat ? {showBoth: this.options.showBoth} : {mode: this.options.mode},
+                    {showReticle: this.options.showReticle},
                     BsButtonBox_getState.call(this)
                 );
             };
@@ -84585,6 +85975,7 @@ https://github.com/nerik/leaflet-graphicscale
                     this.setBoth(this.options.showBoth);
                 else
                     this.setMode(this.options.mode);
+                this.onShowReticle(this.options.showReticle);
                 return this;
             };
         }(L.Control.BsButtonBox.prototype.setState),
@@ -84594,7 +85985,7 @@ https://github.com/nerik/leaflet-graphicscale
 
     /********************************************************************************
     L.Control.SingleScale
-    Leaflet control representning a simgle scale
+    Leaflet control representning a single scale
     ********************************************************************************/
     function $div( className ){ return $('<div/>').addClass(className); }
 
@@ -84647,6 +86038,7 @@ https://github.com/nerik/leaflet-graphicscale
 
             this._setLabelPlacement( this.options.labelPlacement );
 
+            //Add events
             map.on('move', this._update, this);
             map.on('resize', this._resize, this);
             map.whenReady(this._resize, this);
@@ -84686,15 +86078,26 @@ https://github.com/nerik/leaflet-graphicscale
         },
 
         _update: function () {
-            if (!this._map._loaded) return;
+            if (!this._map || !this._map._loaded || !this.options.parent.options.isExtended) return;
 
+
+            //Update the scale
+            /*The old AND INCORRECT method
             var bounds = this._map.getBounds(),
                 centerLat = bounds.getCenter().lat,
+
                 //length of an half world arc at current lat
                 halfWorldMeters = 6378137 * Math.PI * Math.cos(centerLat * Math.PI / 180),
                 //length of this arc from map left to map right
                 dist = halfWorldMeters * (bounds.getNorthEast().lng - bounds.getSouthWest().lng) / 180,
+
                 size = this._map.getSize();
+            */
+
+            //New methods to calc dist. Assume that the control is placed at the bottom of the map - TOD: Check for position
+            var bounds = this._map.getBounds(),
+                dist   = this._map.distance(bounds.getSouthEast(), bounds.getSouthWest()),
+                size   = this._map.getSize();
 
             if (this.options.type == 'NAUTICAL'){
                 dist = dist/1.852;
@@ -84837,6 +86240,7 @@ https://github.com/nerik/leaflet-graphicscale
                 if (showDivision) {
                     var lblText = window.numeral( (index+1)*displayUnit.amount ).format(numFormat);
 
+
                     if (index === scale.numUnits-1) {
                         lblText += displayUnit.unit;
                         $lbl.addClass('labelLast');
@@ -84876,6 +86280,258 @@ https://github.com/nerik/leaflet-graphicscale
     });//end of L.Control.SingleScale = L.Control.extend({
 
 
+    /********************************************************************************
+    L.Control.Reticle
+    Leaflet control representning a reticle at map center
+
+    Modified version of leaflet-reticle
+    https://github.com/rwev/leaflet-reticle by https://github.com/rwev
+    ********************************************************************************/
+    L.Icon.Reticle = L.DivIcon.extend({
+        options: {
+            className : 'visible', //Must be <> ""
+            iconSize  : [10, 10],
+            iconAnchor: [ 0,  0],
+        }
+    });
+
+    L.Marker.Reticle = L.Marker.extend({
+        options: {
+            margin     : 20,
+            tickLength : 11,
+            maxLength  : 125,
+            shadowColor        : 'rgba(255,255,255,.28)',
+            fontSize           : 12,
+            textBackgroundColor: "rgba(255,255,255,.6)"
+        },
+
+        onAdd: function(map) {
+            var result = L.Marker.prototype.onAdd.apply(this, arguments);
+
+            this.canvas = document.createElement(`canvas`);
+
+            this.options.canvasDim = 2*this.options.maxLength;
+
+            this.canvas.width = this.options.canvasDim;
+            this.canvas.height = this.options.canvasDim;
+            $(this.canvas)
+                .css({
+                    'margin-top' : -this.options.margin + 'px',
+                    'margin-left': -this.options.margin + 'px'
+                })
+                .addClass('icon-reticle')
+                .appendTo(this._icon);
+
+            this.ctx = this.canvas.getContext(`2d`);
+
+            map.on('move', this._update, this);
+            map.whenReady(this._update, this);
+
+            return result;
+        },
+
+        onRemove: function(map){
+            map.off('move', this._update, this);
+            this.canvas = null;
+            return L.Marker.prototype.onRemove.apply(this, arguments);
+        },
+
+        setShow: function(show){
+            $(this._icon).toggle(!!show);
+        },
+
+        _update: function() {
+            if (!this._map || !this._map._loaded) return;
+
+            var center = this._map.getCenter();
+            this.setLatLng(center);
+
+            //Reset canvas
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+            //Draw scales
+            this.ctx.fillStyle   = 'black';
+            this.ctx.strokeStyle = 'black';
+            this.ctx.font = 'normal ' + this.options.fontSize + 'px Verdana';
+
+            //Calc max distance covered (in meter) from center within the maximum width/height of the ruler
+            var mapSize = this._map.getSize(),
+                centerX = mapSize.x / 2,
+                centerY = mapSize.y / 2,
+                maxWidthDist =  this._map.distance( this._map.getCenter(), this._map.containerPointToLatLng( [centerX + this.options.maxLength, centerY] ) ),
+                maxHeightDist = this._map.distance( this._map.getCenter(), this._map.containerPointToLatLng( [centerX, centerY + this.options.maxLength] ) ),
+
+
+                scaleLength = 0,
+                mode     = this.parent.options.mode,
+                modeIsNautical = mode == 'NAUTICAL',
+                showBoth = this.parent.options.showBoth;
+
+
+            //Draw horizontal scale(s)
+            if (showBoth){
+                scaleLength = this.drawOneScale(maxWidthDist, false, false, true);
+                this.drawOneScale(maxWidthDist, false, true,  false, scaleLength);
+            }
+            else
+                scaleLength = this.drawOneScale(maxWidthDist, false, false, modeIsNautical);
+
+            //Draw vertical scale(s)
+            if (showBoth){
+                scaleLength = this.drawOneScale(maxHeightDist, true, false, true);
+                this.drawOneScale(maxHeightDist, true, true,  false, scaleLength);
+            }
+            else
+                this.drawOneScale(maxHeightDist, true, false, modeIsNautical);
+
+        },
+
+        /********************************************
+        drawOneScale
+        *********************************************/
+        drawOneScale: function(maxDistMeter, vertical, ticksBelow, isNautical, existingScaleLength = 0) {
+            var maxDistUnit = maxDistMeter,
+                unitStr = 'm';
+
+            if (isNautical){
+                unitStr = 'nm';
+                maxDistUnit = maxDistMeter / 1852;
+            }
+            else
+                if (maxDistMeter > 1000){
+                    unitStr = 'km';
+                    maxDistUnit = maxDistMeter / 1000;
+                }
+
+            //Get ratio (current-dim / max-dim) and label
+            var pow10 = Math.pow(10, (''+Math.floor(maxDistUnit)).length - 1),
+                digit = maxDistUnit / pow10;
+
+            digit = digit >= 10 ? 10 : digit >= 8 ? 8 : digit >= 6 ? 6 : digit >= 5 ? 5 : digit >= 4 ? 4 : digit >= 3 ? 3 : digit >= 2 ? 2 : 1;
+
+            var currentDistUnit = pow10 * digit,
+                ratio = currentDistUnit / maxDistUnit,
+                label = window.numeral(currentDistUnit).format(this.parent.options.numeralFormat) +' ' + unitStr,
+
+                //Get scale length and number of ticks
+                scaleLength = this.options.maxLength * ratio,
+                sections = digit == 1 ? 5 : digit == 3 ? 3 : digit == 5 ? 5 : digit == 6 ? 3 : 4,
+                delta = scaleLength / sections,
+
+                //Use negative tick-lenght to draw above the line
+                tickLgd = (ticksBelow ? +1 : -1) * this.options.tickLength;
+
+
+            //Draw line
+            if (vertical) {
+                if (scaleLength > existingScaleLength)
+                    this.drawVLine(0, -this.options.tickLength + existingScaleLength, scaleLength - existingScaleLength + this.options.tickLength);
+            }
+            else {
+                if (scaleLength > existingScaleLength)
+                    this.drawHLine(-this.options.tickLength + existingScaleLength, 0, scaleLength - existingScaleLength + this.options.tickLength);
+            }
+
+
+            //Draw ticks
+            var i;
+            if (vertical){
+                var deltaMeter = Math.round(maxDistMeter*ratio/sections),
+                    mapCenter = this._map.getCenter(),
+                    mapCenterY = this._map.latLngToLayerPoint(mapCenter).y;
+
+                for (i=1; i < sections; i++){
+                    var nextPoint = mapCenter.rhumbDestinationPoint(i*deltaMeter, 180);
+                    this.drawHLine(0, this._map.latLngToLayerPoint(nextPoint).y - mapCenterY, tickLgd/2);
+                }
+                this.drawHLine(0, scaleLength, tickLgd);
+            }
+            else {
+                for (i=1; i < sections; i++)
+                    this.drawVLine(i*delta, 0, tickLgd/2);
+                this.drawVLine(scaleLength, 0, tickLgd);
+            }
+
+            //Draw label
+            if (vertical){
+                this.ctx.save();
+                this.ctx.translate(0 , this.options.canvasDim);
+                this.ctx.rotate(0.5*Math.PI);
+                this.drawText(
+                    label,
+                     this.options.margin + scaleLength + 2 - this.options.canvasDim,
+                    -this.options.margin + (ticksBelow ? -3 : this.options.fontSize)
+                );
+                this.ctx.restore();
+            }
+            else
+                this.drawText(
+                    label,
+                    this.options.margin + scaleLength + 2,
+                    this.options.margin + (ticksBelow ? 1 + this.options.fontSize : -2)
+                );
+
+            return scaleLength;
+        },
+
+        drawText: function(text, x, y){
+            x = Math.round(x);
+            y = Math.round(y);
+            var textWidth = this.ctx.measureText(text).width,
+                textHeight = this.options.fontSize;
+
+
+            this.ctx.fillStyle = this.options.textBackgroundColor;
+            this.ctx.fillRect(x-1, y-textHeight, textWidth+2, textHeight+2);
+
+            this.ctx.fillStyle = 'black';
+            this.ctx.fillText(text, x, y);
+        },
+
+        drawLine: function(xS, yS, xE, yE) {
+            xS = Math.round(xS) + .5;
+            yS = Math.round(yS) + .5;
+            xE = Math.round(xE) + .5;
+            yE = Math.round(yE) + .5;
+
+            var extraX = 0, extraY = 0;
+            if (xS < xE)
+                extraX = 1;
+            if (xS > xE)
+                extraX = -1;
+            if (yS < yE)
+                extraY = 1;
+            if (yS > yE)
+                extraY = -1;
+
+            var margin = this.options.margin,
+                ctx = this.ctx;
+
+            ctx.save();
+            ctx.strokeStyle = this.options.shadowColor;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(xS + margin + extraX, yS + margin + extraY);
+            ctx.lineTo(xE + margin,          yE + margin);
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.moveTo(xS + margin, yS + margin);
+            ctx.lineTo(xE + margin, yE + margin);
+            ctx.stroke();
+        },
+
+        drawVLine: function(x, y, lgd){
+            this.drawLine(x, y, x, y+lgd);
+        },
+
+        drawHLine: function(x, y, lgd){
+            this.drawLine(x, y, x+lgd, y);
+        }
+    });
+
+    //********************************************************************************
     //********************************************************************************
     L.Map.mergeOptions({
         bsScaleControl: false,
@@ -85202,9 +86858,7 @@ Options for selectiong position-format and to activate context-menu
 (function ($, L, window/*, document, undefined*/) {
     "use strict";
 
-    var controlPositionMarkerPane = 'controlPositionMarkerPane',
-
-        iconCursorPosition = 'fa-mouse-pointer',
+    var iconCursorPosition = 'fa-mouse-pointer',
         iconMapCenter      = 'fa-lb-center-marker';
 
     /********************************************************************************
@@ -85238,6 +86892,9 @@ Options for selectiong position-format and to activate context-menu
             selectFormat      : null    //function() to select format for position using latlng-format (fcoo/latlng-format)
         },
 
+        /************************************************************
+        initialize
+        ************************************************************/
         initialize: function ( options ) {
             if (window.bsIsTouch)
                 //Zoom- and history buttons are shown in a bsModal-box
@@ -85250,10 +86907,9 @@ Options for selectiong position-format and to activate context-menu
             if (this.options.position.toUpperCase().indexOf('TOP') !== -1)
                 this.options.popupPlacement = this.options.tooltipDirection = 'bottom';
 
-            //Set popup-item(s)
-            var popupList = [];
-            if (!window.bsIsTouch)
-                popupList = [
+            this._adjustPopupList(
+                //Items above options.popupList
+                window.bsIsTouch ? [] : [
                     {text: {da:'Position ved', en:'Position at'} },
                     {
                         radioGroupId: 'mode',
@@ -85266,17 +86922,16 @@ Options for selectiong position-format and to activate context-menu
                             {id:'MAPCENTER', icon: iconMapCenter,      text: {da:'Kortcentrum', en:'Map Center'}},
                         ]
                     }
-                ];
+                ],
 
-            if (this.options.selectFormat)
-                popupList.push(
-                    {type:'button', closeOnClick: true, icon: 'fa-cog', text: {da:'Format...', en:'Format...'}, onClick: $.proxy(this.options.selectFormat, this)}
-                );
-            this.options.popupList = popupList.length ? popupList : null;
-
+                //Items belows options.popupList
+                this.options.selectFormat ?
+                    [{type:'button', closeOnClick: true, icon: 'fa-cog', text: {da:'Format...', en:'Format...'}, onClick: $.proxy(this.options.selectFormat, this)}] :
+                    null
+            );
             //Set format-options and event for change of format
 
-            //latLngFormatSeparator = separator used in formatting the latLng-string. Using <br> for all geo-ref formats
+            //latLngFormatSeparator = separator used in formatting the latlng-string. Using <br> for all geo-ref formats
             this.latLngFormatSeparator = '<br>';
 
             //latLngFormatWidth = min-width of the position-element for different latlng-formats
@@ -85285,25 +86940,20 @@ Options for selectiong position-format and to activate context-menu
             window.latLngFormat.onChange( $.proxy( this._onLatLngFormatChanged, this ));
         },
 
+        /************************************************************
+        addMapContainer
+        ************************************************************/
         addMapContainer: function(map){
             this.$mapContainers = this.$mapContainers || {};
             this.$mapContainers[ L.Util.stamp(map) ] = $(map.getContainer());
         },
 
+        /************************************************************
+        addCenterMarker
+        ************************************************************/
         addCenterMarker: function(map, isInOtherMap){
-            //Create pane to contain marker for map center. Is placed just below popup-pane
             var mapId = L.Util.stamp(map);
             this.centerMarkers = this.centerMarkers || {};
-
-            if (!map.getPane(controlPositionMarkerPane)){
-                map.createPane(controlPositionMarkerPane);
-
-                map.whenReady( function(){
-                    var zIndex = $(this.getPanes().popupPane).css('z-index');
-                    this[controlPositionMarkerPane] = this.getPane(controlPositionMarkerPane);
-                    $(this[controlPositionMarkerPane]).css('z-index', zIndex-1 );
-                }, map );
-            }
 
             //Append the cross in the center of the map
             var centerMarker = L.marker([0,0], {
@@ -85312,23 +86962,29 @@ Options for selectiong position-format and to activate context-menu
                     iconSize  : [36, 36],
                     iconAnchor: [18, 18],
                 }),
-                pane: controlPositionMarkerPane
+                interactive: false,
+                pane       : map.getPaneBelow('tooltipPane') //Create/get pane to contain marker for map center. Is placed just below tooltip-pane
             });
+
             centerMarker.addTo(map);
             this.centerMarkers[ mapId ] = centerMarker;
         },
 
+        /************************************************************
+        onAdd
+        ************************************************************/
         onAdd: function(map){
             this.addMapContainer(map);
             this.addCenterMarker(map);
 
             //Create the content for the control
-            var result = L.Control.BsButtonBox.prototype.onAdd.call(this, map ),
-                $contentContainer = this.$contentContainer.bsModal.$body;
+            var result = L.Control.BsButtonBox.prototype.onAdd.call(this, map );
+
+            this.$innerContentContainer = this.$contentContainer.bsModal.$body;
 
             //Empty and remove borders on modal
             this.$contentContainer.bsModal.$modalContent.css('border', 'none');
-            $contentContainer.empty();
+            this.$innerContentContainer.empty();
 
             //Create two sets of button-input-button
             var cursorOptions = {
@@ -85376,23 +87032,25 @@ Options for selectiong position-format and to activate context-menu
                 mapCenterOptions.after.onClick = $.proxy(this._fireContentmenuOnMapCenter, this);
             }
 
-            $contentContainer
+            this.$innerContentContainer
                 ._bsAppendContent( cursorOptions )
                 ._bsAppendContent( mapCenterOptions );
 
             //Use the added class name to find the two containers for cursor- and map center position
-            this.$cursorPosition = $contentContainer.find('.cursor').parent().empty().addClass('position text-monospace').html('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
-            this.$centerPosition = $contentContainer.find('.center').parent().empty().addClass('position text-monospace').html('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
+            var contentClassName = 'hide-for-no-cursor-on-map bsPosition-content text-monospace justify-content-center align-items-center flex-grow-1';
+            this.$cursorPosition = this.$innerContentContainer.find('.cursor').parent().empty().addClass(contentClassName).html('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
+            this.$centerPosition = this.$innerContentContainer.find('.center').parent().empty().addClass(contentClassName).html('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
 
             if (this.options.inclContextmenu){
                 //Remove tooltips from the two buttons to the right
-                var $rightButtons = $contentContainer.find('.input-group-append .btn');
+                var $rightButtons = this.$innerContentContainer.find('.input-group-append .btn');
                 $rightButtons.on('click', $.proxy(this.hidePopup, this ));
                 this.removeTooltip( $rightButtons );
             }
 
             //Add events to update position
-             map.on('mouseposition', this._onMousePosition, this);
+            map.on('mouseposition', this._onMousePosition, this);
+            $('body').on('mouseleave', $.proxy(this._onMousePosition, this));
 
             map.on('move', this._onMapMove, this);
             map.on('moveend', this._onMapMoveEnd, this);
@@ -85402,22 +87060,128 @@ Options for selectiong position-format and to activate context-menu
             //Set/update latlng-format
             this._onLatLngFormatChanged(window.latLngFormat.options.formatId);
 
+            this.addedToMap = true;
+
             return result;
         },
 
+
+        /************************************************************
+        *************************************************************
+        infoBox
+        add, hide, show and remove extra boxes with additional
+        information on the position
+        options for an infoBox =
+            id       : STRING
+            index    : NUMBER
+            className: STRING
+            alwaysVisible: BOOLEAN if true the infobox is always visible if false it is hidden when the cursor is outside of the map
+            before   : {
+                icon   : STRING
+                onClick: function. If null the left side will just be the icon
+            },
+            content : STRING or OBJECT or FUNCTION
+            after   : As options.before
+        *************************************************************
+        ************************************************************/
+        addInfoBox: function(optionsOrInfoBox){
+            this.infoBoxList = this.infoBoxList || [];
+            this.infoBoxes = this.infoBoxes || [];
+            var _this = this;
+            function adjustOptions(options){
+                options.index = options.index || _this.infoBoxList.length;
+                options.id = options.id || 'id'+optionsOrInfoBox.index;
+
+                if (_this.options.inclContextmenu)
+                    options.after = options.after || {};
+                return options;
+            }
+
+            var infoBox = optionsOrInfoBox instanceof L.Control.BsInfoBox ? optionsOrInfoBox : null;
+
+            if (infoBox)
+                adjustOptions(infoBox.options);
+            else
+                infoBox = new L.Control.BsInfoBox(adjustOptions(optionsOrInfoBox));
+
+            this.infoBoxList.push(infoBox);
+            this.infoBoxes[infoBox.id] = infoBox;
+
+            infoBox.addTo(this);
+
+            //Sort info-boxes by index
+            this.infoBoxList.sort(function(box1, box2){ return box2.options.index - box1.options.index; });
+            for (var i=0; i<this.infoBoxList.length; i++)
+                this.infoBoxList[i].$container.detach().prependTo(this.$innerContentContainer);
+
+            return infoBox;
+        },
+
+
+        /************************************************************
+        getInfoBox
+        ************************************************************/
+        getInfoBox: function(idOrIndexOrInfoBox){
+            if (idOrIndexOrInfoBox instanceof L.Control.BsInfoBox)
+                return idOrIndexOrInfoBox;
+            if (typeof idOrIndexOrInfoBox == 'string')
+                return this.infoBoxes[idOrIndexOrInfoBox];
+            var result = null;
+            $.each(this.infoBoxList, function(dummy, infoBox){
+                if (infoBox.index == idOrIndexOrInfoBox)
+                    result = infoBox;
+            });
+            return result;
+        },
+
+        /************************************************************
+        removeInfoBox
+        ************************************************************/
+        removeInfoBox: function(idOrIndexorInfoBox){
+            var _this = this,
+                removeInfoBox = this.getInfoBox(idOrIndexorInfoBox);
+            if (!removeInfoBox) return;
+
+            removeInfoBox.remove();
+
+            $.each(this.infoBoxList, function(index, infoBox){
+                if (infoBox.id == removeInfoBox.id){
+                    _this.infoBoxList.splice(index, 1);
+                    return false;
+                }
+            });
+            delete this.infoBoxes[removeInfoBox.id];
+
+            //Reste min-width and re-calc
+            this.$cursorPosition.css('min-width', 'initial');
+            this.$centerPosition.css('min-width', 'initial');
+            this.latLngFormatWidth = {};
+
+            this._updatePositions();
+
+            return removeInfoBox;
+        },
+
+        /************************************************************
+        onRemove
+        ************************************************************/
         onRemove: function (map) {
-            this.centerMarkers[L.Util(map)].remove();
-            delete this.centerMarkers[L.Util(map)];
+            this.centerMarkers[L.Util.stamp(map)].remove();
+            delete this.centerMarkers[L.Util.stamp(map)];
             map.off('mouseposition', this._onMousePosition, this);
             map.off('move', this._onMapMove, this);
             map.off('moveend', this._onMapMoveEnd, this);
 
+            this.addedToMap = false;
         },
 
         _onLoad: function(){
             this.setMode( this.options.mode );
         },
 
+        /************************************************************
+        setMode
+        ************************************************************/
         setMode: function( mode ){
             this.options.mode = mode;
 
@@ -85438,20 +87202,31 @@ Options for selectiong position-format and to activate context-menu
         },
 
 
+        /************************************************************
+        onChange
+        ************************************************************/
         onChange: function(/*state*/){
             var showCenterMarker = this.options.show && this.options.isExtended && (this.options.mode == 'MAPCENTER');
             $.each(this.centerMarkers, function(id, marker){
                 var $icon = $(marker._icon);
                 showCenterMarker ? $icon.show() : $icon.hide();
             });
+            if (this.options.isExtended)
+                this._updatePositions(true);
         },
 
+        /************************************************************
+        getState
+        ************************************************************/
         getState: function(BsButtonBox_getState){
             return function () {
                 return $.extend({mode: this.options.mode}, BsButtonBox_getState.call(this) );
             };
         }(L.Control.BsButtonBox.prototype.getState),
 
+        /************************************************************
+        setState
+        ************************************************************/
         setState: function(BsButtonBox_setState){
             return function (options) {
                 BsButtonBox_setState.call(this, options);
@@ -85476,14 +87251,14 @@ Options for selectiong position-format and to activate context-menu
             this._updatePositions();
         },
 
-        _updatePositions: function(){
-            if (!this._map._loaded) return;
+        _updatePositions: function(force){
+            if (!this.addedToMap || !this._map || !this._map._loaded) return;
 
             //Update cursor position. It is updated two time to ensure correct min-width even if no mouse-position is saved
-            this._onMousePosition( this.mouseEvent );
+            this._onMousePosition( this.mouseEvent, false, force );
             var mouseEvent = this.mouseEventWithLatLng;
             if (mouseEvent && mouseEvent.latlng)
-                this._onMousePosition( mouseEvent );
+                this._onMousePosition( mouseEvent, false, force );
 
             //Update center position
             this._onMapMoveEnd();
@@ -85499,6 +87274,7 @@ Options for selectiong position-format and to activate context-menu
                             this.$cursorPosition.outerWidth() :
                             this.$centerPosition.outerWidth()
                     );
+
             this.$cursorPosition.css('min-width', minWidth+'px');
             this.$centerPosition.css('min-width', minWidth+'px');
         },
@@ -85507,18 +87283,26 @@ Options for selectiong position-format and to activate context-menu
             return latlng.format({separator: this.latLngFormatSeparator});
         },
 
-        _onMousePosition: function ( mouseEvent, fromOtherMap ) {
+        _onMousePosition: function ( mouseEvent, fromOtherMap, force ) {
             if (this.dontUpdateMousePosition) return;
 
-            if ((this.mouseEvent ? this.mouseEvent.latlng : null) != (mouseEvent ? mouseEvent.latlng : null)){
-                if ( mouseEvent &&
-                     mouseEvent.latlng &&
-                    (!fromOtherMap || this._map.getBounds().contains(mouseEvent.latlng))
-                   )
-                    this.$cursorPosition.html( this._formatLatLng( mouseEvent.latlng ) );
+
+            if (force || ((this.mouseEvent ? this.mouseEvent.latlng : null) != (mouseEvent ? mouseEvent.latlng : null))){
+                var callOnMousePosition = this.options.onMousePosition && this.options.isExtended && (this.options.mode == 'CURSOR'),
+                    latlng = mouseEvent ? mouseEvent.latlng : null;
+
+                this.$contentContainer.modernizrToggle('cursor-on-map', !!latlng);
+
+                if ( latlng && (!fromOtherMap || this._map.getBounds().contains(latlng)) ){
+                    this.$cursorPosition.html( this._formatLatLng( latlng ) );
+                    if (callOnMousePosition)
+                        this.options.onMousePosition(mouseEvent.latlng, this.$cursorPosition, this);
+
+                }
                 else {
                     this._saveAndSetMinWidth();
-                    this.$cursorPosition.html('&nbsp;');
+                    if (callOnMousePosition)
+                        this.options.onMousePosition(null, this.$cursorPosition, this);
                 }
 
                 if (this.syncWithList && !this.dontUpdateMousePosition){
@@ -85547,6 +87331,9 @@ Options for selectiong position-format and to activate context-menu
             });
 
             this.$centerPosition.html( this._formatLatLng( position ) );
+
+            if (this.options.onCenterPosition && this.options.isExtended && (this.options.mode == 'MAPCENTER'))
+                this.options.onCenterPosition(position, this.$centerPosition, this);
         },
 
         _fireContentmenuOnMapCenter: function(){
@@ -85675,8 +87462,108 @@ Options for selectiong position-format and to activate context-menu
             this.addControl(this.bsPositionControl);
         }
     });
-
     L.control.bsPosition = function(options){ return new L.Control.BsPosition(options); };
+
+    /********************************************************************************
+    L.Control.bsInfoBox
+    Represent a info-box in bsPosition
+    ********************************************************************************/
+    L.Control.BsInfoBox = function(options){
+        this.id = options.id;
+        this.options = options;
+        var innerContainerClassName = this.innerContainerClassName = 'info-box-'+options.index;
+
+        var boxOptions = this.boxOptions = {
+                insideFormGroup: false,
+                noValidation   : true,
+                noBorder       : true,
+                type           : 'textbox',
+                text           : function( $inner ){ $inner.addClass(innerContainerClassName); },
+                class          : (options.className || ''),
+                before: {
+                    type   : 'button',
+                    icon   : 'fa-_',
+                    text   : '',
+                    square : true,
+                    class  : 'disabled show-as-normal',
+                    semiTransparent: true
+                },
+                after: {
+                    type   : 'button',
+                    icon   : 'fa-_',
+                    text   : '',
+                    square : true,
+                    class  : 'disabled show-as-normal',
+                    semiTransparent: true
+                }
+            };
+
+        if (options.before){
+            boxOptions.before.icon = options.before.icon || boxOptions.before.icon;
+            if (options.before.onClick){
+                boxOptions.before.class    = '';
+                boxOptions.before.onClick  = options.before.onClick;
+            }
+            boxOptions.before.class = boxOptions.before.class + ' ' + (options.before.class || options.before.className || '');
+        }
+
+        if (options.after){
+            boxOptions.after.icon = options.after.icon || boxOptions.after.icon;
+            if (options.after.onClick){
+                boxOptions.after.class    = '';
+                boxOptions.after.onClick  = options.after.onClick;
+            }
+            boxOptions.after.class = boxOptions.after.class + ' ' + (options.after.class || options.after.className || '');
+        }
+        else
+            delete boxOptions.after;
+
+    };
+
+    L.Control.BsInfoBox.prototype = {
+        _create$content: function(){
+            if (this.$container) return;
+
+            //Create the content inside a dummy div
+            var $parent = $('<div/>');
+
+            $parent._bsAppendContent( this.boxOptions );
+            this.$contentContainer  =
+                $parent.find('.' + this.innerContainerClassName).parent()
+                    .addClass('d-flex bsPosition-content justify-content-center align-items-center flex-grow-1')
+                    .toggleClass('hide-for-no-cursor-on-map', !this.options.alwaysVisible);
+
+            this.$container = this.$contentContainer.parent();
+            this.$container.detach();
+
+            this.$contentContainer.empty()._bsAddHtml(this.options.content);
+
+        },
+
+
+        addTo: function(bsPositionControl){
+            if (this.bsPositionControl) return this;
+
+            this.bsPositionControl = bsPositionControl;
+
+            this._create$content();
+            this.bsPositionControl.$innerContentContainer.append(this.$container);
+
+            //Remove tooltip from active buttons
+            this.$contentContainer.parent().find('a:not(.disabled)').each(function(){ bsPositionControl.removeTooltip( $(this) ); });
+
+            return this;
+        },
+
+        remove: function(){
+            if (!this.bsPositionControl) return this;
+
+            this.$container.detach(); //remove();
+
+            this.bsPositionControl = null;
+            return this;
+        }
+    };
 
 }(jQuery, L, this, document));
 
@@ -85771,6 +87658,9 @@ Can be used as leaflet standard zoom control with Bootstrap style
             if (includes(pos, 'TOP'))
                 this.options.tooltipDirection = 'bottom';
 
+            //Set options.positionIsLeft = true if the control is in the left-side of the map
+            this.options.positionIsLeft = includes(pos, 'LEFT');
+
             //Set popup-item(s)
             if (!window.bsIsTouch && this.options.historyEnabled){
                 this.options.popupList = [
@@ -85805,7 +87695,6 @@ Can be used as leaflet standard zoom control with Bootstrap style
             var bsButtonGroupClassNames = $.bsButtonGroup({vertical:true, center:true}).attr('class'),
                 bsButtonClassNames = $.bsButton({square: true, bigIcon: true}).attr('class'),
                 $zoomContainer = $(this.zoom._container);
-
             $zoomContainer
                 .removeClass()
                 .addClass( bsButtonGroupClassNames )
@@ -85849,14 +87738,18 @@ Can be used as leaflet standard zoom control with Bootstrap style
                             {id:'history_forward', icon: 'fa-angle-right'   , bigIcon: true, onClick: $.proxy(this.historyList.goForward, this.historyList) },
                         ]} )
                     )
-                        .css('margin-right', '2px')
-                        .prependTo($contentContainer)
+//HER                        .css('margin-right', '2px')
                         .find('.btn')
                             .addClass('disabled')
                             .css({
                                 'border-top-left-radius': '0px',
                                 'border-bottom-left-radius': '0px'
                             });
+
+                if (this.options.positionIsLeft)
+                    $forwardButtons.parent().appendTo($contentContainer);
+                else
+                    $forwardButtons.parent().prependTo($contentContainer);
 
                 $backButtons =
                     $.bsButtonGroup( $.extend(buttonGroupOptions, {
@@ -85866,12 +87759,19 @@ Can be used as leaflet standard zoom control with Bootstrap style
                         ]} )
                     )
                         .prependTo($contentContainer)
+                        .insertBefore( $forwardButtons.parent() )
                         .find('.btn')
                             .addClass('disabled')
                             .css({
                                 'border-top-right-radius': '0px',
                                 'border-bottom-right-radius': '0px'
                             });
+
+                //Set margin to zoom-buttons
+                if (this.options.positionIsLeft)
+                    $backButtons.parent().css('margin-left', '2px');
+                else
+                    $forwardButtons.parent().css('margin-right', '2px');
 
                 $contentContainer.find('.btn-group-vertical').css('margin-top', 0);
 
@@ -86134,13 +88034,13 @@ leaflet-bootstrap-control-legend.js
 
         diminishAll: function(){
             $.each(this.list, function(index, legend){
-                if (!legend.$modalContent.hasClass('modal-normal') && legend.options.content)
+                if (!legend.$modalContent.hasClass('modal-normal') && legend.options.hasContent)
                     legend.$container._bsModalDiminish();
             });
         },
         extendAll: function(){
             $.each(this.list, function(index, legend){
-                if (!legend.$modalContent.hasClass('modal-extended') && legend.options.content)
+                if (!legend.$modalContent.hasClass('modal-extended') && legend.options.hasContent)
                     legend.$container._bsModalExtend();
             });
         },
@@ -86238,11 +88138,11 @@ leaflet-bootstrap-control-legend.js
             var _this = this,
                 options = this.options,
                 normalIcon = options.icon || 'fa-square text-white',
-                normalIconContainerClass = '';
+                normalIconIsStackedIcon = false;
 
             //Add class to normal-icon to make it visible when working = off
             if ($.isArray(normalIcon))
-                normalIconContainerClass = ' hide-for-bsl-working';
+                normalIconIsStackedIcon = true;
             else
                 normalIcon = normalIcon + ' hide-for-bsl-working';
             /*
@@ -86250,10 +88150,10 @@ leaflet-bootstrap-control-legend.js
             The first for layer=visible contains of two icons: normal and working
             The second for layer=hidden contains not-visible-icon
             */
-            var icon = [
-                    [normalIcon, 'show-for-bsl-working fa-fw fas fa-spinner fa-spin no-margin-left'],
-                    'fa-fw fas fa-eye-slash ' + (this.options.hiddenIconClass || '')
-                ];
+            this.options.iconArray = [
+                [normalIcon, 'show-for-bsl-working fa-fw fas fa-spinner fa-spin no-margin-left'],
+                'fa-fw fas fa-eye-slash ' + (this.options.hiddenIconClass || '')
+            ];
 
 
             this.parent = parent;
@@ -86265,7 +88165,7 @@ leaflet-bootstrap-control-legend.js
                     //noHorizontalPadding: true,
                     noShadow: true,
                     header: {
-                        icon: icon,
+                        icon: this.options.iconArray,
                         text: options.text
                     },
                     onInfo   : options.onInfo,
@@ -86276,11 +88176,48 @@ leaflet-bootstrap-control-legend.js
                     closeButton: false
                 };
 
-                if (options.content){
-                    modalContentOptions.extended   = {content: options.content};
+
+                //The extended content can be 'normal' content or buttons/buttonList
+                if (options.content || options.buttons || options.buttonList){
+                    if (options.content)
+                        modalContentOptions.extended   = {content: options.content};
+                    else {
+                        var list = options.buttons || options.buttonList;
+                        $.each(list, function(index, options){
+                            options.type  = 'button';
+                            options.small = true;
+                        });
+                        modalContentOptions.extended   = {
+                            className           : 'text-right modal-footer',
+                            noVerticalPadding   : true,
+                            noHorizontalPadding : true,
+                            content             : list
+                        };
+                    }
                     modalContentOptions.isExtended = true;
+                    options.hasContent = true;
                 }
 
+/*
+        $.each( buttons, function( index, buttonOptions ){
+
+            focusAdded = focusAdded || buttonOptions.focus;
+            if (!focusAdded && (index+1 == buttons.length ) )
+                buttonOptions.focus = true;
+
+            //Add same onClick as close-icon if closeOnClick: true
+            if (buttonOptions.closeOnClick)
+                buttonOptions.equalIconId = (buttonOptions.equalIconId || '') + ' close';
+
+            buttonOptions.class = defaultButtonClass + ' ' + (buttonOptions.className || '');
+
+            var $button =
+                $.bsButton( $.extend({}, defaultButtonOptions, buttonOptions ) )
+                    .appendTo( $modalButtonContainer );
+
+
+
+*/
                 options.onRemove = options.onRemove || options.onClose;
                 if (options.onRemove)
                     modalContentOptions.icons.close = {
@@ -86293,8 +88230,10 @@ leaflet-bootstrap-control-legend.js
 
                 //Find all header icons
                 this.stateIcons = this.$container.bsModal.$header.children();
-                $(this.stateIcons[0]).addClass('fa-fw ' + (this.options.normalIconClass || '') + normalIconContainerClass);
-
+                var $normalIcon = $(this.stateIcons[0]);
+                $normalIcon.addClass('fa-fw ' + (this.options.normalIconClass || ''));
+                if (normalIconIsStackedIcon)
+                    $normalIcon.children('.container-stacked-icons').addClass('hide-for-bsl-working');
 
                 this.actionIcons = {};
                 $.each(['warning', 'info', 'help', 'close'], function(index, id){
@@ -86418,6 +88357,14 @@ Adjust standard Leaflet popup to display as Bootstrap modal
         return function () {
             if (!this._pinned || this._closeViaCloseButton){
                 this._closeViaCloseButton = false;
+
+                if (this.showingTooltipOnPopup){
+                    //Move tooltip back into the original pane
+                    this.showingTooltipOnPopup = false;
+
+//                    this._source.closeTooltip();
+                    this._source.getTooltip().options.pane = 'tooltipPane';
+                }
                 _close.apply(this, arguments);
             }
         };
@@ -86438,7 +88385,7 @@ Adjust standard Leaflet popup to display as Bootstrap modal
             //Original function/method
             _initLayout.apply(this, arguments);
 
-            //Save ref to popup in DOM-eleemnt
+            //Save ref to popup in DOM-element
             $(this._container).data('popup', this);
 
             //Set class-name for wrapper to remove margin, bg-color etc.
@@ -86453,7 +88400,7 @@ Adjust standard Leaflet popup to display as Bootstrap modal
             });
 
             //Close open popup and brint to front when "touched"
-            L.DomEvent.on(this._contentNode, 'mousedown', this._brintToFocus, this );
+            L.DomEvent.on(this._contentNode, 'click', this._brintToFocus, this );
 
             return this;
         };
@@ -86483,13 +88430,16 @@ Adjust standard Leaflet popup to display as Bootstrap modal
     *********************************************************/
     L.Popup.prototype._updateContent = function(){
         //Reset pinned-status
-        var isPinned = !!this._pinned;
+        var _this = this,
+            isPinned = !!this._pinned;
         this._setPinned(false);
 
         //Create and adjust options in this._content into options for bsModal
-        //this._content can be 1: string or function, 2: object with the content, 3: Full popup-options
+        //this._content can be 1: string or function, 2: object with the content, 3: Full popup-options.
+        //If any of the contents are functions the functions must be function($body, popup, map)
         //Convert this._content into bsModal-options
         var contentAsModalOptions = ($.isPlainObject(this._content) && !!this._content.content) ? this._content : {content: this._content},
+            contentArg = [this, this._map],
             modalOptions = $.extend(true, {
                 small         : true,
                 smallButtons  : true,
@@ -86501,10 +88451,16 @@ Adjust standard Leaflet popup to display as Bootstrap modal
                 closeButton   : contentAsModalOptions.closeButton === true, //Change default to false
                 noHeader      : !contentAsModalOptions.header,
                 contentContext: this,
-
-                onChange: $.proxy( this._updatePosition, this )
+                contentArg    : contentArg,
+                onChange      : $.proxy( this._updatePosition, this )
             },
             contentAsModalOptions );
+
+        if (modalOptions.minimized)
+            modalOptions.minimized.contentArg = contentArg;
+
+        if (modalOptions.extended)
+            modalOptions.extended.contentArg = contentArg;
 
         if (modalOptions.fixable){
             this.options.fixable = true;
@@ -86533,13 +88489,64 @@ Adjust standard Leaflet popup to display as Bootstrap modal
         this.modalOptions = modalOptions;
 
         //Get the content-node and build the content as a Bootstrap modal
-        var $contentNode = $(this._contentNode);
-        $contentNode
+        this.$contentNode = $(this._contentNode);
+        this.$contentNode
             .empty()
             ._bsModalContent( modalOptions );
 
         //Save the modal-object
-        this.bsModal = $contentNode.bsModal;
+        this.bsModal = this.$contentNode.bsModal;
+
+        //If any of the contents (minimized, normal, or extended) should have the same tooltip as the source
+        if (this._source && this._source.getTooltip()){
+            var $list = [];
+            $.each(['', 'minimized', 'extended'], function(index, id){
+                var show     = id ? modalOptions[id] && modalOptions[id].showTooltip : modalOptions.showTooltip,
+                    elements = id ? _this.bsModal[id] : _this.bsModal;
+                if (show){
+                    $list.push(elements.$body);
+                    if (elements.$fixedContent)
+                        $list.push(elements.$fixedContent);
+                }
+            });
+
+            this.showingTooltipOnPopup = !!$list.length;
+
+            if (this.showingTooltipOnPopup){
+                //Move the tooltip from tooltip-pane to a tempory pane just above popups
+                this._source.getTooltip().options.pane = this._map.getPaneAbove('popupPane');
+                var this_source = this._source;
+
+                this_source.showtooltip_mouseenter =
+                    this_source.showtooltip_mouseenter ||
+                    $.proxy(function(){
+                        if (this._popup.showingTooltipOnPopup){
+                            this.openTooltip();
+                            this.showTooltip();
+                        }
+                    }, this_source);
+
+                this_source.showtooltip_mouseleave =
+                    this_source.showtooltip_mouseleave ||
+                    $.proxy(function(){
+                        if (this._popup.showingTooltipOnPopup){
+                            this.closeTooltip();
+                            this.hideTooltip();
+                        }
+                    }, this_source);
+
+                this_source.showtooltip_mousemove =
+                    this_source.showtooltip_mousemove ||
+                    $.proxy(this_source._moveTooltip, this_source);
+
+                $.each($list, function(index, $elem){
+                    $elem
+                        .on('mouseenter', this_source.showtooltip_mouseenter)
+                        .on('mouseleave', this_source.showtooltip_mouseleave)
+                        .on('mousemove',  this_source.showtooltip_mousemove);
+                });
+            }
+        }
 
         this._setPinned(isPinned);
 
@@ -86547,7 +88554,10 @@ Adjust standard Leaflet popup to display as Bootstrap modal
     };
 
     /*********************************************************
-    NEW METHOD L.Popup.changeContent - only changes the content
+    NEW METHOD FOR L.Popup
+    *********************************************************/
+    /*********************************************************
+    L.Popup.changeContent - only changes the content
     of the "body" of the bsModal inside the popup
     *********************************************************/
     L.Popup.prototype.changeContent = function(content, contentContext) {
@@ -86585,8 +88595,52 @@ Adjust standard Leaflet popup to display as Bootstrap modal
 		return this;
 	};
 
+    /******************************************************
+    Methods to get and set the size of the popup
+    extend()
+    diminish()
+    getSize()
+    setSize(size)
+    setSizeExtended()
+    setSizeNormal()
+    setSizeMinimized()
+    ******************************************************/
+    L.Popup.prototype.extend = function(){
+        this.$contentNode._bsModalExtend();
+        return this;
+    };
+
+    L.Popup.prototype.diminish = function(){
+        this.$contentNode._bsModalDiminish();
+        return this;
+    };
+
+
+    L.Popup.prototype.getSize = function(){
+        this.$contentNode._bsModalGetSize();
+        return this;
+    };
+
+    L.Popup.prototype.setSize = function(size){
+        this.$contentNode._bsModalSetSize(size);
+        return this;
+    };
+
+    L.Popup.prototype.setSizeExtended  = function(){ return this.setSize($.MODAL_SIZE_EXTENDED ); };
+    L.Popup.prototype.setSizeNormal    = function(){ return this.setSize($.MODAL_SIZE_NORMAL   ); };
+    L.Popup.prototype.setSizeMinimized = function(){ return this.setSize($.MODAL_SIZE_MINIMIZED); };
+
+
     /*********************************************************
-    NEW METHOD L.Map.closeAllPopup - close all popup on the map
+    L.Popup.changeContent - only changes the content
+    of the "body" of the bsModal inside the popup
+    *********************************************************/
+
+
+
+    /*********************************************************
+    NEW METHOD FOR L.Map
+    L.Map.closeAllPopup - close all popup on the map
     *********************************************************/
     L.Map.prototype.closeAllPopup = function() {
         $(this.getPane('popupPane')).find('.leaflet-popup').each(function(){
@@ -86994,622 +89048,6 @@ L.Class.getHtmlElements: function() Return associated html-elements or array of 
     });
 
 })(jQuery, L, this, document);
-
-;
-/*****************************************************************************
-leaflet-latlng-geodesy.js
-
-This is a adjusted "Leaflet"-version of latlon-spherical.js from
-https://github.com/chrisveness/geodesy by Chris Veness
-See http://www.movable-type.co.uk/scripts/latlong.html
-
-The LatLon-object is replaced with standard Leaflet LatLng-object and the
-code is packed in a define-function
-
-
-*****************************************************************************/
-(function (L/*, window, document, undefined*/) {
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
-/* Latitude/longitude spherical geodesy tools                         (c) Chris Veness 2002-2017  */
-/*                                                                                   MIT Licence  */
-/* www.movable-type.co.uk/scripts/latlong.html                                                    */
-/* www.movable-type.co.uk/scripts/geodesy/docs/module-latlon-spherical.html                       */
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
-
-'use strict';
-
-
-/**
- * Library of geodesy functions for operations on a spherical earth model.
- *
- * @module   latlon-spherical
- * @requires dms
- */
-
-
-/**
- * Returns the distance from ‘this’ point to destination point (using haversine formula).
- *
- * @param   {L.LatLng} point - Latitude/longitude of destination point.
- * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
- * @returns {number} Distance between this point and destination point, in same units as radius.
- *
- * @example
- *     var p1 = new L.LatLng(52.205, 0.119);
- *     var p2 = new L.LatLng(48.857, 2.351);
- *     var d = p1.distanceTo(p2); // 404.3 km
- */
-
-
-L.LatLng.prototype.distanceTo = function(point, radius) {
-    radius = (radius === undefined) ? 6371e3 : Number(radius);
-
-    // a = sin²(Δφ/2) + cos(φ1)⋅cos(φ2)⋅sin²(Δλ/2)
-    // tanδ = √(a) / √(1−a)
-    // see mathforum.org/library/drmath/view/51879.html for derivation
-
-    var R = radius;
-    var φ1 = this.lat.toRadians(),  λ1 = this.lng.toRadians();
-    var φ2 = point.lat.toRadians(), λ2 = point.lng.toRadians();
-    var Δφ = φ2 - φ1;
-    var Δλ = λ2 - λ1;
-
-    var a = Math.sin(Δφ/2) * Math.sin(Δφ/2)
-          + Math.cos(φ1) * Math.cos(φ2)
-          * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    var d = R * c;
-
-    return d;
-};
-
-
-/**
- * Returns the (initial) bearing from ‘this’ point to destination point.
- *
- * @param   {L.LatLng} point - Latitude/longitude of destination point.
- * @returns {number} Initial bearing in degrees from north.
- *
- * @example
- *     var p1 = new L.LatLng(52.205, 0.119);
- *     var p2 = new L.LatLng(48.857, 2.351);
- *     var b1 = p1.bearingTo(p2); // 156.2°
- */
-L.LatLng.prototype.bearingTo = function(point) {
-
-    // tanθ = sinΔλ⋅cosφ2 / cosφ1⋅sinφ2 − sinφ1⋅cosφ2⋅cosΔλ
-    // see mathforum.org/library/drmath/view/55417.html for derivation
-
-    var φ1 = this.lat.toRadians(), φ2 = point.lat.toRadians();
-    var Δλ = (point.lng-this.lng).toRadians();
-    var y = Math.sin(Δλ) * Math.cos(φ2);
-    var x = Math.cos(φ1)*Math.sin(φ2) -
-            Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
-    var θ = Math.atan2(y, x);
-
-    return (θ.toDegrees()+360) % 360;
-};
-
-
-/**
- * Returns final bearing arriving at destination destination point from ‘this’ point; the final bearing
- * will differ from the initial bearing by varying degrees according to distance and latitude.
- *
- * @param   {L.LatLng} point - Latitude/longitude of destination point.
- * @returns {number} Final bearing in degrees from north.
- *
- * @example
- *     var p1 = new L.LatLng(52.205, 0.119);
- *     var p2 = new L.LatLng(48.857, 2.351);
- *     var b2 = p1.finalBearingTo(p2); // 157.9°
- */
-L.LatLng.prototype.finalBearingTo = function(point) {
-
-    // get initial bearing from destination point to this point & reverse it by adding 180°
-    return ( point.bearingTo(this)+180 ) % 360;
-};
-
-
-/**
- * Returns the midpoint between ‘this’ point and the supplied point.
- *
- * @param   {L.LatLng} point - Latitude/longitude of destination point.
- * @returns {L.LatLng} Midpoint between this point and the supplied point.
- *
- * @example
- *     var p1 = new L.LatLng(52.205, 0.119);
- *     var p2 = new L.LatLng(48.857, 2.351);
- *     var pMid = p1.midpointTo(p2); // 50.5363°N, 001.2746°E
- */
-L.LatLng.prototype.midpointTo = function(point) {
-
-    // φm = atan2( sinφ1 + sinφ2, √( (cosφ1 + cosφ2⋅cosΔλ) ⋅ (cosφ1 + cosφ2⋅cosΔλ) ) + cos²φ2⋅sin²Δλ )
-    // λm = λ1 + atan2(cosφ2⋅sinΔλ, cosφ1 + cosφ2⋅cosΔλ)
-    // see mathforum.org/library/drmath/view/51822.html for derivation
-
-    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
-    var φ2 = point.lat.toRadians();
-    var Δλ = (point.lng-this.lng).toRadians();
-
-    var Bx = Math.cos(φ2) * Math.cos(Δλ);
-    var By = Math.cos(φ2) * Math.sin(Δλ);
-
-    var x = Math.sqrt((Math.cos(φ1) + Bx) * (Math.cos(φ1) + Bx) + By * By);
-    var y = Math.sin(φ1) + Math.sin(φ2);
-    var φ3 = Math.atan2(y, x);
-
-    var λ3 = λ1 + Math.atan2(By, Math.cos(φ1) + Bx);
-
-    return new L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise to −180..+180°
-};
-
-
-/**
- * Returns the point at given fraction between ‘this’ point and specified point.
- *
- * @param   {L.LatLng} point - Latitude/longitude of destination point.
- * @param   {number} fraction - Fraction between the two points (0 = this point, 1 = specified point).
- * @returns {L.LatLng} Intermediate point between this point and destination point.
- *
- * @example
- *   let p1 = new L.LatLng(52.205, 0.119);
- *   let p2 = new L.LatLng(48.857, 2.351);
- *   let pMid = p1.intermediatePointTo(p2, 0.25); // 51.3721°N, 000.7073°E
- */
-L.LatLng.prototype.intermediatePointTo = function(point, fraction) {
-
-    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
-    var φ2 = point.lat.toRadians(), λ2 = point.lng.toRadians();
-    var sinφ1 = Math.sin(φ1), cosφ1 = Math.cos(φ1), sinλ1 = Math.sin(λ1), cosλ1 = Math.cos(λ1);
-    var sinφ2 = Math.sin(φ2), cosφ2 = Math.cos(φ2), sinλ2 = Math.sin(λ2), cosλ2 = Math.cos(λ2);
-
-    // distance between points
-    var Δφ = φ2 - φ1;
-    var Δλ = λ2 - λ1;
-    var a = Math.sin(Δφ/2) * Math.sin(Δφ/2)
-        + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    var δ = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-    var A = Math.sin((1-fraction)*δ) / Math.sin(δ);
-    var B = Math.sin(fraction*δ) / Math.sin(δ);
-
-    var x = A * cosφ1 * cosλ1 + B * cosφ2 * cosλ2;
-    var y = A * cosφ1 * sinλ1 + B * cosφ2 * sinλ2;
-    var z = A * sinφ1 + B * sinφ2;
-
-    var φ3 = Math.atan2(z, Math.sqrt(x*x + y*y));
-    var λ3 = Math.atan2(y, x);
-
-    return new L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise lng to −180..+180°
-};
-
-
-/**
- * Returns the destination point from ‘this’ point having travelled the given distance on the
- * given initial bearing (bearing normally varies around path followed).
- *
- * @param   {number} distance - Distance travelled, in same units as earth radius (default: metres).
- * @param   {number} bearing - Initial bearing in degrees from north.
- * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
- * @returns {L.LatLng} Destination point.
- *
- * @example
- *     var p1 = new L.LatLng(51.4778, -0.0015);
- *     var p2 = p1.destinationPoint(7794, 300.7); // 51.5135°N, 000.0983°W
- */
-L.LatLng.prototype.destinationPoint = function(distance, bearing, radius) {
-    radius = (radius === undefined) ? 6371e3 : Number(radius);
-
-    // sinφ2 = sinφ1⋅cosδ + cosφ1⋅sinδ⋅cosθ
-    // tanΔλ = sinθ⋅sinδ⋅cosφ1 / cosδ−sinφ1⋅sinφ2
-    // see mathforum.org/library/drmath/view/52049.html for derivation
-
-    var δ = Number(distance) / radius; // angular distance in radians
-    var θ = Number(bearing).toRadians();
-
-    var φ1 = this.lat.toRadians();
-    var λ1 = this.lng.toRadians();
-
-    var sinφ1 = Math.sin(φ1), cosφ1 = Math.cos(φ1);
-    var sinδ = Math.sin(δ), cosδ = Math.cos(δ);
-    var sinθ = Math.sin(θ), cosθ = Math.cos(θ);
-
-    var sinφ2 = sinφ1*cosδ + cosφ1*sinδ*cosθ;
-    var φ2 = Math.asin(sinφ2);
-    var y = sinθ * sinδ * cosφ1;
-    var x = cosδ - sinφ1 * sinφ2;
-    var λ2 = λ1 + Math.atan2(y, x);
-
-    return new L.LatLng(φ2.toDegrees(), (λ2.toDegrees()+540)%360-180); // normalise to −180..+180°
-};
-
-
-/**
- * Returns the point of intersection of two paths defined by point and bearing.
- *
- * @param   {L.LatLng} p1 - First point.
- * @param   {number} brng1 - Initial bearing from first point.
- * @param   {L.LatLng} p2 - Second point.
- * @param   {number} brng2 - Initial bearing from second point.
- * @returns {L.LatLng|null} Destination point (null if no unique intersection defined).
- *
- * @example
- *     var p1 = L.LatLng(51.8853, 0.2545), brng1 = 108.547;
- *     var p2 = L.LatLng(49.0034, 2.5735), brng2 =  32.435;
- *     var pInt = LatLng.intersection(p1, brng1, p2, brng2); // 50.9078°N, 004.5084°E
- */
-L.LatLng.intersection = function(p1, brng1, p2, brng2) {
-    // see www.edwilliams.org/avform.htm#Intersection
-
-    var φ1 = p1.lat.toRadians(), λ1 = p1.lng.toRadians();
-    var φ2 = p2.lat.toRadians(), λ2 = p2.lng.toRadians();
-    var θ13 = Number(brng1).toRadians(), θ23 = Number(brng2).toRadians();
-    var Δφ = φ2-φ1, Δλ = λ2-λ1;
-
-    // angular distance p1-p2
-    var δ12 = 2*Math.asin( Math.sqrt( Math.sin(Δφ/2)*Math.sin(Δφ/2)
-        + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)*Math.sin(Δλ/2) ) );
-    if (δ12 == 0) return null;
-
-    // initial/final bearings between points
-    var θa = Math.acos( ( Math.sin(φ2) - Math.sin(φ1)*Math.cos(δ12) ) / ( Math.sin(δ12)*Math.cos(φ1) ) );
-    if (isNaN(θa)) θa = 0; // protect against rounding
-    var θb = Math.acos( ( Math.sin(φ1) - Math.sin(φ2)*Math.cos(δ12) ) / ( Math.sin(δ12)*Math.cos(φ2) ) );
-
-    var θ12 = Math.sin(λ2-λ1)>0 ? θa : 2*Math.PI-θa;
-    var θ21 = Math.sin(λ2-λ1)>0 ? 2*Math.PI-θb : θb;
-
-    var α1 = θ13 - θ12; // angle 2-1-3
-    var α2 = θ21 - θ23; // angle 1-2-3
-
-    if (Math.sin(α1)==0 && Math.sin(α2)==0) return null; // infinite intersections
-    if (Math.sin(α1)*Math.sin(α2) < 0) return null;      // ambiguous intersection
-
-    var α3 = Math.acos( -Math.cos(α1)*Math.cos(α2) + Math.sin(α1)*Math.sin(α2)*Math.cos(δ12) );
-    var δ13 = Math.atan2( Math.sin(δ12)*Math.sin(α1)*Math.sin(α2), Math.cos(α2)+Math.cos(α1)*Math.cos(α3) );
-    var φ3 = Math.asin( Math.sin(φ1)*Math.cos(δ13) + Math.cos(φ1)*Math.sin(δ13)*Math.cos(θ13) );
-    var Δλ13 = Math.atan2( Math.sin(θ13)*Math.sin(δ13)*Math.cos(φ1), Math.cos(δ13)-Math.sin(φ1)*Math.sin(φ3) );
-    var λ3 = λ1 + Δλ13;
-
-    return new L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise to −180..+180°
-};
-
-
-/**
- * Returns (signed) distance from ‘this’ point to great circle defined by start-point and end-point.
- *
- * @param   {L.LatLng} pathStart - Start point of great circle path.
- * @param   {L.LatLng} pathEnd - End point of great circle path.
- * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
- * @returns {number} Distance to great circle (-ve if to left, +ve if to right of path).
- *
- * @example
- *   var pCurrent = new L.LatLng(53.2611, -0.7972);
- *   var p1 = new L.LatLng(53.3206, -1.7297);
- *   var p2 = new L.LatLng(53.1887,  0.1334);
- *   var d = pCurrent.crossTrackDistanceTo(p1, p2);  // -307.5 m
- */
-L.LatLng.prototype.crossTrackDistanceTo = function(pathStart, pathEnd, radius) {
-    var R = (radius === undefined) ? 6371e3 : Number(radius);
-
-    var δ13 = pathStart.distanceTo(this, R) / R;
-    var θ13 = pathStart.bearingTo(this).toRadians();
-    var θ12 = pathStart.bearingTo(pathEnd).toRadians();
-
-    var δxt = Math.asin(Math.sin(δ13) * Math.sin(θ13-θ12));
-
-    return δxt * R;
-};
-
-
-/**
- * Returns how far ‘this’ point is along a path from from start-point, heading towards end-point.
- * That is, if a perpendicular is drawn from ‘this’ point to the (great circle) path, the along-track
- * distance is the distance from the start point to where the perpendicular crosses the path.
- *
- * @param   {L.LatLng} pathStart - Start point of great circle path.
- * @param   {L.LatLng} pathEnd - End point of great circle path.
- * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
- * @returns {number} Distance along great circle to point nearest ‘this’ point.
- *
- * @example
- *   var pCurrent = new L.LatLng(53.2611, -0.7972);
- *   var p1 = new L.LatLng(53.3206, -1.7297);
- *   var p2 = new L.LatLng(53.1887,  0.1334);
- *   var d = pCurrent.alongTrackDistanceTo(p1, p2);  // 62.331 km
- */
-L.LatLng.prototype.alongTrackDistanceTo = function(pathStart, pathEnd, radius) {
-    var R = (radius === undefined) ? 6371e3 : Number(radius);
-
-    var δ13 = pathStart.distanceTo(this, R) / R;
-    var θ13 = pathStart.bearingTo(this).toRadians();
-    var θ12 = pathStart.bearingTo(pathEnd).toRadians();
-
-    var δxt = Math.asin(Math.sin(δ13) * Math.sin(θ13-θ12));
-
-    var δat = Math.acos(Math.cos(δ13) / Math.abs(Math.cos(δxt)));
-
-    return δat*Math.sign(Math.cos(θ12-θ13)) * R;
-};
-
-
-/**
- * Returns maximum latitude reached when travelling on a great circle on given bearing from this
- * point ('Clairaut's formula'). Negate the result for the minimum latitude (in the Southern
- * hemisphere).
- *
- * The maximum latitude is independent of longitude; it will be the same for all points on a given
- * latitude.
- *
- * @param {number} bearing - Initial bearing.
- * @param {number} latitude - Starting latitude.
- */
-L.LatLng.prototype.maxLatitude = function(bearing) {
-    var θ = Number(bearing).toRadians();
-
-    var φ = this.lat.toRadians();
-
-    var φMax = Math.acos(Math.abs(Math.sin(θ)*Math.cos(φ)));
-
-    return φMax.toDegrees();
-};
-
-
-/**
- * Returns the pair of meridians at which a great circle defined by two points crosses the given
- * latitude. If the great circle doesn't reach the given latitude, null is returned.
- *
- * @param {L.LatLng} point1 - First point defining great circle.
- * @param {L.LatLng} point2 - Second point defining great circle.
- * @param {number} latitude - Latitude crossings are to be determined for.
- * @returns {Object|null} Object containing { lon1, lon2 } or null if given latitude not reached.
- */
-L.LatLng.crossingParallels = function(point1, point2, latitude) {
-    var φ = Number(latitude).toRadians();
-
-    var φ1 = point1.lat.toRadians();
-    var λ1 = point1.lng.toRadians();
-    var φ2 = point2.lat.toRadians();
-    var λ2 = point2.lng.toRadians();
-
-    var Δλ = λ2 - λ1;
-
-    var x = Math.sin(φ1) * Math.cos(φ2) * Math.cos(φ) * Math.sin(Δλ);
-    var y = Math.sin(φ1) * Math.cos(φ2) * Math.cos(φ) * Math.cos(Δλ) - Math.cos(φ1) * Math.sin(φ2) * Math.cos(φ);
-    var z = Math.cos(φ1) * Math.cos(φ2) * Math.sin(φ) * Math.sin(Δλ);
-
-    if (z*z > x*x + y*y) return null; // great circle doesn't reach latitude
-
-    var λm = Math.atan2(-y, x);                  // longitude at max latitude
-    var Δλi = Math.acos(z / Math.sqrt(x*x+y*y)); // Δλ from λm to intersection points
-
-    var λi1 = λ1 + λm - Δλi;
-    var λi2 = λ1 + λm + Δλi;
-
-    return { lon1: (λi1.toDegrees()+540)%360-180, lon2: (λi2.toDegrees()+540)%360-180 }; // normalise to −180..+180°
-};
-
-
-/* Rhumb - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
-
-/**
- * Returns the distance travelling from ‘this’ point to destination point along a rhumb line.
- *
- * @param   {L.LatLng} point - Latitude/longitude of destination point.
- * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
- * @returns {number} Distance in km between this point and destination point (same units as radius).
- *
- * @example
- *     var p1 = new L.LatLng(51.127, 1.338);
- *     var p2 = new L.LatLng(50.964, 1.853);
- *     var d = p1.distanceTo(p2); // 40.31 km
- */
-L.LatLng.prototype.rhumbDistanceTo = function(point, radius) {
-    radius = (radius === undefined) ? 6371e3 : Number(radius);
-
-    // see www.edwilliams.org/avform.htm#Rhumb
-
-    var R = radius;
-    var φ1 = this.lat.toRadians(), φ2 = point.lat.toRadians();
-    var Δφ = φ2 - φ1;
-    var Δλ = Math.abs(point.lng-this.lng).toRadians();
-    // if dLon over 180° take shorter rhumb line across the anti-meridian:
-    if (Δλ > Math.PI) Δλ -= 2*Math.PI;
-
-    // on Mercator projection, longitude distances shrink by latitude; q is the 'stretch factor'
-    // q becomes ill-conditioned along E-W line (0/0); use empirical tolerance to avoid it
-    var Δψ = Math.log(Math.tan(φ2/2+Math.PI/4)/Math.tan(φ1/2+Math.PI/4));
-    var q = Math.abs(Δψ) > 10e-12 ? Δφ/Δψ : Math.cos(φ1);
-
-    // distance is pythagoras on 'stretched' Mercator projection
-    var δ = Math.sqrt(Δφ*Δφ + q*q*Δλ*Δλ); // angular distance in radians
-    var dist = δ * R;
-
-    return dist;
-};
-
-
-/**
- * Returns the bearing from ‘this’ point to destination point along a rhumb line.
- *
- * @param   {L.LatLng} point - Latitude/longitude of destination point.
- * @returns {number} Bearing in degrees from north.
- *
- * @example
- *     var p1 = new L.LatLng(51.127, 1.338);
- *     var p2 = new L.LatLng(50.964, 1.853);
- *     var d = p1.rhumbBearingTo(p2); // 116.7 m
- */
-L.LatLng.prototype.rhumbBearingTo = function(point) {
-
-    var φ1 = this.lat.toRadians(), φ2 = point.lat.toRadians();
-    var Δλ = (point.lng-this.lng).toRadians();
-    // if dLon over 180° take shorter rhumb line across the anti-meridian:
-    if (Δλ >  Math.PI) Δλ -= 2*Math.PI;
-    if (Δλ < -Math.PI) Δλ += 2*Math.PI;
-
-    var Δψ = Math.log(Math.tan(φ2/2+Math.PI/4)/Math.tan(φ1/2+Math.PI/4));
-
-    var θ = Math.atan2(Δλ, Δψ);
-
-    return (θ.toDegrees()+360) % 360;
-};
-
-
-/**
- * Returns the destination point having travelled along a rhumb line from ‘this’ point the given
- * distance on the  given bearing.
- *
- * @param   {number} distance - Distance travelled, in same units as earth radius (default: metres).
- * @param   {number} bearing - Bearing in degrees from north.
- * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
- * @returns {L.LatLng} Destination point.
- *
- * @example
- *     var p1 = new L.LatLng(51.127, 1.338);
- *     var p2 = p1.rhumbDestinationPoint(40300, 116.7); // 50.9642°N, 001.8530°E
- */
-L.LatLng.prototype.rhumbDestinationPoint = function(distance, bearing, radius) {
-    radius = (radius === undefined) ? 6371e3 : Number(radius);
-
-    var δ = Number(distance) / radius; // angular distance in radians
-    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
-    var θ = Number(bearing).toRadians();
-
-    var Δφ = δ * Math.cos(θ);
-    var φ2 = φ1 + Δφ;
-
-    // check for some daft bugger going past the pole, normalise latitude if so
-    if (Math.abs(φ2) > Math.PI/2) φ2 = φ2>0 ? Math.PI-φ2 : -Math.PI-φ2;
-
-    var Δψ = Math.log(Math.tan(φ2/2+Math.PI/4)/Math.tan(φ1/2+Math.PI/4));
-    var q = Math.abs(Δψ) > 10e-12 ? Δφ / Δψ : Math.cos(φ1); // E-W course becomes ill-conditioned with 0/0
-
-    var Δλ = δ*Math.sin(θ)/q;
-    var λ2 = λ1 + Δλ;
-
-    return new L.LatLng(φ2.toDegrees(), (λ2.toDegrees()+540) % 360 - 180); // normalise to −180..+180°
-};
-
-
-/**
- * Returns the loxodromic midpoint (along a rhumb line) between ‘this’ point and second point.
- *
- * @param   {L.LatLng} point - Latitude/longitude of second point.
- * @returns {L.LatLng} Midpoint between this point and second point.
- *
- * @example
- *     var p1 = new L.LatLng(51.127, 1.338);
- *     var p2 = new L.LatLng(50.964, 1.853);
- *     var pMid = p1.rhumbMidpointTo(p2); // 51.0455°N, 001.5957°E
- */
-L.LatLng.prototype.rhumbMidpointTo = function(point) {
-
-    // see mathforum.org/kb/message.jspa?messageID=148837
-
-    var φ1 = this.lat.toRadians(), λ1 = this.lng.toRadians();
-    var φ2 = point.lat.toRadians(), λ2 = point.lng.toRadians();
-
-    if (Math.abs(λ2-λ1) > Math.PI) λ1 += 2*Math.PI; // crossing anti-meridian
-
-    var φ3 = (φ1+φ2)/2;
-    var f1 = Math.tan(Math.PI/4 + φ1/2);
-    var f2 = Math.tan(Math.PI/4 + φ2/2);
-    var f3 = Math.tan(Math.PI/4 + φ3/2);
-    var λ3 = ( (λ2-λ1)*Math.log(f3) + λ1*Math.log(f2) - λ2*Math.log(f1) ) / Math.log(f2/f1);
-
-    if (!isFinite(λ3)) λ3 = (λ1+λ2)/2; // parallel of latitude
-
-    var p = L.LatLng(φ3.toDegrees(), (λ3.toDegrees()+540)%360-180); // normalise to −180..+180°
-
-    return p;
-};
-
-
-/* Area - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-/**
- * Calculates the area of a spherical polygon where the sides of the polygon are great circle
- * arcs joining the vertices.
- *
- * @param   {L.LatLng[]} polygon - Array of points defining vertices of the polygon
- * @param   {number} [radius=6371e3] - (Mean) radius of earth (defaults to radius in metres).
- * @returns {number} The area of the polygon, in the same units as radius.
- *
- * @example
- *   var polygon = [new L.LatLng(0,0), new L.LatLng(1,0), new L.LatLng(0,1)];
- *   var area = LatLng.areaOf(polygon); // 6.18e9 m²
- */
-L.LatLng.areaOf = function(polygon, radius) {
-    // uses method due to Karney: osgeo-org.1560.x6.nabble.com/Area-of-a-spherical-polygon-td3841625.html;
-    // for each edge of the polygon, tan(E/2) = tan(Δλ/2)·(tan(φ1/2) + tan(φ2/2)) / (1 + tan(φ1/2)·tan(φ2/2))
-    // where E is the spherical excess of the trapezium obtained by extending the edge to the equator
-
-    var R = (radius === undefined) ? 6371e3 : Number(radius);
-
-    // close polygon so that last point equals first point
-    var closed = polygon[0].equals(polygon[polygon.length-1]);
-    if (!closed) polygon.push(polygon[0]);
-
-    var nVertices = polygon.length - 1;
-
-    var S = 0; // spherical excess in steradians
-    for (var v=0; v<nVertices; v++) {
-        var φ1 = polygon[v].lat.toRadians();
-        var φ2 = polygon[v+1].lat.toRadians();
-        var Δλ = (polygon[v+1].lng - polygon[v].lng).toRadians();
-        var E = 2 * Math.atan2(Math.tan(Δλ/2) * (Math.tan(φ1/2)+Math.tan(φ2/2)), 1 + Math.tan(φ1/2)*Math.tan(φ2/2));
-        S += E;
-    }
-
-    if (isPoleEnclosedBy(polygon)) S = Math.abs(S) - 2*Math.PI;
-
-    var A = Math.abs(S * R*R); // area in units of R
-
-    if (!closed) polygon.pop(); // restore polygon to pristine condition
-
-    return A;
-
-    // returns whether polygon encloses pole: sum of course deltas around pole is 0° rather than
-    // normal ±360°: blog.element84.com/determining-if-a-spherical-polygon-contains-a-pole.html
-    function isPoleEnclosedBy(polygon) {
-        // TODO: any better test than this?
-        var ΣΔ = 0;
-        var prevBrng = polygon[0].bearingTo(polygon[1]);
-        var initBrng;
-        for (var v=0; v<polygon.length-1; v++) {
-            initBrng = polygon[v].bearingTo(polygon[v+1]);
-            var finalBrng = polygon[v].finalBearingTo(polygon[v+1]);
-            ΣΔ += (initBrng - prevBrng + 540) % 360 - 180;
-            ΣΔ += (finalBrng - initBrng + 540) % 360 - 180;
-            prevBrng = finalBrng;
-        }
-        initBrng = polygon[0].bearingTo(polygon[1]);
-        ΣΔ += (initBrng - prevBrng + 540) % 360 - 180;
-        // TODO: fix (intermittant) edge crossing pole - eg (85,90), (85,0), (85,-90)
-        var enclosed = Math.abs(ΣΔ) < 90; // 0°-ish
-        return enclosed;
-    }
-};
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
-
-/** Extend Number object with method to convert numeric degrees to radians */
-if (Number.prototype.toRadians === undefined) {
-    Number.prototype.toRadians = function() { return this * Math.PI / 180; };
-}
-
-/** Extend Number object with method to convert radians to numeric (signed) degrees */
-if (Number.prototype.toDegrees === undefined) {
-    Number.prototype.toDegrees = function() { return this * 180 / Math.PI; };
-}
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
-}(L, this, document));
 
 ;
 /****************************************************************************
